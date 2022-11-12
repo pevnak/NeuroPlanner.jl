@@ -1,0 +1,8 @@
+[deps]
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+GeometricFlux = "7e08b658-56d3-11e9-2997-919d5b31e4ea"
+GraphSignals = "3ebe565e-a4b5-49c6-aed2-300248c3a9c1"
+PDDL = "2c8894f9-daa1-498a-9e3a-26edd9623db8"
+PDDL2Graph = "628e68bf-2596-4972-a53b-69fd3c43dbca"
+SymbolicPlanners = "b6fe5377-9711-4fad-95b0-be4eed71ecbb"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

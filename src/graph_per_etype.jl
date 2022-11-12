@@ -49,12 +49,16 @@ The idea is that `graphs` is a tuple of `SimpleGraph`, where one graph
 defines edges of type. `vprops` contains properties of vertices, which are shared
 among graphs
 """
-struct MultiGraph{G<:Tuple, T}
-	graphs::G
+struct MultiGraph{N,G,T<:AbstractMatrix,C}
+	graphs::NTuple{N,G}
 	vprops::T
+	components::C
 end
 
-MultiGraph(graphs::Vector, vprops) = MultiGraph(tuple(graphs...), vprops)
+SparseMultiGraph = MultiGraph{<:Any,<:SparseGraph,<:Any,<:Any}
+SimpleMultiGraph = MultiGraph{<:Any,<:SimpleGraph,<:Any,<:Any}
+
+MultiGraph(graphs::Vector, args...) = MultiGraph(tuple(graphs...), args...)
 
 """
 	multigraph(pddle::PDDLExtractor{<:Dict,<:MultiGraph}, state)
@@ -66,6 +70,8 @@ MultiGraph(graphs::Vector, vprops) = MultiGraph(tuple(graphs...), vprops)
 function multigraph(pddle::PDDLExtractor{<:Dict,<:MultiGraph}, state)
 	vcat(multigraph(pddle, state, pddle.term2id), pddle.goal)
 end
+
+(pddle::PDDLExtractor{<:Dict,<:MultiGraph})(state) = vcat(multigraph(pddle, state, pddle.term2id), pddle.goal)
 
 function multigraph(pddle::PDDLExtractor{<:Dict,<:Nothing}, state)
 	multigraph(pddle, state, pddle.term2id)
@@ -91,7 +97,7 @@ function multigraph(pddle::PDDLExtractor, state, term2id)
 		end
 	end
 	foreach(g -> foreach(i -> add_edge!(g, Edge(i,i)), 1:nv(g)), graphs)
-	MultiGraph(graphs, vprops)
+	MultiGraph(graphs, vprops, nothing)
 end
 
 """
@@ -101,11 +107,34 @@ concatenate graphs and their features. It is assumed
 the vertices are aligned
 """
 function Base.vcat(a::MultiGraph, b::MultiGraph)
+	a.components != b.components && error("components has to be equal when concatenating graphs")
 	all(nv(a.graphs[1]) == nv(g) for g in a.graphs)
 	all(nv(a.graphs[1]) == nv(g) for g in b.graphs)
 	vprops = vcat(a.vprops, b.vprops)
-	MultiGraph((a.graphs..., b.graphs...), vprops)
+	MultiGraph((a.graphs..., b.graphs...), vprops, a.components)
 end
+
+function Base.reduce(::typeof(Base.cat), mgs::Vector{<:SimpleMultiGraph})
+	# TODO: consider to add some sane asserts
+	components = map(g -> g.components === nothing ? [1:size(g.vprops,2)] : g.components, mgs)
+	fadj = [map(g -> g.graphs[i].fadjlist, mgs) for i in 1:length(first(mgs).graphs)]
+	offset = 0
+	for (i, g) in enumerate(mgs)
+		components[i] = map(c -> c .+ offset, components[i])
+		for j in 1:length(fadj)
+			fadj[j][i] = map(c -> c .+ offset, fadj[j][i])
+		end
+		offset += size(g.vprops, 2)
+	end
+	components = reduce(vcat, components)
+	fadj = map(fa -> reduce(vcat, fa), fadj)
+	graphs = tuple(map(fa -> SimpleGraph(sum(length.(fa)), fa), fadj)...)
+	vprops = reduce(hcat, [g.vprops for g in mgs])
+	MultiGraph(graphs, vprops, components)
+end
+
+
+
 
 using GraphSignals: EdgeSignal, GlobalSignal, NodeDomain
 
@@ -139,30 +168,39 @@ function MultiGNNLayer(a::MultiGraph, odim)
 	MultiGNNLayer(tuple(gconvs...))
 end
 
-function (mg::MultiGNNLayer)(g::MultiGraph{<:NTuple{N, <:SparseGraph},T}) where {N,T}
+function (mg::MultiGNNLayer)(g::SparseMultiGraph)
 	vprops = map(mg.gconvs, g.graphs) do gconv, h 
 		gconv(_construct_fg(h, g.vprops)).nf.signal
 	end 
 	vprops = vcat(vprops...)
-	MultiGraph(g.graphs, vprops)
+	MultiGraph(g.graphs, vprops, g.components)
 end
 
-function (mg::MultiGNNLayer)(g::MultiGraph{<:NTuple{N, <:SimpleGraph},T}) where {N,T}
+function (mg::MultiGNNLayer)(g::SimpleMultiGraph)
 	graphs = map(g -> FeaturedGraph(g).graph, g.graphs)
-	mg(MultiGraph(graphs, g.vprops))
+	mg(MultiGraph(graphs, g.vprops, g.components))
 end
 
 _construct_fg(g::SparseGraph, nf) = FeaturedGraph(g, nf,  EdgeSignal(nothing), GlobalSignal(nothing), NodeDomain(nothing), :adjm)
 
 
 """
-	meanmax(g::MultiGraph)
+meanmax(g::MultiGraph)
 
-	Reduction function over the features MultiGraph
+Reduction function over the features of MultiGraph. Understands components
 """
-function meanmax(g::MultiGraph)
+function meanmax(g::MultiGraph{<:Any,<:Any,<:Any,<:Nothing})
 	vprops = g.vprops
 	vcat(mean(vprops, dims = 2), maximum(vprops, dims = 2))
+end
+
+function meanmax(g::MultiGraph{<:Any,<:Any,<:Any,<:Vector{<:UnitRange}})
+	vprops = g.vprops
+	xx = map(g.components) do c 
+		x = (@view vprops[:,c])
+		vcat(mean(x, dims = 2), maximum(x, dims = 2))
+	end
+	reduce(hcat, xx)
 end
 
 
