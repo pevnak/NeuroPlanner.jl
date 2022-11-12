@@ -107,32 +107,6 @@ function Base.vcat(a::MultiGraph, b::MultiGraph)
 	MultiGraph((a.graphs..., b.graphs...), vprops)
 end
 
-"""
-struct FeaturedMultiGraph{G}
-	graphs::G
-end
-
-holds tuple of `FeaturedGraph` constructed from `MultiGraph` by 
-embedding `vprops` to `FeaturedGraph`. Thus, it is assumed (but not tested)
-that vertex properties of all graphs in `graphs` are the same
-"""
-struct FeaturedMultiGraph{G}
-	graphs::G
-end
-
-FeaturedMultiGraph(graphs::Vector) = FeaturedMultiGraph(tuple(graphs...))
-
-
-function FeaturedMultiGraph(a::MultiGraph)
-	vprops = a.vprops
-	graphs = map(g -> FeaturedGraph(g; nf = vprops), a.graphs)
-	FeaturedMultiGraph(graphs)
-end
-
-function FeaturedMultiGraph(pddle::PDDLExtractor{<:Dict,<:MultiGraph}, state)
-	FeaturedMultiGraph(MultiGraph(pddle, state))
-end
-
 using GraphSignals: EdgeSignal, GlobalSignal, NodeDomain
 
 """
@@ -140,10 +114,14 @@ struct MultiGNNLayer{G<:Tuple}
 	gconvs::G
 end
 
-implements one layer over MultiGraph. At the moment, the layer 
-is implemented as a tuple of graph convolutions. Each graph
-convolution is executed independantly and the output features 
-of vertices are concatenated producing a new FeaturedMultiGraph
+implements one graph convolution layer over the MultiGraph. 
+convolutions stored in `gconvs` are assumed to come from 
+`GeometricFlux`, hence the `MultiGNNLayer` can process only 
+`MultiGraph{<:NTuple{N, <:SparseGraph}`, where 
+`SparseGraph` is a type from `GraphSignals.jl.` 
+If `MultiGraph{<:NTuple{N, <:SimpleGraph}` is supplied, it 
+internally converted to `MultiGraph{<:NTuple{N, <:SparseGraph}`
+and forwared for further processing.
 """
 struct MultiGNNLayer{G<:Tuple}
 	gconvs::G
@@ -153,28 +131,12 @@ MultiGNNLayer(gconvs::Vector) = MultiGNNLayer(tuple(gconvs...))
 
 Flux.@functor MultiGNNLayer
 
-function MultiGNNLayer(a::FeaturedMultiGraph, odim)
-	gconvs = map(a.graphs) do g
-		idim = size(g.nf.signal,1)
-		GATConv(idim => odim, relu)
-	end 
-	MultiGNNLayer(tuple(gconvs...))
-end
-
 function MultiGNNLayer(a::MultiGraph, odim)
 	gconvs = map(a.graphs) do g
 		idim = size(a.vprops, 1)
 		GATConv(idim => odim, relu)
 	end 
 	MultiGNNLayer(tuple(gconvs...))
-end
-
-function (mg::MultiGNNLayer)(g::FeaturedMultiGraph)
-	vprops = map(mg.gconvs, g.graphs) do m, h 
-		m(h).nf.signal
-	end 
-	vprops = vcat(vprops...)
-	PDDL2Graph.FeaturedMultiGraph(map(g -> FeaturedGraph(g.graph, vprops,  EdgeSignal(nothing), GlobalSignal(nothing), NodeDomain(nothing), g.matrix_type), g.graphs))
 end
 
 function (mg::MultiGNNLayer)(g::MultiGraph{<:NTuple{N, <:SparseGraph},T}) where {N,T}
@@ -194,15 +156,10 @@ _construct_fg(g::SparseGraph, nf) = FeaturedGraph(g, nf,  EdgeSignal(nothing), G
 
 
 """
-	meanmax(g::FeaturedMultiGraph)
+	meanmax(g::MultiGraph)
 
-	Reduction function over the features FeaturedMultiGraph
+	Reduction function over the features MultiGraph
 """
-function meanmax(g::FeaturedMultiGraph)
-	vprops = first(g.graphs).nf.signal
-	vcat(mean(vprops, dims = 2), maximum(vprops, dims = 2))
-end
-
 function meanmax(g::MultiGraph)
 	vprops = g.vprops
 	vcat(mean(vprops, dims = 2), maximum(vprops, dims = 2))

@@ -33,23 +33,15 @@ pddle = PDDLExtractor(domain, problem)
 state = initstate(domain, problem)
 gstate = goalstate(domain, problem)
 
-a = PDDL2Graph.multigraph(pddle, state)
-h₀ = PDDL2Graph.FeaturedMultiGraph(a)
-
+h₀ = PDDL2Graph.multigraph(pddle, state)
 m = MultiModel(h₀, 4, d -> Chain(Dense(d, 32,relu), Dense(32,1)))
-m(h₀)
-
-
 ps = Flux.params(m)
-h₀ = PDDL2Graph.FeaturedMultiGraph(a)
 gs = gradient(() -> sum(m(h₀)), ps)
 [gs[p] for p in ps]
 
-
+# get training example by running A* planner with h_add heuristic
 state = initstate(domain, problem)
 goal = PDDL.get_goal(problem)
-
-# Construct A* planner with h_add heuristic
 planner = AStarPlanner(HAdd())
 sol = planner(domain, state, goal)
 plan = collect(sol)
@@ -57,7 +49,7 @@ trajectory = sol.trajectory
 satisfy(domain, sol.trajectory[end], goal)
 
 #construct training set for L2 loss
-xx = [PDDL2Graph.FeaturedMultiGraph(PDDL2Graph.multigraph(pddle, state)) for state in sol.trajectory];
+xx = [PDDL2Graph.multigraph(pddle, state) for state in sol.trajectory];
 yy = collect(length(sol.trajectory):-1:1);
 
 ps = Flux.params(m);
