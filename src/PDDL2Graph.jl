@@ -3,7 +3,13 @@ module PDDL2Graph
 using PDDL
 using Julog
 using Graphs
+using GraphSignals
+using Flux
+using GeometricFlux
+using Statistics
 
+include("graph_per_etype.jl")
+export PDDLExtractor, MultiGraph, MultiGNN, FeaturedMultiGraph, MultiModel
 
 """
 	function Graphs.Graph(state::GenericState)
@@ -62,5 +68,32 @@ function _construct_graph!(g::AbstractGraph, term2id, facts)
 	end
 	(;graph = g, vprops, eprops, term2id)
 end
+
+function _construct_featured_graph(term2id, facts)
+	(g, vprops, eprops, term2id) = _construct_graph(term2id, facts)
+end
+
+function _construct_featured_graph(g, vprops, eprops, term2id)
+	vertex_properties = sort(unique(reduce(vcat, (values(vprops)))))
+
+	vpmap = Dict(reverse.(enumerate(vertex_properties)))
+	nf = zeros(Float32, length(vertex_properties), nv(g))
+	for (i, ps) in vprops
+		foreach(p -> nf[vpmap[p], i] = 1, ps)
+	end
+	fg = FeaturedGraph(g)
+
+	edge_properties = sort(unique(reduce(vcat, (values(eprops)))))
+	epmap = Dict(reverse.(enumerate(edge_properties)))
+	ef = zeros(Float32, length(edge_properties), ne(fg))
+	for (i, (vi, vj)) in edges(fg)
+		vj, vi, = Int64(vj), Int64(vi)
+		e = (vi < vj) ? Edge(vi, vj) : Edge(Int64(vj), Int64(vi))
+		ps = get(eprops, e, [])
+		foreach(p -> ef[epmap[p], i] = 1, ps)
+	end
+	fg = FeaturedGraph(g; nf, ef)
+end
+
 
 end

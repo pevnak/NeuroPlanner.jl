@@ -1,50 +1,69 @@
 using PDDL2Graph
 using PDDL
 using Graphs
-using GraphPlot
-using Cairo
-using Compose
+using Flux
+using Julog
+using GraphSignals
+using GeometricFlux
+using SymbolicPlanners
+# using GraphPlot
+# using Cairo
+# using Compose
 
 
 domain = load_domain("sokoban.pddl")
 problem = load_problem("s1.pddl")
 
-domain = load_domain("benchmarks/blocks-slaney/domain.pddl")
-problem = load_problem("benchmarks/blocks-slaney/blocks10/task01.pddl")
+# domain = load_domain("benchmarks/blocks-slaney/domain.pddl")
+# problem = load_problem("benchmarks/blocks-slaney/blocks10/task01.pddl")
 
-domain = load_domain("benchmarks/ferry/ferry.pddl")
-problem = load_problem("benchmarks/ferry/train/ferry-l2-c1.pddl")
+# domain = load_domain("benchmarks/ferry/ferry.pddl")
+# problem = load_problem("benchmarks/ferry/train/ferry-l2-c1.pddl")
 
-domain = load_domain("benchmarks/gripper/domain.pddl")
-problem = load_problem("benchmarks/gripper/problems/gripper-n1.pddl")
+# domain = load_domain("benchmarks/gripper/domain.pddl")
+# problem = load_problem("benchmarks/gripper/problems/gripper-n1.pddl")
 
-domain = load_domain("benchmarks/n-puzzle/domain.pddl")
-problem = load_problem("benchmarks/n-puzzle/train/n-puzzle-2x2-s1.pddl")
+# domain = load_domain("benchmarks/n-puzzle/domain.pddl")
+# problem = load_problem("benchmarks/n-puzzle/train/n-puzzle-2x2-s1.pddl")
 
 # domain = load_domain("benchmarks/zenotravel/domain.pddl")
 # problem = load_problem("benchmarks/zenotravel/train/zenotravel-cities2-planes1-people2-1864.pddl")
 
+pddle = PDDLExtractor(domain, problem) 
+state = initstate(domain, problem)
+gstate = goalstate(domain, problem)
+
+a = PDDL2Graph.multigraph(pddle, state)
+h₀ = PDDL2Graph.FeaturedMultiGraph(a)
+
+m = MultiModel(h₀, 4, d -> Chain(Dense(d, 32,relu), Dense(32,1)))
+m(h₀)
+
+
+ps = Flux.params(m)
+h₀ = PDDL2Graph.FeaturedMultiGraph(a)
+gs = gradient(() -> sum(m(h₀)), ps)
+[gs[p] for p in ps]
+
 
 state = initstate(domain, problem)
-goalstate(domain, problem)
+goal = PDDL.get_goal(problem)
 
-a = PDDL2Graph.state2graph(state)
-b = PDDL2Graph.goal2graph(a.term2id, problem)
+# Construct A* planner with h_add heuristic
+planner = AStarPlanner(HAdd())
+sol = planner(domain, state, goal)
+plan = collect(sol)
+trajectory = sol.trajectory
+satisfy(domain, sol.trajectory[end], goal)
 
-function graph_labels(a)
-	map(sort(reverse.(collect(a.term2id)), lt = (i,j) -> i[1] < j[1])) do i 
-		s = string(i[2])
-		s *= haskey(a.vprops, i[1]) ? " ("*join(string.(a.vprops[i[1]]))*")" : ""
-		s
-	end
-end
-locs_x, locs_y = circular_layout(a.graph)
-# locs_x, locs_y = spring_layout(a.graph)
-nodelabel = graph_labels(a)
-edgelabel = [join(a.eprops[e]) for e in edges(a.graph)]
-gp = gplot(a.graph, locs_x, locs_y; nodelabel, edgelabel);
-draw(SVG("/tmp/state.svg", 16cm, 16cm), gp)
-nodelabel = graph_labels(b)
-edgelabel = [join(b.eprops[e]) for e in edges(b.graph)]
-gp = gplot(b.graph, locs_x, locs_y; nodelabel, edgelabel);
-draw(SVG("/tmp/goal.svg", 16cm, 16cm), gp)
+#construct training set for L2 loss
+xx = [PDDL2Graph.FeaturedMultiGraph(PDDL2Graph.multigraph(pddle, state)) for state in sol.trajectory];
+yy = collect(length(sol.trajectory):-1:1);
+
+ps = Flux.params(m);
+gs = gradient(ps) do 
+	map(xx, yy) do h₀, y
+		(sum(m(h₀)) - y)^2
+	end |> sum 
+end;
+[gs[p] for p in ps]
