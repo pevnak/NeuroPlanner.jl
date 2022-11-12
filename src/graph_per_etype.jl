@@ -4,7 +4,8 @@
 	contains information about converting problem described in PDDL 
 	to graph representation.
 """
-struct PDDLExtractor{D,G}
+struct PDDLExtractor{D,G,DO}
+	domain::DO
 	binary_predicates::Dict{Symbol,Int64}
 	nunanary_predicates::Dict{Symbol,Int64}
 	term2id::D
@@ -17,9 +18,9 @@ function PDDLExtractor(domain, problem; embed_goal = true)
 	any(kv -> length(kv[2].args) > 2, predicates) && error("Cannot interpret domains with more than binary predicates")
 	binary_predicates = dictmap([kv[1] for kv in predicates if length(kv[2].args) == 2])
 	nunanary_predicates = dictmap([kv[1] for kv in predicates if length(kv[2].args) ≤  1])
-	pddle = PDDLExtractor(binary_predicates, nunanary_predicates, nothing, nothing)
+	pddle = PDDLExtractor(domain, binary_predicates, nunanary_predicates, nothing, nothing)
 	!embed_goal && return(pddle)
-	add_goalstate(pddle, domain, problem)
+	add_goalstate(pddle, problem)
 end
 
 function PDDLExtractor(domain)
@@ -28,14 +29,18 @@ function PDDLExtractor(domain)
 	any(kv -> length(kv[2].args) > 2, predicates) && error("Cannot interpret domains with more than binary predicates")
 	binary_predicates = dictmap([kv[1] for kv in predicates if length(kv[2].args) == 2])
 	nunanary_predicates = dictmap([kv[1] for kv in predicates if length(kv[2].args) ≤  1])
-	PDDLExtractor(binary_predicates, nunanary_predicates, nothing, nothing)
+	PDDLExtractor(domain, binary_predicates, nunanary_predicates, nothing, nothing)
 end
 
-function add_goalstate(pddle::PDDLExtractor{<:Nothing,<:Nothing}, domain, problem)
-	goal =  goalstate(domain, problem)
+function add_goalstate(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem)
+	goal =  goalstate(pddle.domain, problem)
 	term2id = Dict(only(get_args(v)) => i for (i, v) in enumerate(goal.types))
 	goal = multigraph(pddle, goal, term2id)
-	PDDLExtractor(pddle.binary_predicates, pddle.nunanary_predicates, term2id, goal)
+	PDDLExtractor(pddle.domain, pddle.binary_predicates, pddle.nunanary_predicates, term2id, goal)
+end
+
+function initproblem(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem)
+	add_goalstate(pddle, problem), initstate(pddle.domain, problem)
 end
 
 """

@@ -43,11 +43,12 @@ end
 	end
 
 	@testset "gradient path" begin 
+		h₀ = PDDL2Graph.multigraph(pddle, state)
+		m = MultiModel(h₀, 4, d -> Chain(Dense(d, 32,relu), Dense(32,1)))
 		xx = [PDDL2Graph.multigraph(pddle, state) for state in sol.trajectory];
 		batch = reduce(cat, xx);
 		yy = collect(length(sol.trajectory):-1:1);
 
-		m = MultiModel(h₀, 4, d -> Chain(Dense(d, 32,relu), Dense(32,1)))
 		ps = Flux.params(m);
 		gs1 = gradient(ps) do 
 			map(xx, yy) do h₀, y

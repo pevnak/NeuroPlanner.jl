@@ -9,7 +9,7 @@ using GeometricFlux
 using Statistics
 
 include("graph_per_etype.jl")
-export PDDLExtractor, MultiGraph, MultiGNN, FeaturedMultiGraph, MultiModel
+export PDDLExtractor, MultiGraph, MultiGNN, FeaturedMultiGraph, MultiModel, initproblem
 
 """
 	function Graphs.Graph(state::GenericState)
