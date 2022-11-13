@@ -71,5 +71,13 @@ goal = PDDL.get_goal(problem)
 planner = AStarPlanner(GNNHeuristic(pddld, problem, model))
 sol = planner(domain, state, goal)
 satisfy(domain, sol.trajectory[end], goal)
-
 ``` 
+
+## Simple and Sparse Graphs
+When PDDL representation is converted to graph, the conversion routine uses on `SimpleGraph` from `Graphs.jl`, since it represents the graph as an adjacency list, which is easy for adding edges. The returned `MultiGraph` then contains tuple of `SimpleGraph`s, where there is one `SimpleGraph` for one type of edges. When graphs in `MultiGraph` are stored in `SimpleGraph`, the resulting type as an alias `SimpleMultiGraph` and crucially they can be concatenated to minibatch. Concatenation for `SimpleMultiGraph`s is easy due to the simplicity in manipulating adjacency list. Contrary, `GeometricFlux` understands `SparseGraphs`, where the adjacency matrix is stored as a `SparseMatrixCSC`, for which we did not implemented concatenation to minibatches. `MultiGNNLayer` automatically converts `SimpleMultiGraph`s to `SparseMultiGraph`s, therefore user does not even notice. you can perform the conversion by itself by method `simplegraph`. The suggested construction of one minibatch containing `minibatch_states` should therefore be
+```julia
+xx = pddle.(minibatch_states)
+batch = reduce(cat, xx);
+sbatch = PDDL2Graph.sparsegraph(batch);
+```
+*We emphasize that resulting `sbatch` cannot be concatenated with other `sbatch`, unlike `batch`.* Thus `sparsegraph` effectively freezes the representation. Using `SparseMultiGraph` put less stress on `Zygote`, but we have not observed huge difference in practice.

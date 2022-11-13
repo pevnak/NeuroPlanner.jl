@@ -14,7 +14,7 @@ pddle = PDDLExtractor(domain, problem)
 state = initstate(domain, problem)
 
 @testset "extraction and basic gradient" begin
-	h₀ = PDDL2Graph.multigraph(pddle, state)
+	h₀ = pddle(state)
 	m = MultiModel(h₀, 4, d -> Chain(Dense(d, 32,relu), Dense(32,32)))
 	ps = Flux.params(m)
 	gs = gradient(() -> sum(m(h₀)), ps)
@@ -33,9 +33,9 @@ end
 	satisfy(domain, sol.trajectory[end], goal)
 
 	@testset "forward path" begin 
-		h₀ = PDDL2Graph.multigraph(pddle, state)
+		h₀ = pddle(state)
 		m = MultiModel(h₀, 4, d -> Chain(Dense(d, 32,relu), Dense(32,32)))
-		xx = [PDDL2Graph.multigraph(pddle, state) for state in sol.trajectory];
+		xx = [pddle(state) for state in sol.trajectory];
 		yy = collect(length(sol.trajectory):-1:1);
 		@test reduce(hcat, map(m, xx)) ≈  m(reduce(cat, xx))
 		ii = [7,1,6,2,5,3,4]
@@ -43,10 +43,11 @@ end
 	end
 
 	@testset "gradient path" begin 
-		h₀ = PDDL2Graph.multigraph(pddle, state)
+		h₀ = pddle(state)
 		m = MultiModel(h₀, 4, d -> Chain(Dense(d, 32,relu), Dense(32,1)))
-		xx = [PDDL2Graph.multigraph(pddle, state) for state in sol.trajectory];
+		xx = [pddle(state) for state in sol.trajectory];
 		batch = reduce(cat, xx);
+		sparse_batch = PDDL2Graph.sparsegraph(batch);
 		yy = collect(length(sol.trajectory):-1:1);
 
 		ps = Flux.params(m);

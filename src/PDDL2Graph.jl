@@ -8,7 +8,7 @@ using Flux
 using GeometricFlux
 using Statistics
 
-include("graph_per_etype.jl")
+include("multigraph.jl")
 export PDDLExtractor, MultiGraph, MultiGNN, FeaturedMultiGraph, MultiModel, initproblem
 
 """

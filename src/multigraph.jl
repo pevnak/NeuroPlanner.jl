@@ -138,6 +138,10 @@ function Base.reduce(::typeof(Base.cat), mgs::Vector{<:SimpleMultiGraph})
 	MultiGraph(graphs, vprops, components)
 end
 
+function sparsegraph(g::SimpleMultiGraph) 
+	MultiGraph(map(g -> FeaturedGraph(g).graph, g.graphs), g.vprops, g.components)
+end
+
 
 
 
@@ -182,8 +186,7 @@ function (mg::MultiGNNLayer)(g::SparseMultiGraph)
 end
 
 function (mg::MultiGNNLayer)(g::SimpleMultiGraph)
-	graphs = map(g -> FeaturedGraph(g).graph, g.graphs)
-	mg(MultiGraph(graphs, g.vprops, g.components))
+	mg(sparsegraph(g))
 end
 
 _construct_fg(g::SparseGraph, nf) = FeaturedGraph(g, nf,  EdgeSignal(nothing), GlobalSignal(nothing), NodeDomain(nothing), :adjm)
