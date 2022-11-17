@@ -69,7 +69,7 @@ function update_solution(oldsol::NamedTuple, newsol::NamedTuple, pddld, problem,
 		sol_length = min(oldsol.stats.sol_length, newsol.stats.sol_length),
 		expanded = newsol.stats.expanded,
 		)
-	length(oldsol.y) ≤ length(newsol.sol.trajectory) ? oldsol : merge(fminibatch(newsol.sol, pddld, problem), (;stats))
+	length(oldsol.stats.sol_length) ≤ length(newsol.sol.trajectory) ? oldsol : merge(fminibatch(newsol.sol, pddld, problem), (;stats))
 end
 
 function update_solution(oldsol::Nothing, newsol::NamedTuple, pddld, problem, fminibatch) 
@@ -79,11 +79,11 @@ end
 
 function update_solution(oldsol::NamedTuple, newsol::Nothing, pddld, problem, fminibatch)
 	verbose && println(@red "new is unsolved: $((oldsol.stats.sol_length, oldsol.stats.expanded))")
-	stats = (;solution_time = oldsol.stats.solution_time,
-	sol_length = oldsol.stats.sol_length,
-	expanded = 10*oldsol.stats.expanded, # let's try to increase priority of this poor guy
-	)
-	(;x = oldsol.x, y = oldsol.y, stats = stats)
+	# stats = (;solution_time = oldsol.stats.solution_time,
+	# sol_length = oldsol.stats.sol_length,
+	# expanded = 10*oldsol.stats.expanded, # let's try to increase priority of this poor guy
+	# )
+	oldsol
 end
 
 function prepare_minibatch_l2(sol, pddld, problem)
