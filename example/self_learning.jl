@@ -71,7 +71,7 @@ function experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch; sol
 			# we should actually 
 			solved = filter(nonempty, solutions[solved]);
 			w = StatsBase.Weights([s.stats.expanded for s in solved]);
-			mbs = [s.minibatch for s in solved]
+			mbs = [s.minibatch for s in solved];
 			t₂ = @elapsed Flux.train!(x -> loss_fun(model, x), ps, repeatedly(() -> sample(mbs, w), 1000), opt)
 			@show (t₁, t₂)
 		end
@@ -89,7 +89,7 @@ end
 # seed = parse(Int, ARGS[3])
 
 problem_name = "blocks"
-loss_name = "l2"
+loss_name = "lgbfs"
 seed = 1
 
 Random.seed!(seed)
