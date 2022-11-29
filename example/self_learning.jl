@@ -4,6 +4,7 @@ using Flux
 using GraphSignals
 using GeometricFlux
 using SymbolicPlanners
+using PDDL: GenericProblem, PathSearchSolution
 using Statistics
 using IterTools
 using Random
@@ -61,17 +62,17 @@ function experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch; sol
 			show_stats(solutions)
 			length(solved) == length(solutions) && break
 			#do one epoch on newly solved instances
-			updated_solutions = filter(nonempty, solutions[updated])
+			updated_solutions = [s.minibatch for s in solutions[updated] if nonempty(s.minibatch)];
 			t₁ = @elapsed length(updated) > 0 && Flux.train!(x -> loss_fun(model, x), ps, updated_solutions, opt)
 			#do one epoch on all solved instances so far
 			# t₂ = @elapsed Flux.train!(loss, ps, solutions[ii], opt)		
 			#do one epoch on all solved instances but prioriteze those with the largest number of expanded nodes
-			solved = solutions[solved];
-			solved = filter(nonempty, solved);
 
 			# we should actually 
+			solved = filter(nonempty, solutions[solved]);
 			w = StatsBase.Weights([s.stats.expanded for s in solved]);
-			t₂ = @elapsed Flux.train!(x -> loss_fun(model, x), ps, repeatedly(() -> sample(solved, w), 1000), opt)
+			mbs = [s.minibatch for s in solved]
+			t₂ = @elapsed Flux.train!(x -> loss_fun(model, x), ps, repeatedly(() -> sample(mbs, w), 1000), opt)
 			@show (t₁, t₂)
 		end
 		l = [loss_fun(model, s) for s in solutions if s !== nothing && nonempty(s)]
@@ -83,9 +84,13 @@ function experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch; sol
 	end
 end
 
-problem_name = ARGS[1]
-loss_name = ARGS[2]
-seed = parse(Int, ARGS[3])
+# problem_name = ARGS[1]
+# loss_name = ARGS[2]
+# seed = parse(Int, ARGS[3])
+
+problem_name = "blocks"
+loss_name = "l2"
+seed = 1
 
 Random.seed!(seed)
 domain_pddl, problem_files, ofile = getproblem(problem_name)

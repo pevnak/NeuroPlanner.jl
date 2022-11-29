@@ -19,7 +19,6 @@ end
 
 solve_problem(pddld, problem_file::AbstractString, model; kwargs...) = solve_problem(pddld, load_problem(problem_file), model;kwargs...)
 
-
 function update_solutions!(solutions, pddld, model, problem_files, fminibatch; offset = 1, stop_after=32, cycle = false, solve_solved = false)
 	@assert length(solutions) == length(problem_files)
 	updated_solutions = Int[]
@@ -69,12 +68,12 @@ function update_solution(oldsol::NamedTuple, newsol::NamedTuple, pddld, problem,
 		sol_length = min(oldsol.stats.sol_length, newsol.stats.sol_length),
 		expanded = newsol.stats.expanded,
 		)
-	length(oldsol.stats.sol_length) ≤ length(newsol.sol.trajectory) ? oldsol : merge(fminibatch(newsol.sol, pddld, problem), (;stats))
+	length(oldsol.stats.sol_length) ≤ length(newsol.sol.trajectory) ? oldsol : (;minibatch = fminibatch(newsol.sol, pddld, problem), stats)
 end
 
 function update_solution(oldsol::Nothing, newsol::NamedTuple, pddld, problem, fminibatch) 
 	verbose && println(@green "new solution: $((newsol.stats.sol_length, newsol.stats.expanded))")
-	merge(fminibatch(newsol.sol, pddld, problem), (;stats = newsol.stats))
+	(;minibatch = fminibatch(newsol.sol, pddld, problem), stats = newsol.stats)
 end
 
 function update_solution(oldsol::NamedTuple, newsol::Nothing, pddld, problem, fminibatch)
@@ -84,40 +83,6 @@ function update_solution(oldsol::NamedTuple, newsol::Nothing, pddld, problem, fm
 	# expanded = 10*oldsol.stats.expanded, # let's try to increase priority of this poor guy
 	# )
 	oldsol
-end
-
-function prepare_minibatch_l2(sol, pddld, problem)
-   pddle, state = PDDL2Graph.initproblem(pddld, problem)
-   (;x = PDDL2Graph.sparsegraph(reduce(cat, map(pddle, sol.trajectory))),
-     y = collect(length(sol.trajectory):-1:1),
-     )
-end
-
-function prepare_minibatch_lₛ(sol, pddld, problem)
-	sol.search_tree === nothing && error("solve the problem with `save_search=true` to keep the search tree")
-	pddle, state = PDDL2Graph.initproblem(pddld, problem)
-
-	# get indexes of the states on the solution path, which seems to be hashes of states 
-	trajectory_id = hash.(sol.trajectory)
-	child₁ = off_path_childs(sol, trajectory_id)
-	# child₂ = off_path_childs(sol, union(child₁, trajectory_id))
-	ids = vcat(trajectory_id, child₁)
-	path_cost = [sol.search_tree[i].path_cost for i in ids]
-	states = [sol.search_tree[i].state for i in ids]
-	# we want every state on the solution path to be smaller than  
-	pm = [(i,j) for i in 1:length(trajectory_id) for j in length(trajectory_id)+1:length(ids)]
-	H₊ = onehotbatch([i[2] for i in pm], 1:length(ids))
-	H₋ = onehotbatch([i[1] for i in pm], 1:length(ids))
-
-	(;x = PDDL2Graph.sparsegraph(reduce(cat, map(pddle, states))),
-         sol_length = length(trajectory_id), H₊, H₋, path_cost)
-end
-
-off_path_childs(sol, parents_id::Vector) = off_path_childs(sol, Set(parents_id))
-
-function off_path_childs(sol, parents_id::Set)
-	childs = [s.id for s in values(sol.search_tree) if s.parent_id ∈ parents_id]
-	setdiff(childs, parents_id)
 end
 
 function show_stats(solutions)

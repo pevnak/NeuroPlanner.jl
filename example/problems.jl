@@ -52,4 +52,24 @@ function getproblem(problem)
 end
 
 
+function similarity_of_problems()
+	prefix = "../classical-domains/classical"
+	problems =filter(isdir, readdir(prefix, join = true))
+	problems = filter(f -> isfile(joinpath(f, "domain.pddl")), problems)
+
+	constants = []
+	nunanary_predicates = []
+	binary_predicates = []
+	for f in problems
+		try 
+			domain = load_domain(joinpath(f, "domain.pddl"))
+		catch 
+			@info "cannot parse $(f)"
+		end
+		predicates = collect(domain.predicates)
+		append!(binary_predicates, [kv[2] for kv in predicates if length(kv[2].args) == 2])
+		append!(nunanary_predicates, [kv[2] for kv in predicates if length(kv[2].args) ≤ 2])
+		append!(constants, domain.constants)
+	end
+end
 
