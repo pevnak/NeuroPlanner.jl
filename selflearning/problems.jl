@@ -51,7 +51,25 @@ function getproblem(problem)
 	error("unknown problem $(problem)")
 end
 
+"""
+(domain_pddl, problem_files, ofile) =  getproblem(problem)
+(domain_pddl, problem_files, ofile) =  getproblem(problem, sort_by_complexity)
 
+if sort_by_complexity is true, problem_files are sorted by the number of objects, 
+which is treated as a proxy for complexity.
+"""
+function getproblem(problem, sort_by_complexity)
+	!sort_by_complexity	 && return(getproblem(problem))
+	(domain_pddl, problem_files, ofile) = getproblem(problem)
+	no = map(f -> length(load_problem(f).objects), problem_files)
+	problem_files = problem_files[sortperm(no)]
+	return(domain_pddl, problem_files, ofile)
+end
+
+"""
+	A leftover function, which is used to found out, how many domains have similar 
+	relations and similar names of objects.
+"""
 function similarity_of_problems()
 	prefix = "../classical-domains/classical"
 	problems =filter(isdir, readdir(prefix, join = true))

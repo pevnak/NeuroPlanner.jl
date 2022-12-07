@@ -4,7 +4,8 @@ using Flux
 using GraphSignals
 using GeometricFlux
 using SymbolicPlanners
-using PDDL: GenericProblem, PathSearchSolution
+using PDDL: GenericProblem
+using SymbolicPlanners: PathSearchSolution
 using Statistics
 using IterTools
 using Random
@@ -14,6 +15,7 @@ using Serialization
 include("solution_tracking.jl")
 include("problems.jl")
 include("losses.jl")
+include("training.jl")
 
 # problem_name = "ferry"
 # loss_name = "l2"
@@ -31,7 +33,7 @@ GNNHeuristic(pddld, problem, model) = GNNHeuristic(PDDL2Graph.add_goalstate(pddl
 Base.hash(g::GNNHeuristic, h::UInt) = hash(g.model, hash(g.pddle, h))
 SymbolicPlanners.compute(h::GNNHeuristic, domain::Domain, state::State, spec::Specification) = only(h.model(h.pddle(state)))
 
-function experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch; solve_solved = false, stop_after=32)
+function experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch, planner; opt_type = :worst, solve_solved = false, stop_after=32, filename = "", max_time=30, double_maxtime=false, max_steps = 100, max_loss = 0.0, epsilon = 0.5)
 	isdir(ofile()) || mkpath(ofile())
 	domain = load_domain(domain_pddl)
 	pddld = PDDLExtractor(domain)
@@ -44,7 +46,7 @@ function experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch; sol
 		h₀ = pddle(state)
 		odim_of_graph_conv = 8
 		model = MultiModel(h₀, odim_of_graph_conv, d -> Chain(Dense(d, 32,relu), Dense(32,1)))
-		solve_problem(pddld, problem, model)	#warmup the solver
+		solve_problem(pddld, problem, model, planner)	#warmup the solver
 		model
 	end
 
@@ -53,35 +55,38 @@ function experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch; sol
 	ps = Flux.params(model)
 	all_solutions = []
 	losses = []
+	fvals = fill(typemax(Float64), length(solutions))
 	for i in 1:10
+		solved_before = solutions .!== nothing
 		offset = 1
 		while offset < length(solutions)
-			offset, updated = update_solutions!(solutions, pddld, model, problem_files, fminibatch; offset, solve_solved , stop_after)	
+			offset, updated = update_solutions!(solutions, pddld, model, problem_files, fminibatch, planner; offset, solve_solved, stop_after, max_time)	
+			# print some Statistics
 			solved = findall(solutions .!== nothing)
 			print("offset = ", offset," updated = ", length(updated), " ")
 			show_stats(solutions)
 			length(solved) == length(solutions) && break
-			#do one epoch on newly solved instances
-			updated_solutions = [s.minibatch for s in solutions[updated] if nonempty(s.minibatch)];
-			t₁ = @elapsed length(updated) > 0 && Flux.train!(x -> loss_fun(model, x), ps, updated_solutions, opt)
-			#do one epoch on all solved instances so far
-			# t₂ = @elapsed Flux.train!(loss, ps, solutions[ii], opt)		
-			#do one epoch on all solved instances but prioriteze those with the largest number of expanded nodes
-
-			# we should actually 
-			solved = filter(nonempty, solutions[solved]);
-			w = StatsBase.Weights([s.stats.expanded for s in solved]);
-			mbs = [s.minibatch for s in solved];
-			t₂ = @elapsed Flux.train!(x -> loss_fun(model, x), ps, repeatedly(() -> sample(mbs, w), 1000), opt)
-			@show (t₁, t₂)
+			
+			t₁ = @elapsed fvals[solved] .= train!(x -> loss_fun(model, x.minibatch), ps, opt, solutions[solved], fvals[solved], max_steps; max_loss, ϵ = epsilon, opt_type)
 		end
-		l = [loss_fun(model, s) for s in solutions if s !== nothing && nonempty(s)]
+		solved_after = solutions .!== nothing
+		l = filter(x -> x !== typemax(Float64), fvals)
 		push!(losses, l)
-		println("loss after $(i) epoch = ", mean(l))
+		println("loss after $(i) epoch = ", mean(l), " max time = ", max_time)
 		push!(all_solutions, [(s == nothing ? nothing : s.stats) for s in solutions])
-		serialize(ofile("$(loss_name)_$(solve_solved)_$(stop_after)_$(seed).jls"),(;all_solutions, losses))
+		if !isempty(filename)
+			serialize(filename,(;all_solutions, losses))
+		end
 		all(s !== nothing for s in solutions) && break
+		if sum(solved_after) == sum(solved_before) 
+			if double_maxtime
+				max_time *= 2
+			else 
+				break
+			end
+		end
 	end
+	all_solutions
 end
 
 # problem_name = ARGS[1]
@@ -89,10 +94,24 @@ end
 # seed = parse(Int, ARGS[3])
 
 problem_name = "blocks"
-loss_name = "lgbfs"
+# loss_name = "lgbfs"
+loss_name = "lstar"
 seed = 1
+double_maxtime = false
+planner_name = "astar"
+# planner_name = "gbfs"
+solve_solved = false
+stop_after = 32
+max_steps = 100
+opt_type = :worst
+epsilon = 0.5
+max_loss = 0.0
+max_time = 30
+sort_by_complexity = true
 
 Random.seed!(seed)
-domain_pddl, problem_files, ofile = getproblem(problem_name)
-loss_fun, fminibatch = get_loss(loss_name)
-experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch)
+domain_pddl, problem_files, ofile = getproblem(problem_name, sort_by_complexity)
+planner = (planner_name == "astar") ? AStarPlanner : GreedyPlanner
+loss_fun, fminibatch = getloss(loss_name)
+filename = ofile("$(planner_name)_$(loss_name)_$(solve_solved)_$(stop_after)_$(seed).jls")
+experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch, planner; double_maxtime, filename, solve_solved, stop_after, max_steps, max_loss, max_time, opt_type, epsilon)

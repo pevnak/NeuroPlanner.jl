@@ -3,11 +3,11 @@ using SparseArrays
 using OneHotArrays
 verbose::Bool = true
 
-function solve_problem(pddld, problem::GenericProblem, model; max_time=30)
+function solve_problem(pddld, problem::GenericProblem, model, init_planner; max_time=30)
 	domain = pddld.domain
 	pddle, state = PDDL2Graph.initproblem(pddld, problem)
 	goal = PDDL.get_goal(problem)
-	planner = AStarPlanner(GNNHeuristic(pddld, problem, model); max_time, save_search = true)
+	planner = init_planner(GNNHeuristic(pddld, problem, model); max_time, save_search = true)
 	solution_time = @elapsed sol = planner(domain, state, goal)
 	sol.status == :success || return(nothing)
 	stats = (;solution_time, 
@@ -17,9 +17,9 @@ function solve_problem(pddld, problem::GenericProblem, model; max_time=30)
 	(;sol, stats)
 end
 
-solve_problem(pddld, problem_file::AbstractString, model; kwargs...) = solve_problem(pddld, load_problem(problem_file), model;kwargs...)
+solve_problem(pddld, problem_file::AbstractString, model, init_planner; kwargs...) = solve_problem(pddld, load_problem(problem_file), model, init_planner; kwargs...)
 
-function update_solutions!(solutions, pddld, model, problem_files, fminibatch; offset = 1, stop_after=32, cycle = false, solve_solved = false)
+function update_solutions!(solutions, pddld, model, problem_files, fminibatch, planner; offset = 1, stop_after=32, cycle = false, solve_solved = false, max_time = 30)
 	@assert length(solutions) == length(problem_files)
 	updated_solutions = Int[]
 	init_offset = offset
@@ -28,12 +28,12 @@ function update_solutions!(solutions, pddld, model, problem_files, fminibatch; o
 		problem = load_problem(problem_files[i])
 		oldsol = solutions[i]
 		if solve_solved || oldsol == nothing
-			newsol = solve_problem(pddld, problem, model)
+			newsol = solve_problem(pddld, problem, model, planner; max_time)
 			solutions[i] = update_solution(oldsol, newsol, pddld, problem, fminibatch)
 			solutions[i] != oldsol && push!(updated_solutions, i)
 		end
 		!cycle && offset == length(solutions) && break 
-		offset = offset == length(solutions) ? 1 : offset+1
+		offset = (offset == length(solutions)) ? 1 : offset+1
 		init_offset == offset && break
 		length(updated_solutions) ≥ stop_after && break
 	end

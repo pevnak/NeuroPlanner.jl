@@ -63,7 +63,9 @@ struct LₛLoss end
 function lₛloss(model, x, g, H₊, H₋)
 	g = reshape(g, 1, :)
 	f = model(x) .+ g
-	mean(softplus.(f * H₋ .- f * H₊))
+	o = f * H₋ .- f * H₊
+	isempty(o) && return(zero(eltype(o)))
+	mean(softplus.(o))
 end
 lₛloss(model, xy::LₛMiniBatch) = lₛloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋)
 
@@ -94,7 +96,9 @@ struct LgbfsLoss end
 
 function lgbfsloss(model, x, g, H₊, H₋)
 	f = model(x)
-	mean(softplus.(f * H₋ .- f * H₊))
+	o = f * H₋ .- f * H₊
+	isempty(o) && return(zero(eltype(o)))
+	mean(softplus.(o))
 end
 lgbfsloss(model, xy::LgbfsMiniBatch) = lgbfsloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋)
 
@@ -117,7 +121,7 @@ nonempty(s::LgbfsMiniBatch) = !isempty(s.H₊) && !isempty(s.H₋)
 nonempty(s::L₂MiniBatch)  = true
 nonempty(s::NamedTuple{(:minibatch, :stats)}) = nonempty(s.minibatch)
 
-function get_loss(name)
+function getloss(name)
 	name == "l2" && return((L₂Loss(), L₂MiniBatch))
 	name == "l₂" && return((L₂Loss(), L₂MiniBatch))
 	name == "lstar" && return((LₛLoss(), LₛMiniBatch))
