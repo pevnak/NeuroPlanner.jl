@@ -1,4 +1,4 @@
-name = "PDDL2Graph"
+name = "NeuroPlanner"
 uuid = "628e68bf-2596-4972-a53b-69fd3c43dbca"
 authors = ["Tomas Pevny"]
 version = "0.1.0"

@@ -1,4 +1,4 @@
-using PDDL2Graph
+using NeuroPlanner
 using PDDL
 using Flux
 using GraphSignals
@@ -29,7 +29,7 @@ struct GNNHeuristic{P,M} <: Heuristic
 	model::M
 end
 
-GNNHeuristic(pddld, problem, model) = GNNHeuristic(PDDL2Graph.add_goalstate(pddld, problem), model)
+GNNHeuristic(pddld, problem, model) = GNNHeuristic(NeuroPlanner.add_goalstate(pddld, problem), model)
 Base.hash(g::GNNHeuristic, h::UInt) = hash(g.model, hash(g.pddle, h))
 SymbolicPlanners.compute(h::GNNHeuristic, domain::Domain, state::State, spec::Specification) = only(h.model(h.pddle(state)))
 
@@ -68,6 +68,8 @@ function experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch, pla
 			length(solved) == length(solutions) && break
 			
 			t₁ = @elapsed fvals[solved] .= train!(x -> loss_fun(model, x.minibatch), ps, opt, solutions[solved], fvals[solved], max_steps; max_loss, ϵ = epsilon, opt_type)
+			l = filter(x -> x != typemax(Float64), fvals)
+			println("epoch = $(offset) offset $(offset)  mean error = ", mean(l), " worst case = ", maximum(l)," time: = ", t₁)
 		end
 		solved_after = solutions .!== nothing
 		l = filter(x -> x !== typemax(Float64), fvals)
@@ -94,15 +96,15 @@ end
 # seed = parse(Int, ARGS[3])
 
 problem_name = "blocks"
-# loss_name = "lgbfs"
-loss_name = "lstar"
 seed = 1
 double_maxtime = false
-planner_name = "astar"
+# loss_name = "lgbfs"
 # planner_name = "gbfs"
+loss_name = "lstar"
+planner_name = "astar"
 solve_solved = false
 stop_after = 32
-max_steps = 100
+max_steps = 500
 opt_type = :worst
 epsilon = 0.5
 max_loss = 0.0

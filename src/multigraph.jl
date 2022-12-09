@@ -34,6 +34,10 @@ end
 
 function add_goalstate(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem)
 	goal =  goalstate(pddle.domain, problem)
+	# spec = Specification(problem)
+	# state = initstate(pddle.domain, problem)
+	# goal = SymbolicPlanners.simplify_goal(spec, pddle.domain, state)
+	
 	term2id = Dict(only(get_args(v)) => i for (i, v) in enumerate(goal.types))
 	goal = multigraph(pddle, goal, term2id)
 	PDDLExtractor(pddle.domain, pddle.binary_predicates, pddle.nunanary_predicates, term2id, goal)
@@ -220,11 +224,11 @@ end
 Flux.@functor MultiModel
 
 function MultiModel(h₀::MultiGraph, odim::Int, maked)
-	m₁ = PDDL2Graph.MultiGNNLayer(h₀, odim)
+	m₁ = NeuroPlanner.MultiGNNLayer(h₀, odim)
 	h₁ = m₁(h₀)
-	m₂ = PDDL2Graph.MultiGNNLayer(h₁, odim)
+	m₂ = NeuroPlanner.MultiGNNLayer(h₁, odim)
 	h₂ = m₂(h₁)
-	h = vcat(PDDL2Graph.meanmax(h₁), PDDL2Graph.meanmax(h₂))
+	h = vcat(NeuroPlanner.meanmax(h₁), NeuroPlanner.meanmax(h₂))
 	d = maked(size(h,1))
 	MultiModel((m₁,m₂), d)
 end
@@ -232,7 +236,7 @@ end
 function (mm::MultiModel)(h₀::MultiGraph)
 	h₁ = mm.g[1](h₀)
 	h₂ = mm.g[2](h₁)
-	h = vcat(PDDL2Graph.meanmax(h₁), PDDL2Graph.meanmax(h₂))
+	h = vcat(NeuroPlanner.meanmax(h₁), NeuroPlanner.meanmax(h₂))
 	mm.d(h)
 end
 

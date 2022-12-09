@@ -1,4 +1,4 @@
-using PDDL2Graph
+using NeuroPlanner
 using PDDL
 using Flux
 using GraphSignals
@@ -13,7 +13,7 @@ taskfiles(s) = [benchdir(s, f) for f in readdir(benchdir(s)) if startswith(f,"ta
 # define some examples 
 function create_example(pddld, problem::GenericProblem)
 	domain = pddld.domain
-	pddle = PDDL2Graph.add_goalstate(pddld, problem)
+	pddle = NeuroPlanner.add_goalstate(pddld, problem)
 	state = initstate(domain, problem)
 	goal = PDDL.get_goal(problem)
 	planner = AStarPlanner(HAdd())
@@ -55,7 +55,7 @@ struct GNNHeuristic{P,M} <: Heuristic
 	model::M
 end
 
-GNNHeuristic(pddld, problem, model) = GNNHeuristic(PDDL2Graph.add_goalstate(pddld, problem), model)
+GNNHeuristic(pddld, problem, model) = GNNHeuristic(NeuroPlanner.add_goalstate(pddld, problem), model)
 Base.hash(g::GNNHeuristic, h::UInt) = hash(g.model, hash(g.pddle, h))
 SymbolicPlanners.compute(h::GNNHeuristic, domain::Domain, state::State, spec::Specification) = only(h.model(h.pddle(state)))
 

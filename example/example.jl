@@ -1,4 +1,4 @@
-using PDDL2Graph
+using NeuroPlanner
 using PDDL
 using Flux
 using GraphSignals
@@ -14,10 +14,10 @@ pddld = PDDLExtractor(domain)
 
 
 #Get the extractor for the problem instance
-pddle = PDDL2Graph.add_goalstate(pddld, domain, problem)
+pddle = NeuroPlanner.add_goalstate(pddld, domain, problem)
 state = initstate(domain, problem)
 
-# PDDL2Graph.multigraph
+# NeuroPlanner.multigraph
 h₀ = pddle(state)
 model = MultiModel(h₀, 4, d -> Chain(Dense(d, 32,relu), Dense(32,1)))
 

@@ -5,7 +5,7 @@ verbose::Bool = true
 
 function solve_problem(pddld, problem::GenericProblem, model, init_planner; max_time=30)
 	domain = pddld.domain
-	pddle, state = PDDL2Graph.initproblem(pddld, problem)
+	pddle, state = NeuroPlanner.initproblem(pddld, problem)
 	goal = PDDL.get_goal(problem)
 	planner = init_planner(GNNHeuristic(pddld, problem, model); max_time, save_search = true)
 	solution_time = @elapsed sol = planner(domain, state, goal)

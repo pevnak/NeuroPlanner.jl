@@ -1,11 +1,11 @@
-# PDDL2Graph
+# NeuroPlanner
 Is a naive attempt to learn heuristics over PDDL domains. It is restricted only to PDDL2 with predicates with arity at most 2, as it represents the state as a graph, where each object corresponds to one vertex and predicates with arity two are represented as edges. Very naive, but might work.
 
 Below is a commented example which learns heuristic for a single instance of Sokoban. A complete example is located in `example.jl`.
 
 Start as usually with few imports and load domain and problem instance.
 ```julia
-using PDDL2Graph
+using NeuroPlanner
 using PDDL
 using Flux
 using GraphSignals
@@ -19,7 +19,7 @@ problem = load_problem("../test/s1.pddl")
 Then, we need to prepare extractor `pddld` for a domain . This extractor define order of predicates, which should not change, otherwise the neural network would be totally confused. An extractor for a domain has to be further specialized for a given problem instance to problem instance extractor `pddle`. This adds to the extractor a representation of the goal state and define order of vertices ensuring that goal state will be consistent with other states from this problem instance. 
 ```julia
 pddld = PDDLExtractor(domain)
-pddle = PDDL2Graph.add_goalstate(pddld, problem)
+pddle = NeuroPlanner.add_goalstate(pddld, problem)
 ```
 
 Than, we get an initial state, which allows us to define the model. The model is not much flexible. It contains two graph attention layers (you can specify their output dimension) and then you can specify the feed forward neural network processing the output after being aggergated. For simplicity with dimentions, you should provide a function constructing this dense part as in the below example.
@@ -61,7 +61,7 @@ struct GNNHeuristic{P,M} <: Heuristic
 	model::M
 end
 
-GNNHeuristic(pddld, problem, model) = GNNHeuristic(PDDL2Graph.add_goalstate(pddld, problem), model)
+GNNHeuristic(pddld, problem, model) = GNNHeuristic(NeuroPlanner.add_goalstate(pddld, problem), model)
 Base.hash(g::GNNHeuristic, h::UInt) = hash(g.model, hash(g.pddle, h))
 SymbolicPlanners.compute(h::GNNHeuristic, domain::Domain, state::State, spec::Specification) = only(h.model(h.pddle(state)))
 
@@ -78,6 +78,6 @@ When PDDL representation is converted to graph, the conversion routine uses on `
 ```julia
 xx = pddle.(minibatch_states)
 batch = reduce(cat, xx);
-sbatch = PDDL2Graph.sparsegraph(batch);
+sbatch = NeuroPlanner.sparsegraph(batch);
 ```
 *We emphasize that resulting `sbatch` cannot be concatenated with other `sbatch`, unlike `batch`.* Thus `sparsegraph` effectively freezes the representation. Using `SparseMultiGraph` put less stress on `Zygote`, but we have not observed huge difference in practice.

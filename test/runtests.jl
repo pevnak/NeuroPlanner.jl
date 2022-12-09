@@ -1,4 +1,5 @@
-using PDDL2Graph
+using 
+NeuroPlanner
 using PDDL
 using Flux
 using GraphSignals
@@ -47,7 +48,8 @@ end
 		m = MultiModel(h₀, 4, d -> Chain(Dense(d, 32,relu), Dense(32,1)))
 		xx = [pddle(state) for state in sol.trajectory];
 		batch = reduce(cat, xx);
-		sparse_batch = PDDL2Graph.sparsegraph(batch);
+		sparse_batch = 
+NeuroPlanner.sparsegraph(batch);
 		yy = collect(length(sol.trajectory):-1:1);
 
 		ps = Flux.params(m);

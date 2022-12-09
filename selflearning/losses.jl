@@ -7,8 +7,8 @@ struct L₂MiniBatch{X,Y}
 end
 
 function L₂MiniBatch(sol, pddld, problem)
-   pddle, state = PDDL2Graph.initproblem(pddld, problem)
-   L₂MiniBatch(PDDL2Graph.sparsegraph(reduce(cat, map(pddle, sol.trajectory))),
+   pddle, state = NeuroPlanner.initproblem(pddld, problem)
+   L₂MiniBatch(NeuroPlanner.sparsegraph(reduce(cat, map(pddle, sol.trajectory))),
      collect(length(sol.trajectory):-1:1),
      )
 end
@@ -34,7 +34,7 @@ end
 
 function LₛMiniBatch(sol, pddld, problem)
 	sol.search_tree === nothing && error("solve the problem with `save_search=true` to keep the search tree")
-	pddle, state = PDDL2Graph.initproblem(pddld, problem)
+	pddle, state = NeuroPlanner.initproblem(pddld, problem)
 
 	# get indexes of the states on the solution path, which seems to be hashes of states 
 	trajectory_id = hash.(sol.trajectory)
@@ -48,7 +48,7 @@ function LₛMiniBatch(sol, pddld, problem)
 	H₊ = onehotbatch([i[2] for i in pm], 1:length(ids))
 	H₋ = onehotbatch([i[1] for i in pm], 1:length(ids))
 
-	LₛMiniBatch(PDDL2Graph.sparsegraph(reduce(cat, map(pddle, states))), H₊, H₋, path_cost, length(trajectory_id))
+	LₛMiniBatch(NeuroPlanner.sparsegraph(reduce(cat, map(pddle, states))), H₊, H₋, path_cost, length(trajectory_id))
 end
 
 """
