@@ -37,7 +37,7 @@ function add_goalstate(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem)
 	# spec = Specification(problem)
 	# state = initstate(pddle.domain, problem)
 	# goal = SymbolicPlanners.simplify_goal(spec, pddle.domain, state)
-	
+
 	term2id = Dict(only(get_args(v)) => i for (i, v) in enumerate(goal.types))
 	goal = multigraph(pddle, goal, term2id)
 	PDDLExtractor(pddle.domain, pddle.binary_predicates, pddle.nunanary_predicates, term2id, goal)
@@ -58,16 +58,18 @@ The idea is that `graphs` is a tuple of `SimpleGraph`, where one graph
 defines edges of type. `vprops` contains properties of vertices, which are shared
 among graphs
 """
-struct MultiGraph{N,G,T<:AbstractMatrix,C}
+struct MultiGraph{N,G<:GNNGraph,T<:AbstractMatrix}
 	graphs::NTuple{N,G}
 	vprops::T
-	components::C
+
+	function MultiGraph(gs::NTuple{N,G}, x::T) where {N,G,T}
+		N < 1 && error("multigraph has to contain at least one graph, needed to identify components. Use empty Graph")
+		new{N,G,T}(gs, x)
+	end
 end
 
-SparseMultiGraph = MultiGraph{<:Any,<:SparseGraph,<:Any,<:Any}
-SimpleMultiGraph = MultiGraph{<:Any,<:SimpleGraph,<:Any,<:Any}
-
-MultiGraph(graphs::Vector, args...) = MultiGraph(tuple(graphs...), args...)
+MultiGraph(graphs::Vector, vprops) = MultiGraph(tuple(graphs...), vprops)
+MultiGraph(graphs::NTuple{<:Any,<:SimpleGraph}, vprops) = MultiGraph(map(GNNGraph, graphs), vprops)
 
 """
 	multigraph(pddle::PDDLExtractor{<:Dict,<:MultiGraph}, state)
@@ -106,7 +108,7 @@ function multigraph(pddle::PDDLExtractor, state, term2id)
 		end
 	end
 	foreach(g -> foreach(i -> add_edge!(g, Edge(i,i)), 1:nv(g)), graphs)
-	MultiGraph(graphs, vprops, nothing)
+	MultiGraph(graphs, vprops)
 end
 
 """
@@ -116,40 +118,18 @@ concatenate graphs and their features. It is assumed
 the vertices are aligned
 """
 function Base.vcat(a::MultiGraph, b::MultiGraph)
-	a.components != b.components && error("components has to be equal when concatenating graphs")
 	all(nv(a.graphs[1]) == nv(g) for g in a.graphs)
 	all(nv(a.graphs[1]) == nv(g) for g in b.graphs)
 	vprops = vcat(a.vprops, b.vprops)
-	MultiGraph((a.graphs..., b.graphs...), vprops, a.components)
+	MultiGraph((a.graphs..., b.graphs...), vprops)
 end
 
-function Base.reduce(::typeof(Base.cat), mgs::Vector{<:SimpleMultiGraph})
-	# TODO: consider to add some sane asserts
-	components = map(g -> g.components === nothing ? [1:size(g.vprops,2)] : g.components, mgs)
-	fadj = [map(g -> g.graphs[i].fadjlist, mgs) for i in 1:length(first(mgs).graphs)]
-	offset = 0
-	for (i, g) in enumerate(mgs)
-		components[i] = map(c -> c .+ offset, components[i])
-		for j in 1:length(fadj)
-			fadj[j][i] = map(c -> c .+ offset, fadj[j][i])
-		end
-		offset += size(g.vprops, 2)
-	end
-	components = reduce(vcat, components)
-	fadj = map(fa -> reduce(vcat, fa), fadj)
-	graphs = tuple(map(fa -> SimpleGraph(sum(length.(fa)), fa), fadj)...)
-	vprops = reduce(hcat, [g.vprops for g in mgs])
-	MultiGraph(graphs, vprops, components)
+function GraphNeuralNetworks.batch(gs::Vector{<:MultiGraph})
+	graphs = [batch([g.graphs[i] for g in gs]) for i in 1:length(gs[1].graphs)]
+	graphs = tuple(graphs...)
+	x = reduce(hcat, [g.vprops for g in gs])
+	MultiGraph(graphs, x)
 end
-
-function sparsegraph(g::SimpleMultiGraph) 
-	MultiGraph(map(g -> FeaturedGraph(g).graph, g.graphs), g.vprops, g.components)
-end
-
-
-
-
-using GraphSignals: EdgeSignal, GlobalSignal, NodeDomain
 
 """
 struct MultiGNNLayer{G<:Tuple}
@@ -159,10 +139,10 @@ end
 implements one graph convolution layer over the MultiGraph. 
 convolutions stored in `gconvs` are assumed to come from 
 `GeometricFlux`, hence the `MultiGNNLayer` can process only 
-`MultiGraph{<:NTuple{N, <:SparseGraph}`, where 
-`SparseGraph` is a type from `GraphSignals.jl.` 
+`MultiGraph{<:NTuple{N, <:GNNGraph}`, where 
+`GNNGraph` is a type from `GraphSignals.jl.` 
 If `MultiGraph{<:NTuple{N, <:SimpleGraph}` is supplied, it 
-internally converted to `MultiGraph{<:NTuple{N, <:SparseGraph}`
+internally converted to `MultiGraph{<:NTuple{N, <:GNNGraph}`
 and forwared for further processing.
 """
 struct MultiGNNLayer{G<:Tuple}
@@ -181,40 +161,15 @@ function MultiGNNLayer(a::MultiGraph, odim)
 	MultiGNNLayer(tuple(gconvs...))
 end
 
-function (mg::MultiGNNLayer)(g::SparseMultiGraph)
+function (mg::MultiGNNLayer)(g::MultiGraph)
 	vprops = map(mg.gconvs, g.graphs) do gconv, h 
-		gconv(_construct_fg(h, g.vprops)).nf.signal
+		gconv(set_vertex_properties(h, g.vprops)).ndata.x
 	end 
 	vprops = vcat(vprops...)
-	MultiGraph(g.graphs, vprops, g.components)
+	MultiGraph(g.graphs, vprops)
 end
 
-function (mg::MultiGNNLayer)(g::SimpleMultiGraph)
-	mg(sparsegraph(g))
-end
-
-_construct_fg(g::SparseGraph, nf) = FeaturedGraph(g, nf,  EdgeSignal(nothing), GlobalSignal(nothing), NodeDomain(nothing), :adjm)
-
-
-"""
-meanmax(g::MultiGraph)
-
-Reduction function over the features of MultiGraph. Understands components
-"""
-function meanmax(g::MultiGraph{<:Any,<:Any,<:Any,<:Nothing})
-	vprops = g.vprops
-	vcat(mean(vprops, dims = 2), maximum(vprops, dims = 2))
-end
-
-function meanmax(g::MultiGraph{<:Any,<:Any,<:Any,<:Vector{<:UnitRange}})
-	vprops = g.vprops
-	xx = map(g.components) do c 
-		x = (@view vprops[:,c])
-		vcat(mean(x, dims = 2), maximum(x, dims = 2))
-	end
-	reduce(hcat, xx)
-end
-
+set_vertex_properties(g::GNNGraph, nf) = GNNGraph(g; ndata = nf)
 
 struct MultiModel{G<:Tuple,D}
 	g::G
@@ -228,6 +183,8 @@ function MultiModel(h₀::MultiGraph, odim::Int, maked)
 	h₁ = m₁(h₀)
 	m₂ = NeuroPlanner.MultiGNNLayer(h₁, odim)
 	h₂ = m₂(h₁)
+	reduce_nodes(mean, h₂.graphs[1], h₂.vprops)
+	reduce_nodes(max, h₂.graphs[1], h₂.vprops)
 	h = vcat(NeuroPlanner.meanmax(h₁), NeuroPlanner.meanmax(h₂))
 	d = maked(size(h,1))
 	MultiModel((m₁,m₂), d)
@@ -236,11 +193,12 @@ end
 function (mm::MultiModel)(h₀::MultiGraph)
 	h₁ = mm.g[1](h₀)
 	h₂ = mm.g[2](h₁)
-	h = vcat(NeuroPlanner.meanmax(h₁), NeuroPlanner.meanmax(h₂))
+	h = vcat(meanmax(h₁), meanmax(h₂))
 	mm.d(h)
 end
 
-function _multimodel(layers, h)
-	isempty(layers) && return(h)
-	_multimodel(Base.tail(layers), first(layers)(h))
+function meanmax(h::MultiGraph)
+	g = h.graphs[1]
+	x = h.vprops
+	vcat(reduce_nodes(mean, g, x),reduce_nodes(max, g, x))
 end

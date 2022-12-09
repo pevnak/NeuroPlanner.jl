@@ -1,12 +1,9 @@
-using 
-NeuroPlanner
+using NeuroPlanner
 using PDDL
 using Flux
-using GraphSignals
-using GeometricFlux
+using GraphNeuralNetworks
 using SymbolicPlanners
 using Test
-
 
 domain = load_domain("sokoban.pddl")
 problem = load_problem("s1.pddl")
@@ -38,18 +35,16 @@ end
 		m = MultiModel(h₀, 4, d -> Chain(Dense(d, 32,relu), Dense(32,32)))
 		xx = [pddle(state) for state in sol.trajectory];
 		yy = collect(length(sol.trajectory):-1:1);
-		@test reduce(hcat, map(m, xx)) ≈  m(reduce(cat, xx))
+		@test reduce(hcat, map(m, xx)) ≈  m(batch(xx))
 		ii = [7,1,6,2,5,3,4]
-		@test reduce(hcat, map(m, xx[ii])) ≈  m(reduce(cat, xx[ii]))
+		@test reduce(hcat, map(m, xx[ii])) ≈  m(batch(xx[ii]))
 	end
 
 	@testset "gradient path" begin 
 		h₀ = pddle(state)
 		m = MultiModel(h₀, 4, d -> Chain(Dense(d, 32,relu), Dense(32,1)))
 		xx = [pddle(state) for state in sol.trajectory];
-		batch = reduce(cat, xx);
-		sparse_batch = 
-NeuroPlanner.sparsegraph(batch);
+		bxx = batch(xx);
 		yy = collect(length(sol.trajectory):-1:1);
 
 		ps = Flux.params(m);
@@ -60,8 +55,8 @@ NeuroPlanner.sparsegraph(batch);
 		end;
 
 		gs2 = gradient(ps) do 
-			sum((vec(m(batch)) .- yy) .^ 2)
+			sum((vec(m(bxx)) .- yy) .^ 2)
 		end;
-		@test all(gs1[p] ≈ gs2[p] for p in ps)
+		@test all(maximum(abs2.(gs1[p] .- gs2[p])) < 1e-6 for p in ps)
 	end
 end

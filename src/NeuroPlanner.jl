@@ -3,11 +3,10 @@ module NeuroPlanner
 using PDDL
 using Julog
 using Graphs
-using GraphSignals
 using Flux
-using GeometricFlux
 using Statistics
 using SymbolicPlanners
+using GraphNeuralNetworks
 
 include("multigraph.jl")
 export PDDLExtractor, MultiGraph, MultiGNN, FeaturedMultiGraph, MultiModel, initproblem
