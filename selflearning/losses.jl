@@ -8,7 +8,7 @@ end
 
 function L₂MiniBatch(sol, pddld, problem)
    pddle, state = NeuroPlanner.initproblem(pddld, problem)
-   L₂MiniBatch(NeuroPlanner.sparsegraph(reduce(cat, map(pddle, sol.trajectory))),
+   L₂MiniBatch(batch(map(pddle, sol.trajectory)),
      collect(length(sol.trajectory):-1:1),
      )
 end
@@ -48,7 +48,7 @@ function LₛMiniBatch(sol, pddld, problem)
 	H₊ = onehotbatch([i[2] for i in pm], 1:length(ids))
 	H₋ = onehotbatch([i[1] for i in pm], 1:length(ids))
 
-	LₛMiniBatch(NeuroPlanner.sparsegraph(reduce(cat, map(pddle, states))), H₊, H₋, path_cost, length(trajectory_id))
+	LₛMiniBatch(batch(map(pddle, states)), H₊, H₋, path_cost, length(trajectory_id))
 end
 
 """

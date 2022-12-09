@@ -1,8 +1,7 @@
 using NeuroPlanner
 using PDDL
 using Flux
-using GraphSignals
-using GeometricFlux
+using GraphNeuralNetworks
 using SymbolicPlanners
 using PDDL: GenericProblem
 using SymbolicPlanners: PathSearchSolution
