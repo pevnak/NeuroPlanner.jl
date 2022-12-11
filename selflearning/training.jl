@@ -31,7 +31,7 @@ end
 function train!(loss, ps::Params, opt::AbstractOptimiser, minibatches, fvals, mbsampler, max_steps, max_loss)
 	for _ in 1:max_steps
 		j = mbsampler()
-		d = minibatches[j]
+		d = prepare_minibatch(minibatches[j])
 		l, gs = withgradient(() -> loss(d), ps)
 		!isfinite(l) && error("Loss is $l on data item $j")
 		fvals[j] = l
@@ -54,3 +54,6 @@ function sample_minibatch(w, ϵ)
 	i = findfirst(==(typemax(T)), w)
 	(i !== nothing) ? i : sample(StatsBase.Weights(w))
 end
+
+prepare_minibatch(d) = d
+prepare_minibatch(mb::NamedTuple{(:minibatch, :stats)}) = prepare_minibatch(mb.minibatch)

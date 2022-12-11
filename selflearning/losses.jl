@@ -1,3 +1,5 @@
+using Parameters
+include("artificial_goal.jl")
 #############
 #	L2 Losses
 #############
@@ -6,19 +8,36 @@ struct L₂MiniBatch{X,Y}
 	y::Y
 end
 
-function L₂MiniBatch(sol, pddld, problem)
-   pddle, state = NeuroPlanner.initproblem(pddld, problem)
-   L₂MiniBatch(batch(map(pddle, sol.trajectory)),
-     collect(length(sol.trajectory):-1:1),
+struct UnsolvedL₂{S,D,P}
+	sol::S 
+	pddld::D
+	problem::P 
+end
+
+function L₂MiniBatch(sol, pddld, problem::Problem)
+	sol.status != :success && return(UnsolvedL₂(sol, pddld, problem))
+	pddle = NeuroPlanner.initproblem(pddld, problem)[1]
+	L₂MiniBatch(pddle, sol, trajectory)
+end
+
+function L₂MiniBatch(sol, pddle, trajectory::AbstractVector{<:State})
+   L₂MiniBatch(batch(map(pddle, trajectory)),
+     collect(length(trajectory):-1:1),
      )
 end
 
+function prepare_minibatch(mb::UnsolvedL₂)
+	@unpack sol, problem, pddld = mb
+	trajectory = artificial_trajectory(sol)
+	goal = trajectory[end]
+	pddle = NeuroPlanner.add_goalstate(pddld, problem, goal)
+	L₂MiniBatch(sol, pddle, trajectory)
+end 
+
 struct L₂loss end 
-(l::L₂loss)(args...) = l₂loss(args...)
 l₂loss(model, x, y) = Flux.Losses.mse(vec(model(x)), y)
-l₂loss(model, xy::NamedTuple) = l₂loss(model, xy.x, xy.y)
 l₂loss(model, xy::L₂MiniBatch) = l₂loss(model, xy.x, xy.y)
-loss(model, xy::L₂MiniBatch) = l₂loss(model, xy.x, xy.y)
+l₂loss(model, mb::NamedTuple{(:minibatch,:stats)}) = l₂loss(model, mb.minibatch)
 
 
 #############
@@ -32,12 +51,33 @@ struct LₛMiniBatch{X,H,Y}
 	sol_length::Int64
 end
 
-function LₛMiniBatch(sol, pddld, problem)
-	sol.search_tree === nothing && error("solve the problem with `save_search=true` to keep the search tree")
-	pddle, state = NeuroPlanner.initproblem(pddld, problem)
+struct UnsolvedLₛ{S,D,P}
+	sol::S 
+	pddld::D
+	problem::P 
+end
 
+
+function LₛMiniBatch(sol, pddld, problem::Problem)
+	sol.search_tree === nothing && error("solve the problem with `save_search=true` to keep the search tree")
+	sol.status != :success && return(UnsolvedLₛ(sol, pddld, problem))
+	pddle = NeuroPlanner.initproblem(pddld, problem)[1]
+	trajectory = sol.trajectory
+	LₛMiniBatch(sol, pddle, trajectory)
+end
+
+function prepare_minibatch(mb::UnsolvedLₛ)
+	@unpack sol, problem, pddld = mb
+	trajectory = artificial_trajectory(sol)
+	goal = trajectory[end]
+	pddle = NeuroPlanner.add_goalstate(pddld, problem, goal)
+	LₛMiniBatch(sol, pddle, trajectory)
+end
+
+
+function LₛMiniBatch(sol, pddle, trajectory::AbstractVector{<:State})
 	# get indexes of the states on the solution path, which seems to be hashes of states 
-	trajectory_id = hash.(sol.trajectory)
+	trajectory_id = hash.(trajectory)
 	child₁ = descendants(sol, trajectory_id)
 	# child₂ = descendants(sol, union(child₁, trajectory_id))
 	ids = vcat(trajectory_id, child₁)
@@ -58,8 +98,6 @@ Minimizes `L*` loss, We want ``f * H₋ .< f * H₊``, which means to minimize c
 """
 struct LₛLoss end 
 
-(l::LₛLoss)(args...) = lₛloss(args...)
-
 function lₛloss(model, x, g, H₊, H₋)
 	g = reshape(g, 1, :)
 	f = model(x) .+ g
@@ -68,6 +106,7 @@ function lₛloss(model, x, g, H₊, H₋)
 	mean(softplus.(o))
 end
 lₛloss(model, xy::LₛMiniBatch) = lₛloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋)
+lₛloss(model, mb::NamedTuple{(:minibatch,:stats)}) = lₛloss(model, mb.minibatch)
 
 #############
 #	Lstar Losses
@@ -80,10 +119,32 @@ struct LgbfsMiniBatch{X,H,Y}
 	sol_length::Int64
 end
 
-function LgbfsMiniBatch(sol, pddld, problem)
-	l = LₛMiniBatch(sol, pddld, problem)
+struct UnsolvedLgbfs{S,D,P}
+	sol::S 
+	pddld::D
+	problem::P 
+end
+
+
+function LgbfsMiniBatch(sol, pddld, problem::Problem)
+	sol.search_tree === nothing && error("solve the problem with `save_search=true` to keep the search tree")
+	sol.status != :success && return(UnsolvedLgbfs(sol, pddld, problem))
+	pddle = NeuroPlanner.initproblem(pddld, problem)[1]
+	trajectory = sol.trajectory
+	l = LₛMiniBatch(sol, pddle, trajectory)
 	LgbfsMiniBatch(l.x, l.H₊, l.H₋, l.path_cost, l.sol_length)
 end
+
+function prepare_minibatch(mb::UnsolvedLgbfs)
+	@unpack sol, problem, pddld = mb
+	trajectory = artificial_trajectory(sol)
+	goal = trajectory[end]
+	pddle = NeuroPlanner.add_goalstate(pddld, problem, goal)
+	l = LₛMiniBatch(pddle, sol, trajectory)
+	LgbfsMiniBatch(l.x, l.H₊, l.H₋, l.path_cost, l.sol_length)
+end
+
+
 
 """
 LgbfsLoss(x, g, H₊, H₋)
@@ -100,7 +161,9 @@ function lgbfsloss(model, x, g, H₊, H₋)
 	isempty(o) && return(zero(eltype(o)))
 	mean(softplus.(o))
 end
+
 lgbfsloss(model, xy::LgbfsMiniBatch) = lgbfsloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋)
+lgbfsloss(model, mb::NamedTuple{(:minibatch,:stats)}) = lgbfsloss(model, mb.minibatch)
 
 """
 descendants(sol, parents_id)

@@ -3,23 +3,24 @@ using SparseArrays
 using OneHotArrays
 verbose::Bool = true
 
-function solve_problem(pddld, problem::GenericProblem, model, init_planner; max_time=30)
+function solve_problem(pddld, problem::GenericProblem, model, init_planner; max_time=30, return_unsolved = false)
 	domain = pddld.domain
 	pddle, state = NeuroPlanner.initproblem(pddld, problem)
 	goal = PDDL.get_goal(problem)
 	planner = init_planner(GNNHeuristic(pddld, problem, model); max_time, save_search = true)
 	solution_time = @elapsed sol = planner(domain, state, goal)
-	sol.status == :success || return(nothing)
+	return_unsolved || sol.status == :success || return(nothing)
 	stats = (;solution_time, 
 		sol_length = length(sol.trajectory),
 		expanded = sol.expanded,
+		solved = sol.status == :success
 		)
 	(;sol, stats)
 end
 
 solve_problem(pddld, problem_file::AbstractString, model, init_planner; kwargs...) = solve_problem(pddld, load_problem(problem_file), model, init_planner; kwargs...)
 
-function update_solutions!(solutions, pddld, model, problem_files, fminibatch, planner; offset = 1, stop_after=32, cycle = false, solve_solved = false, max_time = 30)
+function update_solutions!(solutions, pddld, model, problem_files, fminibatch, planner; offset = 1, stop_after=32, cycle = false, solve_solved = false, max_time = 30, artificial_goals = false)
 	@assert length(solutions) == length(problem_files)
 	updated_solutions = Int[]
 	init_offset = offset
@@ -27,8 +28,8 @@ function update_solutions!(solutions, pddld, model, problem_files, fminibatch, p
 		i = offset
 		problem = load_problem(problem_files[i])
 		oldsol = solutions[i]
-		if solve_solved || oldsol == nothing
-			newsol = solve_problem(pddld, problem, model, planner; max_time)
+		if solve_solved || !issolved(oldsol)
+			newsol = solve_problem(pddld, problem, model, planner; max_time, return_unsolved = artificial_goals)
 			solutions[i] = update_solution(oldsol, newsol, pddld, problem, fminibatch)
 			solutions[i] != oldsol && push!(updated_solutions, i)
 		end
@@ -47,6 +48,7 @@ function update_solution(oldsol::NamedTuple, newsol::PathSearchSolution, pddld, 
 end
 
 function update_solution(oldsol::NamedTuple, newsol::NamedTuple, pddld, problem, fminibatch)
+	!oldsol.stats.solved && return(update_solution(nothing, newsol, pddld, problem, fminibatch))
 	o, n = oldsol.stats.sol_length,  newsol.stats.sol_length
 	if o < n
 		print(@red "longer: $(o) -> $(n)  ")
@@ -72,7 +74,8 @@ function update_solution(oldsol::NamedTuple, newsol::NamedTuple, pddld, problem,
 end
 
 function update_solution(oldsol::Nothing, newsol::NamedTuple, pddld, problem, fminibatch) 
-	verbose && println(@green "new solution: $((newsol.stats.sol_length, newsol.stats.expanded))")
+	verbose && newsol.stats.solved && println(@green "new solution: $((newsol.stats.sol_length, newsol.stats.expanded))")
+	verbose && !newsol.stats.solved && println(@yellow "not solved: $((newsol.stats.sol_length, newsol.stats.expanded))")
 	(;minibatch = fminibatch(newsol.sol, pddld, problem), stats = newsol.stats)
 end
 
@@ -85,8 +88,15 @@ function update_solution(oldsol::NamedTuple, newsol::Nothing, pddld, problem, fm
 	oldsol
 end
 
+issolved(::Nothing) = false
+issolved(s::NamedTuple{(:minibatch, :stats)}) = s.stats.solved
+
 function show_stats(solutions)
-	solved = filter(!isnothing, solutions)
+	solved = filter(issolved, solutions)
+	if isempty(solved)
+		println(" solved instances: ", length(solved))
+		return
+	end
 	stats = [s.stats for s in solved]
 	mean_time = round(mean(s.solution_time for s in stats), digits = 2)
 	mean_length = round(mean(s.sol_length for s in stats), digits = 2)
@@ -96,7 +106,11 @@ function show_stats(solutions)
 end
 
 function _show_stats(stats)
-	solved = filter(!isnothing, stats)
+	solved = filter(issolved, stats)
+	if isempty(solved)
+		println(" solved instances: ", length(solved))
+		return
+	end
 	mean_time = round(mean(s.solution_time for s in solved), digits = 2)
 	mean_length = round(mean(s.sol_length for s in solved), digits = 2)
 	mean_expanded = round(mean(s.expanded for s in solved), digits = 2)

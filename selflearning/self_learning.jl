@@ -32,7 +32,7 @@ GNNHeuristic(pddld, problem, model) = GNNHeuristic(NeuroPlanner.add_goalstate(pd
 Base.hash(g::GNNHeuristic, h::UInt) = hash(g.model, hash(g.pddle, h))
 SymbolicPlanners.compute(h::GNNHeuristic, domain::Domain, state::State, spec::Specification) = only(h.model(h.pddle(state)))
 
-function experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch, planner; opt_type = :worst, solve_solved = false, stop_after=32, filename = "", max_time=30, double_maxtime=false, max_steps = 100, max_loss = 0.0, epsilon = 0.5)
+function experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch, planner; opt_type = :worst, solve_solved = false, stop_after=32, filename = "", max_time=30, double_maxtime=false, max_steps = 100, max_loss = 0.0, epsilon = 0.5, artificial_goals = false)
 	isdir(ofile()) || mkpath(ofile())
 	domain = load_domain(domain_pddl)
 	pddld = PDDLExtractor(domain)
@@ -55,36 +55,31 @@ function experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch, pla
 	all_solutions = []
 	losses = []
 	fvals = fill(typemax(Float64), length(solutions))
-	for i in 1:10
-		solved_before = solutions .!== nothing
+	for epoch in 1:10
+		solved_before = issolved.(solutions)
 		offset = 1
 		while offset < length(solutions)
-			offset, updated = update_solutions!(solutions, pddld, model, problem_files, fminibatch, planner; offset, solve_solved, stop_after, max_time)	
+			offset, updated = update_solutions!(solutions, pddld, model, problem_files, fminibatch, planner; offset, solve_solved, stop_after, max_time, artificial_goals)
 			# print some Statistics
-			solved = findall(solutions .!== nothing)
+			solved = findall(issolved.(solutions))
 			print("offset = ", offset," updated = ", length(updated), " ")
 			show_stats(solutions)
 			length(solved) == length(solutions) && break
 			
-			t₁ = @elapsed fvals[solved] .= train!(x -> loss_fun(model, x.minibatch), ps, opt, solutions[solved], fvals[solved], max_steps; max_loss, ϵ = epsilon, opt_type)
+			ii = [s !== nothing for s in solutions]
+			t₁ = @elapsed fvals[ii] .= train!(x -> loss_fun(model, x), ps, opt, solutions[ii], fvals[ii], max_steps; max_loss, ϵ = epsilon, opt_type)
 			l = filter(x -> x != typemax(Float64), fvals)
-			println("epoch = $(offset) offset $(offset)  mean error = ", mean(l), " worst case = ", maximum(l)," time: = ", t₁)
+			println("epoch = $(epoch) offset $(offset)  mean error = ", mean(l), " worst case = ", maximum(l)," time: = ", t₁)
 		end
-		solved_after = solutions .!== nothing
-		l = filter(x -> x !== typemax(Float64), fvals)
-		push!(losses, l)
-		println("loss after $(i) epoch = ", mean(l), " max time = ", max_time)
-		push!(all_solutions, [(s == nothing ? nothing : s.stats) for s in solutions])
+		solved_after = issolved.(solutions)
+		push!(losses, deepcopy(fvals))
+		push!(all_solutions, filter(issolved, solutions))
 		if !isempty(filename)
 			serialize(filename,(;all_solutions, losses))
 		end
-		all(s !== nothing for s in solutions) && break
-		if sum(solved_after) == sum(solved_before) 
-			if double_maxtime
-				max_time *= 2
-			else 
-				break
-			end
+		all(issolved.(solutions)) && break
+		if sum(solved_after) == sum(solved_before)  && double_maxtime
+			max_time *= 2
 		end
 	end
 	all_solutions
@@ -103,16 +98,19 @@ loss_name = "lstar"
 planner_name = "astar"
 solve_solved = false
 stop_after = 32
-max_steps = 500
-opt_type = :worst
+max_steps = 2000
+# opt_type = :worst
+opt_type = :mean
 epsilon = 0.5
 max_loss = 0.0
 max_time = 30
 sort_by_complexity = true
+artificial_goals = true
 
 Random.seed!(seed)
 domain_pddl, problem_files, ofile = getproblem(problem_name, sort_by_complexity)
 planner = (planner_name == "astar") ? AStarPlanner : GreedyPlanner
 loss_fun, fminibatch = getloss(loss_name)
 filename = ofile("$(planner_name)_$(loss_name)_$(solve_solved)_$(stop_after)_$(seed).jls")
-experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch, planner; double_maxtime, filename, solve_solved, stop_after, max_steps, max_loss, max_time, opt_type, epsilon)
+problem_files = problem_files[end-20:end]
+experiment(domain_pddl, problem_files, ofile, loss_fun, fminibatch, planner; double_maxtime, filename, solve_solved, stop_after, max_steps, max_loss, max_time, opt_type, epsilon, artificial_goals)

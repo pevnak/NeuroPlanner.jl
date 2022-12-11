@@ -33,7 +33,10 @@ function PDDLExtractor(domain)
 end
 
 function add_goalstate(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem)
-	goal =  goalstate(pddle.domain, problem)
+	add_goalstate(pddle, problem, goalstate(pddle.domain, problem))
+end
+
+function add_goalstate(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem, goal)
 	# spec = Specification(problem)
 	# state = initstate(pddle.domain, problem)
 	# goal = SymbolicPlanners.simplify_goal(spec, pddle.domain, state)
@@ -183,9 +186,7 @@ function MultiModel(h₀::MultiGraph, odim::Int, maked)
 	h₁ = m₁(h₀)
 	m₂ = NeuroPlanner.MultiGNNLayer(h₁, odim)
 	h₂ = m₂(h₁)
-	reduce_nodes(mean, h₂.graphs[1], h₂.vprops)
-	reduce_nodes(max, h₂.graphs[1], h₂.vprops)
-	h = vcat(NeuroPlanner.meanmax(h₁), NeuroPlanner.meanmax(h₂))
+	h = vcat(meanmax(h₁), meanmax(h₂))
 	d = maked(size(h,1))
 	MultiModel((m₁,m₂), d)
 end
