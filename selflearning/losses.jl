@@ -37,8 +37,8 @@ end
 struct L₂loss end 
 l₂loss(model, x, y) = Flux.Losses.mse(vec(model(x)), y)
 l₂loss(model, xy::L₂MiniBatch) = l₂loss(model, xy.x, xy.y)
-l₂loss(model, mb::NamedTuple{(:minibatch,:stats)}) = l₂loss(model, mb.minibatch)
-
+L₂loss(model, mb::NamedTuple{(:minibatch,:stats)}) = l₂loss(model, mb.minibatch)
+(l::L₂loss)(args...) = L₂loss(args...)
 
 #############
 #	Lstar Losses
@@ -107,6 +107,7 @@ function lₛloss(model, x, g, H₊, H₋)
 end
 lₛloss(model, xy::LₛMiniBatch) = lₛloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋)
 lₛloss(model, mb::NamedTuple{(:minibatch,:stats)}) = lₛloss(model, mb.minibatch)
+(l::LₛLoss)(args...) = lₛloss(args...)
 
 #############
 #	Lstar Losses
@@ -178,11 +179,6 @@ function descendants(sol, parents_id::Set)
 	childs = [s.id for s in values(sol.search_tree) if s.parent_id ∈ parents_id]
 	setdiff(childs, parents_id)
 end
-
-nonempty(s::LₛMiniBatch) = !isempty(s.H₊) && !isempty(s.H₋)
-nonempty(s::LgbfsMiniBatch) = !isempty(s.H₊) && !isempty(s.H₋)
-nonempty(s::L₂MiniBatch)  = true
-nonempty(s::NamedTuple{(:minibatch, :stats)}) = nonempty(s.minibatch)
 
 function getloss(name)
 	name == "l2" && return((L₂Loss(), L₂MiniBatch))
