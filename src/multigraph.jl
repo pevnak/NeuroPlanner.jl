@@ -32,22 +32,48 @@ function PDDLExtractor(domain)
 	PDDLExtractor(domain, binary_predicates, nunanary_predicates, nothing, nothing)
 end
 
+"""
+add_goalstate(pddle, problem)
+add_goalstate(pddle, problem, goal)
+
+adds goal state to the extract, such that the goal descripto is always add 
+to the graph.
+"""
 function add_goalstate(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem)
 	add_goalstate(pddle, problem, goalstate(pddle.domain, problem))
 end
 
 function add_goalstate(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem, goal)
-	# spec = Specification(problem)
-	# state = initstate(pddle.domain, problem)
-	# goal = SymbolicPlanners.simplify_goal(spec, pddle.domain, state)
-
-	term2id = Dict(only(get_args(v)) => i for (i, v) in enumerate(goal.types))
-	goal = multigraph(pddle, goal, term2id)
-	PDDLExtractor(pddle.domain, pddle.binary_predicates, pddle.nunanary_predicates, term2id, goal)
+	pddle = specialize(pddle, problem)
+	goal = multigraph(pddle, goal)
+	PDDLExtractor(pddle.domain, pddle.binary_predicates, pddle.nunanary_predicates, pddle.term2id, goal)
 end
 
-function initproblem(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem)
-	add_goalstate(pddle, problem), initstate(pddle.domain, problem)
+function add_goalstate(pddle::PDDLExtractor{<:Any,<:Nothing}, problem, goal)
+	goal = multigraph(pddle, goal)
+	PDDLExtractor(pddle.domain, pddle.binary_predicates, pddle.nunanary_predicates, pddle.term2id, goal)
+end
+
+"""
+specialize(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem)
+
+initializes extractor for a given `problem` by initializing mapping 
+from objects to id of vertices. Goals are not changed added to the 
+extractor.
+"""
+function specialize(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem)
+	term2id = Dict(v => i for (i, v) in enumerate(problem.objects))
+	PDDLExtractor(pddle.domain, pddle.binary_predicates, pddle.nunanary_predicates, term2id, nothing)
+end
+
+"""
+initproblem(pddld::PDDLExtractor{<:Nothing,<:Nothing}, problem; add_goal = true)
+
+Specialize extractor for the given problem instance and return init state 
+"""
+function initproblem(pddld::PDDLExtractor{<:Nothing,<:Nothing}, problem; add_goal = true)
+	pddle = add_goal ? add_goalstate(pddld, problem) : specialize(pddld, problem)
+	pddle, initstate(pddld.domain, problem)
 end
 
 """
