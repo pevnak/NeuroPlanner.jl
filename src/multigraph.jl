@@ -207,20 +207,36 @@ end
 
 Flux.@functor MultiModel
 
-function MultiModel(h₀::MultiGraph, odim::Int, maked)
-	m₁ = NeuroPlanner.MultiGNNLayer(h₀, odim)
-	h₁ = m₁(h₀)
-	m₂ = NeuroPlanner.MultiGNNLayer(h₁, odim)
-	h₂ = m₂(h₁)
-	h = vcat(meanmax(h₁), meanmax(h₂))
+"""
+MultiModel(h₀::MultiGraph, odim::Int, nlayers, maked)
+
+construct GNN for MultiModel with `nlayers` of GATs, each with output dimension
+`odim` and `nlayers`. The dense part after the aggregation will be constructed 
+by `maked(d),` where `d` is the input dimension 
+"""
+function MultiModel(h₀::MultiGraph, odim::Int, nlayers, maked)
+	layers = tuple()
+	hs = (h₀,)
+	h = h₀
+	for i in 1:nlayers
+		m = NeuroPlanner.MultiGNNLayer(h, odim)
+		h = m(h)
+		hs = (hs..., h)
+		layers = (layers..., m)
+	end
+	h = vcat(map(meanmax, hs)...)
 	d = maked(size(h,1))
-	MultiModel((m₁,m₂), d)
+	MultiModel(layers, d)
+end
+
+function apply_glayers(layers, h)
+	isempty(layers) && return((h,))
+	return(h, apply_glayers(layers[2:end], layers[1](h))...)
 end
 
 function (mm::MultiModel)(h₀::MultiGraph)
-	h₁ = mm.g[1](h₀)
-	h₂ = mm.g[2](h₁)
-	h = vcat(meanmax(h₁), meanmax(h₂))
+	hs = apply_glayers(mm.g, h₀)
+	h = vcat(map(meanmax, hs)...)
 	mm.d(h)
 end
 

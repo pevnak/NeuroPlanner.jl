@@ -16,26 +16,29 @@ optimizes the `loss` with respect to parameters `ps` using optimiser `opt`
 opt_type --- type of optimization: either `:mean` error or `:worst`-case error
 `ϵ` --- exploration in worst-case optimization
 """
-function train!(loss, ps::Params, opt::AbstractOptimiser, minibatches, fvals, steps; ϵ = 0.5, max_loss = 0.0, opt_type = :worst, kwargs...)
+function train!(loss, model, ps::Params, opt::AbstractOptimiser, minibatches, fvals, steps; ϵ = 0.5, max_loss = 0.0, opt_type = :worst, kwargs...)
 	if opt_type == :worst
 		worst_sampler() = sample_minibatch(fvals, ϵ)
-		train!(loss, ps, opt, minibatches, fvals, worst_sampler, steps, max_loss)
+		train!(loss, model, ps, opt, minibatches, fvals, worst_sampler, steps, max_loss)
 	elseif opt_type == :mean
 		mean_sampler() = rand(1:length(minibatches))
-		train!(loss, ps, opt, minibatches, fvals, mean_sampler, steps, max_loss)
+		train!(loss, model, ps, opt, minibatches, fvals, mean_sampler, steps, max_loss)
 	else
 		error("unknown type of optimization $(opt_type), supported is `:worst` and `:mean`")
 	end
 end
 
-function train!(loss, ps::Params, opt::AbstractOptimiser, minibatches, fvals, mbsampler, max_steps, max_loss)
+function train!(loss, model, ps::Params, opt::AbstractOptimiser, minibatches, fvals, mbsampler, max_steps, max_loss)
 	for _ in 1:max_steps
 		j = mbsampler()
 		d = prepare_minibatch(minibatches[j])
 		l, gs = withgradient(() -> loss(d), ps)
 		!isfinite(l) && error("Loss is $l on data item $j")
+		# serialize("/tmp/debug.jls",(model, d))
 		fvals[j] = l
 		Flux.Optimise.update!(opt, ps, gs)
+		# any(any(isnan.(p)) for p in ps) && error("nan in parameters")
+		# any(any(isinf.(p)) for p in ps) && error("inf in parameters")
 		all(l ≤ max_loss for l in fvals) && break
 	end
 	fvals
@@ -57,3 +60,17 @@ end
 
 prepare_minibatch(d) = d
 prepare_minibatch(mb::NamedTuple{(:minibatch, :stats)}) = prepare_minibatch(mb.minibatch)
+
+
+
+isvalid(args...) = !isinvalid(args...)
+isinvalid(gs::Flux.Zygote.Grads) = any(map(isinvalid, collect(values(gs.grads))))
+isinvalid(x::AbstractArray) =     any(isinf.(x)) || any(isnan.(x))
+isinvalid(x::Number) = isinf(x) || isnan(x)
+isinvalid(x::Tuple) = any(map(isinvalid, x))
+isinvalid(x::NamedTuple) = any(map(isinvalid, x))
+isinvalid(x::Nothing) = false
+
+function isinvalid(l::NamedTuple{(:dense_x, :dense_e, :bias, :a, :σ, :negative_slope, :channel, :heads, :concat, :add_self_loops)})
+	any(map(isinvalid,( l.dense_x, l.dense_e, l.bias, l.a)))
+end
