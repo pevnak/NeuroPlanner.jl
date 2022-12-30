@@ -1,4 +1,5 @@
 using Parameters
+using SymbolicPlanners: PathNode
 include("artificial_goal.jl")
 #############
 #	L2 Losses
@@ -17,7 +18,7 @@ end
 function L₂MiniBatch(sol, pddld, problem::Problem)
 	sol.status != :success && return(UnsolvedL₂(sol, pddld, problem))
 	pddle = NeuroPlanner.initproblem(pddld, problem)[1]
-	L₂MiniBatch(pddle, sol, trajectory)
+	L₂MiniBatch(sol, pddle, trajectory)
 end
 
 function L₂MiniBatch(sol, pddle, trajectory::AbstractVector{<:State})
@@ -34,11 +35,11 @@ function prepare_minibatch(mb::UnsolvedL₂)
 	L₂MiniBatch(sol, pddle, trajectory)
 end 
 
-struct L₂loss end 
+struct L₂Loss end 
 l₂loss(model, x, y) = Flux.Losses.mse(vec(model(x)), y)
 l₂loss(model, xy::L₂MiniBatch) = l₂loss(model, xy.x, xy.y)
-L₂loss(model, mb::NamedTuple{(:minibatch,:stats)}) = l₂loss(model, mb.minibatch)
-(l::L₂loss)(args...) = L₂loss(args...)
+l₂loss(model, mb::NamedTuple{(:minibatch,:stats)}) = l₂loss(model, mb.minibatch)
+(l::L₂Loss)(args...) = l₂loss(args...)
 
 #############
 #	Lstar Losses
@@ -75,14 +76,18 @@ function prepare_minibatch(mb::UnsolvedLₛ)
 end
 
 
-function LₛMiniBatch(sol, pddle, trajectory::AbstractVector{<:State})
+function LₛMiniBatch(sol::PathSearchSolution, pddle, trajectory::AbstractVector{<:State})
+	LₛMiniBatch(sol.search_tree, pddle, trajectory)
+end
+
+function LₛMiniBatch(search_tree::Dict{UInt64, <:PathNode}, pddle, trajectory::AbstractVector{<:State})
 	# get indexes of the states on the solution path, which seems to be hashes of states 
 	trajectory_id = hash.(trajectory)
-	child₁ = descendants(sol, trajectory_id)
+	child₁ = descendants(search_tree, trajectory_id)
 	# child₂ = descendants(sol, union(child₁, trajectory_id))
 	ids = vcat(trajectory_id, child₁)
-	path_cost = [sol.search_tree[i].path_cost for i in ids]
-	states = [sol.search_tree[i].state for i in ids]
+	path_cost = [search_tree[i].path_cost for i in ids]
+	states = [search_tree[i].state for i in ids]
 	# we want every state on the solution path to be smaller than  
 	pm = [(i,j) for i in 1:length(trajectory_id) for j in length(trajectory_id)+1:length(ids)]
 	H₊ = onehotbatch([i[2] for i in pm], 1:length(ids))
@@ -175,8 +180,12 @@ parents_id ∩ descendants(sol, parents_id) = ∅
 """
 descendants(sol, parents_id::Vector) = descendants(sol, Set(parents_id))
 
-function descendants(sol, parents_id::Set)
-	childs = [s.id for s in values(sol.search_tree) if s.parent_id ∈ parents_id]
+function descendants(sol::PathSearchSolution, parents_id::Set)
+	descendants(sol.search_tree, parents_id)
+end
+
+function descendants(search_tree::Dict{UInt64,<:PathNode}, parents_id::Set)
+	childs = [s.id for s in values(search_tree) if s.parent_id ∈ parents_id]
 	setdiff(childs, parents_id)
 end
 

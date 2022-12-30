@@ -95,5 +95,6 @@ function _construct_featured_graph(g, vprops, eprops, term2id)
 	fg = FeaturedGraph(g; nf, ef)
 end
 
+include("sample_trace.jl")
 
 end
