@@ -95,6 +95,7 @@ function _construct_featured_graph(g, vprops, eprops, term2id)
 	fg = FeaturedGraph(g; nf, ef)
 end
 
+include("artificial_goals.jl")
 include("sample_trace.jl")
-
+export sample_trace, sample_forward_trace, sample_backward_trace, sample_backward_tree, search_tree_from_trajectory
 end
