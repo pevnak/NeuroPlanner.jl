@@ -1,6 +1,6 @@
 using Parameters
 using SymbolicPlanners: PathNode
-include("artificial_goal.jl")
+using OneHotArrays: onehotbatch
 #############
 #	L2 Losses
 #############

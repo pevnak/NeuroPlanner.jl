@@ -112,6 +112,22 @@ function sample_backward_trace(domain, search_tree::Dict, l; full_states = true)
 	trajectory, plan
 end
 
+
+struct BackwardSampler{D,S<:Dict,L,F}
+	domain::D
+	search_tree::S
+	lists::L
+	full_states::Bool
+	sample_goal::Bool
+	fminibatch::F
+end
+
+function BackwardSampler(domain, search_tree; full_states = true, sample_goal = false, fminibatch = identity)
+
+end
+
+
+
 """
 (trajectory, plan) = sample_forward_trace(domain, problem, depth; full_states = true, remove_cycles = true)
 (trajectory, plan) = sample_forward_trace(domain, problem, initial_state, depth; full_states = true, remove_cycles = true)
