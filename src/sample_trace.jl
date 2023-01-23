@@ -90,11 +90,11 @@ function sample_backward_tree(domain, problem, goal_state; max_depth = 30, max_s
 	search_tree
 end
 
-function sample_backward_trace(domain, search_tree::Dict; full_states = true)
-	sample_backward_trace(search_tree, leafs(search_tree); full_states)
+function sample_backward_trace(domain, search_tree::Dict; full_states = true, sample_goal = false)
+	sample_backward_trace(search_tree, leafs(search_tree); full_states, sample_goal)
 end
 
-function sample_backward_trace(domain, search_tree::Dict, l; full_states = true)
+function sample_backward_trace(domain, search_tree::Dict, l; full_states = true, sample_goal = false)
 	id = rand(l)
 	trajectory =  Vector{GenericState}()
 	plan =  []
@@ -109,23 +109,50 @@ function sample_backward_trace(domain, search_tree::Dict, l; full_states = true)
 		state = first(trajectory)
 		trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
 	end
+	if sample_goal && length(trajectory) > 2 
+		i = rand(2:length(trajectory))
+		trajectory = trajectory[1:i]
+		plan = plan[1:i-1]
+	end
 	trajectory, plan
 end
 
 
+"""
 struct BackwardSampler{D,S<:Dict,L,F}
 	domain::D
 	search_tree::S
-	lists::L
+	l::L
 	full_states::Bool
 	sample_goal::Bool
 	fminibatch::F
 end
 
-function BackwardSampler(domain, search_tree; full_states = true, sample_goal = false, fminibatch = identity)
-
+Simplify sampling a random solution from a tree and then creating minibatch from it.
+It wraps all arguments of the sampler and the run it. 
+"""
+struct BackwardSampler{D,P,S<:Dict,L}
+	domain::D
+	problem::P
+	search_tree::S
+	l::L
+	full_states::Bool
+	sample_goal::Bool
 end
 
+function BackwardSampler(domain, problem::GenericProblem; full_states = true, sample_goal = false, max_states = 100_000, max_depth = 30)
+	search_tree = sample_backward_tree(domain, problem; max_depth, max_states)
+	l = leafs(search_tree)
+	BackwardSampler(domain, problem, search_tree, l, full_states, sample_goal)
+end
+
+function Base.show(io::IO, bs::BackwardSampler)
+	println(io, "BackwardSampler (treesize: ", length(bs.search_tree), ", leafs: ", length(bs.l), ", full states: ", bs.full_states, ", sample goal:", bs.sample_goal,")")
+end
+
+function (bs::BackwardSampler)(;full_states = bs.full_states, sample_goal = bs.sample_goal)
+	sample_backward_trace(bs.domain, bs.search_tree, bs.l;full_states, sample_goal)
+end
 
 
 """
@@ -162,6 +189,13 @@ function sample_forward_trace(domain, problem, initial_state, depth; remove_cycl
 	return(trajectory, plan)
 end
 
+
+"""
+search_tree_from_trajectory(domain, trajectory, plan)
+
+expand states off the trajectory to create search tree returned by 
+an optimal search expanding only states on the trajectory. 
+"""
 function search_tree_from_trajectory(domain, trajectory, plan)
 	state = first(trajectory)
 
@@ -184,6 +218,20 @@ function add_descendants!(search_tree::SearchTree, domain, state, g)
     search_tree
 end
 
+"""
+(trajectory, plan) = removecycles(trajectory, plan)
+
+detect cycle in trajectory and truncate it (together with plan), 
+such that the cycle is removed.
+"""
+function removecycles(trajectory, plan)
+	j = firstcycle(trajectory)
+	j == nothing && return(trajectory, plan)
+	@assert j < length(trajectory)
+	j = j + 1
+	trajectory[j:end], plan[j:end]
+end
+
 function firstcycle(trajectory)
 	cycles = Int[]
 	for i in eachindex(trajectory)
@@ -193,12 +241,4 @@ function firstcycle(trajectory)
 	end
 	isempty(cycles) && return(nothing)
 	return(maximum(cycles))
-end
-
-function removecycles(trajectory, plan)
-	j = firstcycle(trajectory)
-	j == nothing && return(trajectory, plan)
-	@assert j < length(trajectory)
-	j = j + 1
-	trajectory[j:end], plan[j:end]
 end

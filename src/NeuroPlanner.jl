@@ -4,6 +4,7 @@ using PDDL
 using Julog
 using Graphs
 using Flux
+using OneHotArrays
 using Statistics
 using SymbolicPlanners
 using GraphNeuralNetworks
@@ -98,9 +99,11 @@ end
 include("losses.jl")
 export L₂MiniBatch, UnsolvedL₂, L₂Loss, l₂loss, 
        LₛMiniBatch, UnsolvedLₛ, lₛloss, LₛLoss, 
+       LRTMiniBatch, lrtloss, LRTLoss, 
        LgbfsMiniBatch, UnsolvedLgbfs, LgbfsLoss, lgbfsLoss, getloss
 
 include("artificial_goals.jl")
 include("sample_trace.jl")
 export sample_trace, sample_forward_trace, sample_backward_trace, sample_backward_tree, search_tree_from_trajectory
+export BackwardSampler
 end
