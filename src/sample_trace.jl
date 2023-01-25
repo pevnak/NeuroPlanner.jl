@@ -48,6 +48,36 @@ function sample_backward_trace(domain, problem, goal_state, depth; full_states =
 end
 
 """
+execute_backward_plan(domain, problem, goal_state, plan; full_states = true)
+execute_backward_plan(domain, problem, plan; full_states = true)
+
+return a trajectory of a plan executed from the goal state forward. The plan should be already
+reversed.
+"""
+function execute_backward_plan(domain, problem, goal_state, plan; full_states = true)
+	state = goal_state
+	trajectory = [state]
+	for act in plan
+		acts = relevant(domain, state)
+		isempty(acts) && error("No action exist even though the plan has actions left")
+		act ∉ acts  && error("empty intersection of actions and action from the plan")
+		next_state = regress(domain, state, act; check=false)
+		push!(trajectory, next_state)
+		state = next_state
+	end
+	trajectory, plan = reverse(trajectory), reverse(plan)
+	if full_states
+		trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
+	end
+	!issubset(goal_state, last(trajectory)) && error("Something went terribly wrong, goal_state is not last in trajectory. File an issue.")
+	return(trajectory, plan)	
+end
+
+function execute_backward_plan(domain, problem, plan; full_states = true)
+	execute_backward_plan(domain, problem, goalstate(domain, problem), plan; full_states)
+end
+
+"""
 search_tree = sample_backward_tree(domain, problem; max_depth = 30, max_leaves=10_000, max_states=100_000)
 search_tree = sample_backward_tree(domain, problem, goal_state; max_depth = 30, max_leaves=10_000, max_states=100_000)
 
@@ -242,3 +272,39 @@ function firstcycle(trajectory)
 	isempty(cycles) && return(nothing)
 	return(maximum(cycles))
 end
+
+"""
+	plan_from_trajectory(domain, problem, trajectory)
+
+	extract the plan from a trajectory
+
+"""
+function plan_from_trajectory(domain, problem, trajectory)
+	state = initstate(domain, problem)
+	goal = goalstate(domain, problem)
+	!issubset(state.facts, trajectory[1].facts) && error("initial state not in the trajectory")
+	!issubset(goal.facts, trajectory[end].facts) && error("goal state not in the trajectory")
+	plan = map(zip(trajectory[1:end-1], trajectory[2:end])) do (s, t)
+		acts = filter(available(domain, s)) do act
+			u = execute(domain, s, act; check=false)
+			issubset(t,u)
+		end
+		isempty(acts) && error("actions are empty")
+		first(acts)
+	end
+	plan
+end
+
+"""
+	verify_plan(domain, problem, plan)
+
+	verify the plan is solving the problem
+
+"""
+function verify_plan(domain, problem, plan)
+	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, initstate(domain, problem), plan)
+	gstate = goalstate(domain, problem)
+	issubset(gstate.facts, trajectory[end].facts)
+end
+
+

@@ -79,7 +79,7 @@ function experiment(domain_pddl, train_files, problem_files, filename, loss_fun,
 		@show problem_file
 		sol = solve_problem(pddld, problem_file, model, planner;return_unsolved = true)
 		trajectory = sol.sol.status == :max_time ? nothing : sol.sol.trajectory
-		merge(sol.stats, (;used_in_train, planner = "$(planner)", trajectory))
+		merge(sol.stats, (;used_in_train, planner = "$(planner)", trajectory, problem_file))
 	end
 	serialize(filename, stats)
 end

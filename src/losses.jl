@@ -119,11 +119,12 @@ function LₛMiniBatch(pddld, domain::GenericDomain, problem::Problem, trajector
 	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem, goal) : pddld
 
 	state = initstate(domain, problem)
+	@assert issubset(trajectory[1].facts, state.facts)
+	state = trajectory[1]
 	spec = Specification(problem)
 	spec = SymbolicPlanners.simplify_goal(spec, domain, state)
 
 	stateids = Dict(state => (;id = 1, g = 0))
-	@assert trajectory[1] == state
 	I₊ = Vector{Int64}()
 	I₋ = Vector{Int64}()
 
