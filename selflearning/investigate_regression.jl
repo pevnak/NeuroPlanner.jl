@@ -140,8 +140,8 @@ filename = joinpath("investigate_regression", problem_name, join([loss_name, tra
 experiment(domain_pddl, train_files, problem_files, filename, loss_fun, fminibatch; max_steps, max_time, graph_layers, graph_dim, dense_layers, dense_dim, trajectory_type, trajectory_goal)
 
 
-function parse_results(problem, loss, trajectory_type; testset = true)
-	namefun(number) = "investigate_regression/$(problem)/$(loss)_$(trajectory_type)_true_20000_30_2_8_2_32_$(number).jls"
+function parse_results(problem, loss, trajectory_type, trajectory_goal; testset = true)
+	namefun(number) = "investigate_regression/$(problem)/$(loss)_$(trajectory_type)_$(trajectory_goal)_20000_30_2_8_2_32_$(number).jls"
 	n = (Symbol("$(trajectory_type)_astar"), Symbol("$(trajectory_type)_gbfs"))
 	numbers = filter(isfile ∘ namefun, 1:3)
 	isempty(numbers) && return(NamedTuple{n}((NaN,NaN)))
@@ -161,11 +161,11 @@ function parse_results(problem, loss, trajectory_type; testset = true)
 	NamedTuple{n}(tuple(x...))
 end
 
-function show_results()
+function show_results(trajectory_goal)
 	problems = ["blocks", "ferry", "gripper", "npuzzle"]
 	df = map(problems) do problem
 		mapreduce(merge,["forward", "backward", "both"]) do t
-			parse_results(problem, "lstar", t;testset = true)
+			parse_results(problem, "lstar", t,trajectory_goal;testset = true)
 		end
 	end |> DataFrame;
 	hcat(DataFrame(problem = problems),  df[:,1:2:end], df[:,2:2:end])

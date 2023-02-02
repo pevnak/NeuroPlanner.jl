@@ -1,13 +1,6 @@
 using SymbolicPlanners: PathNode
 const SearchTree = Dict{UInt64, PathNode{GenericState}}
 
-function sample_trace(domain, problem, depth, forward_traces, backward_traces)
-	!forward_traces && !backward_traces && error("either forward_traces or backward_traces has to be true")
-	forward_traces && !backward_traces && return(sample_forward_trace(domain, problem, depth))
-	!forward_traces && backward_traces && return(sample_backward_trace(domain, problem, depth))
-	return(rand([true,false]) ? sample_forward_trace(domain, problem, depth) : sample_backward_trace(domain, problem, depth))
-end
-
 """
 (trajectory, plan) = sample_backward_trace(domain, problem, depth; full_states = true, remove_cycles = true)
 (trajectory, plan) = sample_backward_trace(domain, problem, goal_state, depth; full_states = true, remove_cycles = true)

@@ -9,4 +9,5 @@
 ml Julia/1.8.3-linux-x86_64
 export JULIA_PROJECT="/home/pevnytom/julia/Pkg/NeuroPlanner.jl/selflearning"
 # julia -O3 --project=. supervised.jl $1 $2 $3
-julia -O3 --project=. investigate_regression.jl $1 $2 $3
+# julia -O3 --project=. investigate_regression.jl $1 $2 $3
+julia -O3 --project=. pattern_database.jl $1 $2 $3

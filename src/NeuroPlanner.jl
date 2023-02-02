@@ -9,8 +9,9 @@ using Statistics
 using SymbolicPlanners
 using GraphNeuralNetworks
 
-include("multigraph.jl")
+include("multigraph/extractor.jl")
 export PDDLExtractor, MultiGraph, MultiGNN, FeaturedMultiGraph, MultiModel, initproblem
+include("potential/extractor.jl")
 
 """
 	function Graphs.Graph(state::GenericState)

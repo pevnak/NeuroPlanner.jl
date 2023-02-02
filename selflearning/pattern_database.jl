@@ -36,17 +36,35 @@ GNNHeuristic(pddld, problem, model) = GNNHeuristic(NeuroPlanner.add_goalstate(pd
 Base.hash(g::GNNHeuristic, h::UInt) = hash(g.model, hash(g.pddle, h))
 SymbolicPlanners.compute(h::GNNHeuristic, domain::Domain, state::State, spec::Specification) = only(h.model(h.pddle(state)))
 
+		
+function sample_trace(domain, problem, depth, trace_type)
+	if trace_type == :forward
+		error("not implemented")
+		trajectory, plan = sample_forward_trace(domain, problem, depth)
+		goal = goalstate(domain, problem)
+		return(trajectory, plan, goal)
+	end
+
+	if trace_type == :backward
+		trajectory, plan = sample_backward_trace(domain, problem, depth)
+		goal = goalstate(domain, problem)
+		return(trajectory, plan, goal)
+	end
+	trace_type == :both && return(sample_trace(domain, problem, depth, rand([:forward, :backward])))
+	error("either forward_traces or backward_traces has to be true")
+end
+
 """
 	This is pretty lame and should be done better (one day if it works)
 """
-function create_training_set(pddld, problem_file, fminibatch, n, depths; forward_traces = true, backward_traces = true)
+function create_training_set(pddld, problem_file, fminibatch, n, depths; trace_type = :backward)
 	problem = load_problem(problem_file)
 	domain = pddld.domain
 	map(1:n) do _
 		depth = rand(depths)
-		trajectory, plan = sample_trace(domain, problem, depth, forward_traces, backward_traces)
+		trajectory, plan, goal = sample_trace(domain, problem, depth, trace_type)
 		search_tree = search_tree_from_trajectory(domain, trajectory, plan)
-		pddle = NeuroPlanner.add_goalstate(pddld, problem, trajectory[end])
+		pddle = NeuroPlanner.add_goalstate(pddld, problem, goal)
 		fminibatch(search_tree, pddle, trajectory)
 	end
 end
@@ -60,7 +78,7 @@ end
 function experiment(domain_pddl, problem_file, ofile, loss_fun, fminibatch; 
 			opt_type = :worst, filename = "", max_time=30, max_steps = 10000, 
 			max_loss = 0.0, epsilon = 0.5, graph_layers = 2, graph_dim = 8, dense_layers = 2, 
-			dense_dim = 32, max_epochs = 100, training_set_size = 10000, depths = 1:30)
+			dense_dim = 32, max_epochs = 100, training_set_size = 10000, depths = 1:30, trace_type = :backward)
 	isdir(ofile()) || mkpath(ofile())
 	domain = load_domain(domain_pddl)
 	pddld = PDDLExtractor(domain)
@@ -76,23 +94,32 @@ function experiment(domain_pddl, problem_file, ofile, loss_fun, fminibatch;
 		model
 	end
 
-	training_set = create_training_set(pddld, problem_file, fminibatch, training_set_size, depths)
+	training_set = create_training_set(pddld, problem_file, fminibatch, training_set_size, depths; trace_type)
 	opt = AdaBelief()
 	ps = Flux.params(model)
 	fvals = fill(typemax(Float64), length(training_set))
-	fvals .= train!(x -> loss_fun(model, x), model, ps, opt, training_set, fvals, max_steps; max_loss, ϵ = epsilon, opt_type = Symbol(opt_type))
+	sol = test_planner(pddld, model, problem_file, planner; max_time = 600)
+	stats = map(1:10) do i 
+		fvals .= train!(x -> loss_fun(model, x), model, ps, opt, training_set, fvals, max_steps; max_loss, ϵ = epsilon, opt_type = Symbol(opt_type))
+		fv = mean(filter(!isinf, fvals))
+		solution = test_planner(pddld, model, problem_file, planner; max_time = 600)
+		(;i, solution, fv)
+	end
+
 
 	# serialize(filename[end-4:end]*"_model.jls", model) 
 
 	results = []
 	for h_mult in [1, 1.5, 2, 2.5]
 		planner = (heuristic; kwargs...) -> ForwardPlanner(;heuristic=heuristic, h_mult=h_mult, kwargs...)
-		solution = only(test_planner(pddld, model, [problem_file], planner; max_time))
+		solution = test_planner(pddld, model, problem_file, planner; max_time)
 		r = (;h_mult, solution)
 		push!(results, r)
 		# serialize(filename, results)
 	end
 end
+
+∘
 
 # Let's make configuration ephemeral
 # problem_name = ARGS[1]
@@ -112,17 +139,47 @@ graph_layers = 2
 graph_dim = 8
 dense_layers = 2
 dense_dim = 32
-training_set_size = 100000
-max_steps = 10*training_set_size
+training_set_size = 100
+max_steps = 20000
 max_loss = 0.0
 depths = 1:30
 ttratio = 1.0
+trace_type = :backward
 
 Random.seed!(seed)
 domain_pddl, problem_files, _ = getproblem(problem_name, false)
-train_files = sample(problem_files, round(Int, length(problem_files)); replace = false)
-test_files = setdiff(problem_files, train_files)
 loss_fun, fminibatch = getloss(loss_name)
-ofile(s...) = joinpath("deepcubea3", problem_name, s...)
+ofile(s...) = joinpath("patterndatabase", problem_name, s...)
 filename = ofile(join([loss_name,opt_type,epsilon,max_time,graph_layers,graph_dim,dense_layers,dense_dim,training_set_size,max_steps,max_loss, depths,ttratio,seed], "_")*".jls")
-experiment(domain_pddl, train_files, test_files, ofile, loss_fun, fminibatch; filename, opt_type, epsilon, max_time, graph_layers, graph_dim, dense_layers, dense_dim, training_set_size, max_steps, depths, max_loss)
+experiment(domain_pddl, problem_files[2], ofile, loss_fun, fminibatch; filename, opt_type, epsilon, max_time, graph_layers, graph_dim, dense_layers, dense_dim, training_set_size, max_steps, depths, max_loss, trace_type)
+
+function parse_results(problem, loss, trajectory_type, trajectory_goal; testset = true)
+	namefun(number) = "patterndatabase/$(problem)/$(loss)_$(trajectory_type)_$(trajectory_goal)_20000_30_2_8_2_32_$(number).jls"
+	n = (Symbol("$(trajectory_type)_astar"), Symbol("$(trajectory_type)_gbfs"))
+	numbers = filter(isfile ∘ namefun, 1:3)
+	isempty(numbers) && return(NamedTuple{n}((NaN,NaN)))
+	x = map(numbers) do number
+		filename = namefun(number)
+		stats = deserialize(filename)
+		df = DataFrame(stats[:])
+		da = filter(df) do r 
+			(r.used_in_train !== testset) && (r.planner == "AStarPlanner")
+		end
+		dg = filter(df) do r 
+			(r.used_in_train !== testset) && (r.planner == "GreedyPlanner")
+		end
+		[mean(da.solved), mean(dg.solved)]
+	end |> mean
+	x = round.(x, digits = 2)
+	NamedTuple{n}(tuple(x...))
+end
+
+function show_results(trajectory_goal)
+	problems = ["blocks", "ferry", "gripper", "npuzzle"]
+	df = map(problems) do problem
+		mapreduce(merge,["forward", "backward", "both"]) do t
+			parse_results(problem, "lstar", t,trajectory_goal;testset = true)
+		end
+	end |> DataFrame;
+	hcat(DataFrame(problem = problems),  df[:,1:2:end], df[:,2:2:end])
+end
