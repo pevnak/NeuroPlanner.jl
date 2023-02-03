@@ -7,11 +7,13 @@ using Flux
 using OneHotArrays
 using Statistics
 using SymbolicPlanners
+using StatsBase
 using GraphNeuralNetworks
 
 include("multigraph/extractor.jl")
 export PDDLExtractor, MultiGraph, MultiGNN, FeaturedMultiGraph, MultiModel, initproblem
 include("potential/extractor.jl")
+export LinearExtractor
 
 """
 	function Graphs.Graph(state::GenericState)

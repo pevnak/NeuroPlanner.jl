@@ -1,14 +1,13 @@
-using Dictionaries
+using PDDL: get_facts
 
 """
-find_leafs(sol)
+find_leafs(search_tree)
 
-identify all states without successors (leafs) in search tree `sol.search_tree`
+identify all states without successors (leafs) in `search_tree`
 
 """
-function find_leafs(sol)
-	search_tree = sol.search_tree
-	st = map(i -> true, Indices(keys(search_tree)))
+function find_leafs(search_tree)
+	st = Dict(k => true for k in keys(search_tree)))
 	for v in values(search_tree)
 		v.parent_id === nothing && continue
 		st[v.parent_id] = false

@@ -250,20 +250,17 @@ such that the cycle is removed.
 function removecycles(trajectory, plan)
 	j = firstcycle(trajectory)
 	j == nothing && return(trajectory, plan)
-	@assert j < length(trajectory)
-	j = j + 1
-	trajectory[j:end], plan[j:end]
+	trajectory[1:j], plan[1:j-1]
 end
 
 function firstcycle(trajectory)
-	cycles = Int[]
-	for i in eachindex(trajectory)
-		for j in i+1:lastindex(trajectory)
-			trajectory[i] == trajectory[j] && push!(cycles, i)
+	ff = map(PDDL.get_facts, trajectory)
+	for i in reverse(eachindex(ff))
+		for j in 1:i-1
+			issubset(ff[i], ff[j]) && return(j) 
 		end 
 	end
-	isempty(cycles) && return(nothing)
-	return(maximum(cycles))
+	return(nothing)
 end
 
 """

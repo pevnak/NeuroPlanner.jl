@@ -7,19 +7,26 @@ is fixed for a problem instance. It is not transferable between problem
 instances.
 
 """
-struct LinearExtractor{D,CDO,N,M}
+struct LinearExtractor{DO,CDO,N,NP,M, G}
 	domain::DO
 	c_domain::CDO
 	array_props::NTuple{N, Symbol}
-	array_offsets::NTuple{N + 1, Int}
+	array_offsets::NTuple{NP, Int}
 	scalar_props::NTuple{M, Symbol}
 	scalar_offsets::NTuple{M, Int}
 	dimension::Int
+	goal::G
 end
 
+LinearExtractorGoalLess =  LinearExtractor{<:Any,<:Any,<:Any,<:Any,<:Any,<:Nothing}
+LinearExtractorGoalAware = LinearExtractor{<:Any,<:Any,<:Any,<:Any,<:Any,<:AbstractVector}
+LinearExtractorBlank = LinearExtractor{<:Any,<:Nothing,0,0,0,<:Nothing}
 
 
-function LinearExtractor(domain, problem; kwargs...)
+"""
+
+"""
+function LinearExtractor(domain, problem; embed_goal = true)
 	c_domain, c_state = compiled(domain, initstate(domain, problem))
 	props = propertynames(c_state)
 	array_props = filter(k -> getproperty(c_state, k) isa AbstractArray, props)
@@ -28,20 +35,47 @@ function LinearExtractor(domain, problem; kwargs...)
 	array_offsets = (0, cumsum(l)...)
 	scalar_offsets = tuple([array_offsets[end] + i for i in eachindex(scalar_props)]...)
 	dimension = isempty(scalar_offsets) ? array_offsets[end] : scalar_offsets[end]
-	LinearExtractor(domain, c_domain, array_props, array_offsets, scalar_props, scalar_offsets, dimension)
+	le = LinearExtractor(domain, c_domain, array_props, array_offsets, scalar_props, scalar_offsets, dimension, nothing)
 end
 
+function LinearExtractor(domain)
+	LinearExtractor(domain, nothing, NTuple{0,Symbol}(), NTuple{0,Int}(),
+		NTuple{0,Symbol}(), NTuple{0,Int}(), 0, nothing)
+end
 
-function (e::LinearExtractor)(T, s::CompiledState)
-	x = zeros(T, dimension)
-	for (i,k) in enumerate(array_props)
-		start = array_offsets[i] + 1
-		stop = array_offsets[i + 1]
+function add_goalstate(lx::LinearExtractor, domain, problem, goal = goalstate(domain, problem))
+	LinearExtractor(
+		lx.domain,
+		lx.c_domain,
+		lx.array_props,
+		lx.array_offsets,
+		lx.scalar_props,
+		lx.scalar_offsets,
+		lx.dimension,
+		state2vec(Float32, lx, goal),
+	)
+end
+
+function state2vec(T::DataType, e::LinearExtractor, s::CompiledState)
+	x = zeros(T, e.dimension)
+	for (i,k) in enumerate(e.array_props)
+		start = e.array_offsets[i] + 1
+		stop = e.array_offsets[i + 1]
 		x[start:stop] .= vec(getproperty(s, k))
 	end
-	for (i, k) in enumerate(scalar_props)
-		x[scalar_offsets[i]] = getproperty(s, k)
+	for (i, k) in enumerate(e.scalar_props)
+		x[e.scalar_offsets[i]] = getproperty(s, k)
 	end
+	x
 end
 
-function (e::LinearExtractor)(T, s::State) = e(T, compile(e.c_domain, s))
+function (e::LinearExtractorGoalLess)(T::DataType, s::CompiledState)
+	state2vec(T, e, s)
+end
+
+function (e::LinearExtractorGoalAware)(T::DataType, s::CompiledState)
+	state2vec(T, e, s)
+end
+
+(e::LinearExtractor)(T::DataType, s::State) = e(T, PDDL.compilestate(e.c_domain, s))
+(e::LinearExtractor)(s::State) = e(Float32, s)

@@ -1,3 +1,4 @@
+using PDDL: get_facts
 """
 leafs(search_tree)
 
@@ -30,4 +31,25 @@ function artificial_trajectory(sol)
 		id = v.parent_id
 	end
 	reverse(trajectory)
+end
+
+"""
+trajectory, plan, new_goal = artificial_goal(domain, problem, trajectory, goal)
+
+finds a new goal in trajectory with predicates similar to goals 
+"""
+function artificial_goal(domain, problem, trajectory, plan, goal = goalstate(domain, problem))
+	tgoal = last(trajectory)
+	gf = get_facts(goal)
+	gn = countmap([f.name for f in gf])
+	gt = collect(get_facts(tgoal))
+	new_facts = mapreduce(vcat, keys(gn)) do k
+		v = gn[k]
+		tt = filter(x -> x.name == k, gt)
+		sample(tt, min(v, length(tt)), replace = false)
+	end
+	new_goal = GenericState(tgoal.types, Set(new_facts))
+
+	i = findfirst(i -> issubset(new_facts, get_facts(trajectory[i])), 1:length(trajectory))
+	trajectory[1:i], plan[1:i-1], new_goal
 end

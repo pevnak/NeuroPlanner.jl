@@ -12,6 +12,7 @@ using Random
 using StatsBase
 using Serialization
 using PDDL: get_facts
+using NeuroPlanner: artificial_goal
 
 include("solution_tracking.jl")
 include("problems.jl")
@@ -56,6 +57,8 @@ function create_training_set_from_tree(pddld, problem::GenericProblem, fminibatc
 	map(sample(collect(NeuroPlanner.leafs(st)), n, replace = false)) do node_id
 		plan, trajectory = SymbolicPlanners.reconstruct(node_id, st)
 		trajectory, plan, agoal = artificial_goal(domain, problem, trajectory, plan, goal)
+		# linex = LinearExtractor(domain, problem)
+		# fminibatch(st, linex, trajectory)
 		pddle = NeuroPlanner.add_goalstate(pddld, problem, agoal)
 		fminibatch(st, pddle, trajectory)
 	end
@@ -163,10 +166,10 @@ end
 
 # Let's make configuration ephemeral
 # problem_name = ARGS[1]
-# problem_name = "gripper"
-# loss_name = "lstar"
-# problem_file = "benchmarks/gripper/problems/gripper-n45.pddl"
-# seed = 1
+problem_name = "gripper"
+loss_name = "lstar"
+problem_file = "benchmarks/gripper/problems/gripper-n10.pddl"
+seed = 1
 
 problem_name = ARGS[1]
 loss_name = ARGS[2]
@@ -179,7 +182,7 @@ graph_layers = 2
 graph_dim = 8
 dense_layers = 2
 dense_dim = 32
-training_set_size = 100
+training_set_size = 1000
 max_steps = 20000
 max_loss = 0.0
 depths = 1:30
