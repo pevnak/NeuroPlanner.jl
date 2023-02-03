@@ -20,14 +20,12 @@ end
 
 LinearExtractorGoalLess =  LinearExtractor{<:Any,<:Any,<:Any,<:Any,<:Any,<:Nothing}
 LinearExtractorGoalAware = LinearExtractor{<:Any,<:Any,<:Any,<:Any,<:Any,<:AbstractVector}
-LinearExtractorBlank = LinearExtractor{<:Any,<:Nothing,0,0,0,<:Nothing}
-
-
-"""
+LinearExtractorBlank = LinearExtractor{<:Any,<:Any,0,0,0,<:Nothing}
 
 """
-function LinearExtractor(domain, problem; embed_goal = true)
-	c_domain, c_state = compiled(domain, initstate(domain, problem))
+
+"""
+function LinearExtractor(domain, problem, c_domain, c_state; embed_goal = true)
 	props = propertynames(c_state)
 	array_props = filter(k -> getproperty(c_state, k) isa AbstractArray, props)
 	scalar_props = filter(k -> getproperty(c_state, k) isa Number, props)
@@ -36,14 +34,14 @@ function LinearExtractor(domain, problem; embed_goal = true)
 	scalar_offsets = tuple([array_offsets[end] + i for i in eachindex(scalar_props)]...)
 	dimension = isempty(scalar_offsets) ? array_offsets[end] : scalar_offsets[end]
 	le = LinearExtractor(domain, c_domain, array_props, array_offsets, scalar_props, scalar_offsets, dimension, nothing)
+	embed_goal ? add_goalstate(le, goalstate(domain, problem)) : le
 end
 
-function LinearExtractor(domain)
-	LinearExtractor(domain, nothing, NTuple{0,Symbol}(), NTuple{0,Int}(),
-		NTuple{0,Symbol}(), NTuple{0,Int}(), 0, nothing)
+function initproblem(lx::LinearExtractor, problem; add_goal = true)
+	lx, PDDL.compilestate(lx.c_domain, initstate(lx.domain, problem))
 end
 
-function add_goalstate(lx::LinearExtractor, domain, problem, goal = goalstate(domain, problem))
+function add_goalstate(lx::LinearExtractor, goal)
 	LinearExtractor(
 		lx.domain,
 		lx.c_domain,
@@ -56,6 +54,11 @@ function add_goalstate(lx::LinearExtractor, domain, problem, goal = goalstate(do
 	)
 end
 
+"""
+state2vec(T::DataType, e::LinearExtractor, s::CompiledState)
+
+Convert state to vector. Goal is not added.
+"""
 function state2vec(T::DataType, e::LinearExtractor, s::CompiledState)
 	x = zeros(T, e.dimension)
 	for (i,k) in enumerate(e.array_props)
@@ -69,12 +72,16 @@ function state2vec(T::DataType, e::LinearExtractor, s::CompiledState)
 	x
 end
 
+function state2vec(T::DataType, e::LinearExtractor, s::State)
+	state2vec(T, e, PDDL.compilestate(e.c_domain, s))
+end
+
 function (e::LinearExtractorGoalLess)(T::DataType, s::CompiledState)
 	state2vec(T, e, s)
 end
 
 function (e::LinearExtractorGoalAware)(T::DataType, s::CompiledState)
-	state2vec(T, e, s)
+	vcat(state2vec(T, e, s), e.goal)
 end
 
 (e::LinearExtractor)(T::DataType, s::State) = e(T, PDDL.compilestate(e.c_domain, s))

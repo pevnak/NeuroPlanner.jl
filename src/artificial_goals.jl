@@ -39,7 +39,19 @@ trajectory, plan, new_goal = artificial_goal(domain, problem, trajectory, goal)
 finds a new goal in trajectory with predicates similar to goals 
 """
 function artificial_goal(domain, problem, trajectory, plan, goal = goalstate(domain, problem))
-	tgoal = last(trajectory)
+	new_goal = artificial_goal(trajectory[end], goal)
+	new_facts = get_facts(new_goal)
+	i = findfirst(i -> issubset(new_facts, get_facts(trajectory[i])), 1:length(trajectory))
+	trajectory[1:i], plan[1:i-1], new_goal
+end
+
+
+"""
+artificial_goal(target_goal::GenericState, goal::GenericState)
+
+create a substate of `target_goal` with similar predicates as `goal` 
+"""
+function artificial_goal(tgoal::GenericState, goal::GenericState)
 	gf = get_facts(goal)
 	gn = countmap([f.name for f in gf])
 	gt = collect(get_facts(tgoal))
@@ -48,8 +60,9 @@ function artificial_goal(domain, problem, trajectory, plan, goal = goalstate(dom
 		tt = filter(x -> x.name == k, gt)
 		sample(tt, min(v, length(tt)), replace = false)
 	end
-	new_goal = GenericState(tgoal.types, Set(new_facts))
+	GenericState(tgoal.types, Set(new_facts))
+end
 
-	i = findfirst(i -> issubset(new_facts, get_facts(trajectory[i])), 1:length(trajectory))
-	trajectory[1:i], plan[1:i-1], new_goal
+function artificial_goal(tgoal, goal)
+	error("artificial_goal is impemented only for interpreted states, not compiled ones")
 end
