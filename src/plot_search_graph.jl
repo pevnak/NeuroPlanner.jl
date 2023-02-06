@@ -1,6 +1,3 @@
-using TikzGraphs
-using TikzPictures
-
 SearchTree{N} = Dict{UInt64, N} where {N<:SymbolicPlanners.PathNode}
 
 """
@@ -109,7 +106,7 @@ closing = """
 \\end{document}
 """
 
-function plot_search_tree(io::IOStream, st::SearchTree, trajectory::AbstractSet, onlystates = nothing)
+function plot_search_tree(io::IOStream, st::SearchTree, trajectory::AbstractSet, hvals = Dict{UInt64, Float64}(), onlystates = nothing;α = 1, β = 1)
 	exportstate(s, onlystates::Nothing) = true
 	exportstate(s, onlystates) = s ∈ onlystates
 	dt, layers = treelayers(st)
@@ -123,7 +120,9 @@ function plot_search_tree(io::IOStream, st::SearchTree, trajectory::AbstractSet,
 			pos = "($(col - offset) ,- $(row))"
 			label = "node$(state)"
 			style = state ∈ trajectory ? "optimal" : "nonoptimal"
-			println(io, "\\node[$(style)node] ($label) at $(pos) {};")
+			f = β * get(hvals, state, 0) + α* st[state].path_cost
+			f = round(f, digits = 2)
+			println(io, "\\node[$(style)node] ($label) at $(pos) {$(f)};")
 			pid = st[state].parent_id
 			if pid !== nothing 
 				println(io, "\\path[$(style)edge] (node$(pid).south) -- ($label.north);")
@@ -150,9 +149,10 @@ tructure to log the order at which the state was evaluated first time
 struct EvalTracker{H<:Heuristic} <: Heuristic 
 	heuristic::H
 	order::Dict{UInt64,Int}
+	vals::Dict{UInt64,Float64}
 end
 
-EvalTracker(heuristic) = EvalTracker(heuristic, Dict{UInt64,Int}())
+EvalTracker(heuristic) = EvalTracker(heuristic, Dict{UInt64,Int}(), Dict{UInt64,Float64}())
 
 #reexport the heuristic api
 Base.hash(g::EvalTracker, h::UInt) = hash(g.model, hash(g.pddle, h))
@@ -160,7 +160,7 @@ Base.hash(g::EvalTracker, h::UInt) = hash(g.model, hash(g.pddle, h))
 function SymbolicPlanners.compute(h::EvalTracker, domain::Domain, state::State, spec::Specification)
 	id = hash(state)
 	get!(h.order, id, length(h.order) + 1)
-	SymbolicPlanners.compute(h.heuristic, domain, state, spec)
+	get!(h.vals, id, SymbolicPlanners.compute(h.heuristic, domain, state, spec))
 end
 
 SymbolicPlanners.precompute!(h::EvalTracker, domain::Domain, state::State, spec::Specification) = SymbolicPlanners.precompute!(h.heuristic, domain, state, spec)
@@ -187,8 +187,9 @@ function plot_example()
 
 
 	# to plot the full tree
-	prefix = "/Users/tomas.pevny/Work/Presentations/planning/animation"
-	plot_search_tree(prefix*"/debug.tex", sol.search_tree,  Set(hash.(sol.trajectory)))
+	# prefix = "/Users/tomas.pevny/Work/Presentations/planning/animation"
+	prefix = "/tmp"
+	plot_search_tree(prefix*"/debug.tex", sol.search_tree,  Set(hash.(sol.trajectory)), h.vals)
 
 	# plot the searc incrementally
 	search_order = map(first, sort(collect(h.order), lt = (i,j) -> i[2] < j[2]))

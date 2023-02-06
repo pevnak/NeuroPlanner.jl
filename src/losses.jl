@@ -119,22 +119,18 @@ function LₛMiniBatch(pddld, domain::GenericDomain, problem::Problem, trajector
 		acts = available(domain, sᵢ)
 		isempty(acts) && break 
 		#add states to the the map
-		next_states = map(acts) do act
+		for act in acts
 			next_state = execute(domain, sᵢ, act; check=false)
 			act_cost = get_cost(spec, domain, sᵢ, act, next_state)
-			if next_state ∉ keys(stateids)
-				stateids[next_state] = (;id = length(stateids) + 1,
-					g = stateids[sᵢ].g + act_cost
-					)
-			end
-			next_state
+			next_state ∈ keys(stateids) && continue
+			stateids[next_state] = (; id = length(stateids) + 1, g = stateids[sᵢ].g + act_cost)
 		end
-		@assert sⱼ ∈ next_states
-		next_states = setdiff(next_states, keys(stateids))
+		@assert sⱼ ∈ keys(stateids)
+		open_set = setdiff(keys(stateids), trajectory)
 
-		for s in setdiff(keys(stateids), trajectory)
+		for s in open_set
 			push!(I₊, stateids[s].id)
-			push!(I₋, stateids[sᵢ].id)			
+			push!(I₋, stateids[sⱼ].id)
 		end
 	end
 	if isempty(I₊)

@@ -47,9 +47,12 @@ end
 
 function solve_problem(linex, problem::GenericProblem, model, init_planner; max_time=30, return_unsolved = false)
 	domain = linex.c_domain
+	# domain = linex.domain
 	state = initstate(domain, problem)
 	goal = PDDL.get_goal(problem)
-	planner = init_planner(PotentialHeuristic(linex, model); max_time, save_search = true)
+	h = PotentialHeuristic(linex, model)
+	# h = EvalTracker(h)
+	planner = init_planner(h; max_time, save_search = true)
 	solution_time = @elapsed sol = planner(domain, state, goal)
 	return_unsolved || sol.status == :success || return(nothing)
 	stats = solver_stats(sol, solution_time)
@@ -77,8 +80,7 @@ function create_training_set_from_tree(linex, problem::GenericProblem, fminibatc
 		plan, trajectory = SymbolicPlanners.reconstruct(node_id, st)
 		trajectory, plan, agoal = artificial_goal(domain, problem, trajectory, plan, goal)
 		lx = NeuroPlanner.add_goalstate(linex, agoal)
-		# fminibatch(st, lx, trajectory)
-		LₛMiniBatch(lx, domain, problem, trajectory, agoal; goal_aware = false)
+		fminibatch(st, lx, trajectory)
 	end
 	minibatches, stats
 end
@@ -89,8 +91,8 @@ end
 # problem_name = "woodworking-sat11-strips"
 # problem_name = "gripper"
 # problem_name = "blocks"
-# loss_name = "lstar"
 # loss_name = "lgbfs"
+# loss_name = "lstar"
 # loss_name = "lrt"
 # seed = 1
 
@@ -100,12 +102,13 @@ seed = parse(Int,ARGS[3])
 
 
 opt_type = :mean
+# opt_type = :worst
 epsilon = 0.5
 max_time = 30
-dense_layers = 2
+dense_layers = 1
 dense_dim = 32
 training_set_size = 1000
-max_steps = 20000
+max_steps = 10000
 max_loss = 0.0
 
 Random.seed!(seed)
@@ -118,8 +121,10 @@ filename = ofile(join([loss_name, opt_type ,epsilon ,max_time ,dense_layers ,den
 @show (problem_name, loss_name, seed)
 @show filename
 
+
 results = DataFrame()
 problem_file = problem_files[1]
+# problem_file = "benchmarks/gripper/problems/gripper-n50.pddl"
 for problem_file in problem_files
 	@show problem_file
 	domain = load_domain(domain_pddl)
