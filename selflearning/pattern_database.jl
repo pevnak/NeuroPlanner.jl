@@ -190,7 +190,7 @@ Random.seed!(seed)
 domain_pddl, problem_files, _ = getproblem(problem_name, false)
 loss_fun, fminibatch = NeuroPlanner.getloss(loss_name)
 ofile(s...) = joinpath("patterndatabase", problem_name, s...)
-filename = ofile(join([loss_name,opt_type,epsilon,max_time,graph_layers,graph_dim,dense_layers,dense_dim,training_set_size,max_steps,max_loss, depths,ttratio,seed], "_")*".jls")
+filename = ofile(join([loss_name,opt_type,epsilon,max_time,graph_layers,graph_dim,dense_layers,dense_dim,training_set_size,max_steps,max_loss, depths,ttratio, seed], "_")*".jls")
 experiment(domain_pddl, problem_files[2], ofile, loss_fun, fminibatch; filename, opt_type, epsilon, max_time, graph_layers, graph_dim, dense_layers, dense_dim, training_set_size, max_steps, depths, max_loss, trace_type)
 
 function parse_results(problem, loss, trajectory_type, trajectory_goal; testset = true)

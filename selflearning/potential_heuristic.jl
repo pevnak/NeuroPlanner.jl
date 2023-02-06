@@ -47,11 +47,9 @@ end
 
 function solve_problem(linex, problem::GenericProblem, model, init_planner; max_time=30, return_unsolved = false)
 	domain = linex.c_domain
-	# domain = linex.domain
 	state = initstate(domain, problem)
 	goal = PDDL.get_goal(problem)
 	h = PotentialHeuristic(linex, model)
-	# h = EvalTracker(h)
 	planner = init_planner(h; max_time, save_search = true)
 	solution_time = @elapsed sol = planner(domain, state, goal)
 	return_unsolved || sol.status == :success || return(nothing)
@@ -80,7 +78,7 @@ function create_training_set_from_tree(linex, problem::GenericProblem, fminibatc
 		plan, trajectory = SymbolicPlanners.reconstruct(node_id, st)
 		trajectory, plan, agoal = artificial_goal(domain, problem, trajectory, plan, goal)
 		lx = NeuroPlanner.add_goalstate(linex, agoal)
-		fminibatch(st, lx, trajectory)
+		fminibatch(lx, domain, problem, trajectory; goal_aware = false)
 	end
 	minibatches, stats
 end
@@ -89,12 +87,12 @@ end
 # problem_name = "agricola-sat18"
 # problem_name = "caldera-sat18"
 # problem_name = "woodworking-sat11-strips"
-# problem_name = "gripper"
+problem_name = "gripper"
 # problem_name = "blocks"
 # loss_name = "lgbfs"
-# loss_name = "lstar"
+loss_name = "lstar"
 # loss_name = "lrt"
-# seed = 1
+seed = 1
 
 problem_name = ARGS[1]
 loss_name = ARGS[2]
@@ -105,7 +103,7 @@ opt_type = :mean
 # opt_type = :worst
 epsilon = 0.5
 max_time = 30
-dense_layers = 1
+dense_layers = 2
 dense_dim = 32
 training_set_size = 1000
 max_steps = 10000
