@@ -1,3 +1,4 @@
+using Printf
 function setup_blocks_slaney()
 	benchdir(s...) = joinpath("benchmarks","blocks-slaney",s...)
 	taskfiles(s) = [benchdir(s, f) for f in readdir(benchdir(s)) if startswith(f,"task",)]
@@ -42,12 +43,22 @@ function setup_zenotravel()
 	return(domain_pddl, problem_files, ofile)
 end
 
+function setup_ispc(name)
+	benchdir(s...) = joinpath("..","classical-domains","classical", name, s...)
+	domain_pddl = benchdir("domain.pddl")
+	problem_files = [benchdir(@sprintf("p%02d.pddl", 1)) for i in 1:20]
+	ofile(s...) = joinpath("results", name, s...)
+	return(domain_pddl, problem_files, ofile)
+end
+
 function getproblem(problem)
 	problem == "blocks" && return(setup_blocks_slaney())
 	problem == "ferry" && return(setup_ferry())
 	problem == "gripper" && return(setup_gripper())
 	problem == "npuzzle" && return(setup_n_puzzle())
 	problem == "zenotravel" && return(setup_zenotravel())
+	standard_ispc = Set(["agricola-sat18","caldera-sat18","woodworking-sat11-strips"])
+	problem ∈ standard_ispc && return(setup_ispc(problem))
 	error("unknown problem $(problem)")
 end
 

@@ -26,6 +26,10 @@ function L₂MiniBatch(pddld, problem::Problem, sol; goal_aware = true)
 	L₂MiniBatch(pddld, problem, sol.trajectory; goal_aware)
 end
 
+function L₂MiniBatch(search_tree::Dict{UInt64, <:PathNode}, pddle, trajectory::AbstractVector{<:State})
+	L₂MiniBatch(pddle, trajectory)	
+end
+
 function L₂MiniBatch(pddld, problem::Problem, trajectory::AbstractVector{<:State}; goal_aware = true)
 	pddle = goal_aware ? add_goalstate(pddld, problem) : pddld
 	L₂MiniBatch(pddle, trajectory)
@@ -92,32 +96,14 @@ function LₛMiniBatch(sol::PathSearchSolution, pddle, trajectory::AbstractVecto
 	LₛMiniBatch(sol.search_tree, pddle, trajectory)
 end
 
-function LₛMiniBatch(search_tree::Dict{UInt64, <:PathNode}, pddle, trajectory::AbstractVector{<:State})
-	# get indexes of the states on the solution path, which seems to be hashes of states 
-	trajectory_id = hash.(trajectory)
-	child₁ = descendants(search_tree, trajectory_id)
-	# child₂ = descendants(sol, union(child₁, trajectory_id))
-	ids = vcat(trajectory_id, child₁)
-	path_cost = [search_tree[i].path_cost for i in ids]
-	states = [search_tree[i].state for i in ids]
-	# we want every state on the solution path to be smaller than  
-	pm = [(i,j) for i in 1:length(trajectory_id) for j in length(trajectory_id)+1:length(ids)]
-	H₊ = onehotbatch([i[2] for i in pm], 1:length(ids))
-	H₋ = onehotbatch([i[1] for i in pm], 1:length(ids))
-
-	LₛMiniBatch(batch(map(pddle, states)), H₊, H₋, path_cost, length(trajectory_id))
-end
-
 function LₛMiniBatch(pddld, domain::GenericDomain, problem::Problem, plan::AbstractVector{<:Julog.Term}; goal_aware = true)
 	state = initstate(domain, problem)
 	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
 	LₛMiniBatch(pddld, domain, problem, trajectory; goal_aware)
 end
 
-function LₛMiniBatch(pddld, domain::GenericDomain, problem::Problem, trajectory::AbstractVector{<:State}; goal_aware = true)
-	goal =  goalstate(domain, problem)
+function LₛMiniBatch(pddld, domain::GenericDomain, problem::Problem, trajectory::AbstractVector{<:State}, goal =  goalstate(domain, problem); goal_aware = true)
 	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem, goal) : pddld
-
 	state = initstate(domain, problem)
 	@assert issubset(trajectory[1].facts, state.facts)
 	state = trajectory[1]
@@ -151,9 +137,13 @@ function LₛMiniBatch(pddld, domain::GenericDomain, problem::Problem, trajector
 			push!(I₋, stateids[sᵢ].id)			
 		end
 	end
-
-	H₊ = onehotbatch(I₊, 1:length(stateids))
-	H₋ = onehotbatch(I₋, 1:length(stateids))
+	if isempty(I₊)
+		H₊ = onehotbatch([], 1:length(stateids))
+		H₋ = onehotbatch([], 1:length(stateids))
+	else
+		H₊ = onehotbatch(I₊, 1:length(stateids))
+		H₋ = onehotbatch(I₋, 1:length(stateids))
+	end
 	states = collect(keys(stateids))
 	states = sort(states, lt = (i,j) -> stateids[i].id < stateids[j].id)
 	@assert stateids[states[1]].id == 1
@@ -208,6 +198,11 @@ function LgbfsMiniBatch(sol, pddld, problem::Problem)
 	LgbfsMiniBatch(l.x, l.H₊, l.H₋, l.path_cost, l.sol_length)
 end
 
+function LgbfsMiniBatch(search_tree::Dict{UInt64, <:PathNode}, pddle, trajectory::AbstractVector{<:State})
+	l = LₛMiniBatch(search_tree, pddle, trajectory)
+	LgbfsMiniBatch(l.x, l.H₊, l.H₋, l.path_cost, l.sol_length)
+end
+
 function LgbfsMiniBatch(pddld, domain::GenericDomain, problem::Problem, trajectory; goal_aware = true)
 	l = LₛMiniBatch(pddld, domain, problem, trajectory)
 	LgbfsMiniBatch(l.x, l.H₊, l.H₋, l.path_cost, l.sol_length)	
@@ -254,8 +249,13 @@ end
 
 function LRTMiniBatch(pddle, trajectory::AbstractVector{<:State})
 	n = length(trajectory)
-	H₊ = onehotbatch(1:n -1 , 1:n)
-	H₋ = onehotbatch(2:n, 1:n)
+	if n < 2
+		H₊ = onehotbatch([], 1:n)
+		H₋ = onehotbatch([], 1:n)
+	else
+		H₊ = onehotbatch(1:n -1 , 1:n)
+		H₋ = onehotbatch(2:n, 1:n)
+	end
 	LRTMiniBatch(batch(map(pddle, trajectory)),
 		H₊,
 		H₋,
@@ -271,6 +271,10 @@ end
 
 function LRTMiniBatch(pddld, problem::Problem, trajectory::AbstractVector{<:State}; goal_aware = true)
 	pddle = goal_aware ? add_goalstate(pddld, problem) : pddld
+	LRTMiniBatch(pddle, trajectory)
+end
+
+function LRTMiniBatch(search_tree::Dict{UInt64, <:PathNode}, pddle, trajectory::AbstractVector{<:State})
 	LRTMiniBatch(pddle, trajectory)
 end
 
@@ -294,24 +298,6 @@ lrtloss(model, xy::LRTMiniBatch) = lrtloss(model, xy.x, xy.path_cost, xy.H₊, x
 lrtloss(model, mb::NamedTuple{(:minibatch,:stats)}) = lrtloss(model, mb.minibatch)
 (l::LRTLoss)(args...) = lrtloss(args...)
 
-
-"""
-descendants(sol, parents_id)
-
-returns `descendants` of `parents_id` expanded during the search,
-which are disjoint of `parents_id`, i.e.  
-parents_id ∩ descendants(sol, parents_id) = ∅
-"""
-descendants(sol, parents_id::Vector) = descendants(sol, Set(parents_id))
-
-function descendants(sol::PathSearchSolution, parents_id::Set)
-	descendants(sol.search_tree, parents_id)
-end
-
-function descendants(search_tree::Dict{UInt64,<:PathNode}, parents_id::Set)
-	childs = [s.id for s in values(search_tree) if s.parent_id ∈ parents_id]
-	setdiff(childs, parents_id)
-end
 
 function getloss(name)
 	name == "l2" && return((L₂Loss(), L₂MiniBatch))
