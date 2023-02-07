@@ -60,7 +60,8 @@ end
 
 function make_search_tree(domain, problem;max_time = 30)
 	state = initstate(domain, problem)
-	planner = AStarPlanner(HAdd(); max_time, save_search = true)
+	planner = AStarPlanner(HMax(); max_time, save_search = true)
+	# planner = AStarPlanner(HAdd(); max_time, save_search = true)
 	spec = MinStepsGoal(problem)
 	solution_time = @elapsed sol = planner(domain, state, spec)
 	stats = solver_stats(sol, solution_time)
@@ -87,12 +88,13 @@ end
 # problem_name = "agricola-sat18"
 # problem_name = "caldera-sat18"
 # problem_name = "woodworking-sat11-strips"
-problem_name = "gripper"
+# problem_name = "gripper"
 # problem_name = "blocks"
 # loss_name = "lgbfs"
-loss_name = "lstar"
+# loss_name = "lstar"
 # loss_name = "lrt"
-seed = 1
+# loss_name = "l2"
+# seed = 1
 
 problem_name = ARGS[1]
 loss_name = ARGS[2]
@@ -105,15 +107,16 @@ epsilon = 0.5
 max_time = 30
 dense_layers = 2
 dense_dim = 32
-training_set_size = 1000
+training_set_size = 10000
 max_steps = 10000
 max_loss = 0.0
+trn_heuristic = "HMax"
 
 Random.seed!(seed)
 domain_pddl, problem_files, _ = getproblem(problem_name, false)
 loss_fun, fminibatch = NeuroPlanner.getloss(loss_name)
 ofile(s...) = joinpath("potential", problem_name, s...)
-filename = ofile(join([loss_name, opt_type ,epsilon ,max_time ,dense_layers ,dense_dim ,training_set_size ,max_steps ,max_loss, seed], "_")*".jls")
+filename = ofile(join([loss_name, opt_type, trn_heuristic, epsilon ,max_time ,dense_layers ,dense_dim ,training_set_size ,max_steps ,max_loss, seed], "_")*".jls")
 !isdir(ofile()) && mkpath(ofile())
 
 @show (problem_name, loss_name, seed)
@@ -121,7 +124,7 @@ filename = ofile(join([loss_name, opt_type ,epsilon ,max_time ,dense_layers ,den
 
 
 results = DataFrame()
-problem_file = problem_files[1]
+problem_file = problem_files[2]
 # problem_file = "benchmarks/gripper/problems/gripper-n50.pddl"
 for problem_file in problem_files
 	@show problem_file
@@ -159,7 +162,7 @@ end
 
 
 function parse_results(problem, loss, layers; testset = true)
-	namefun(number) = "potential/$(problem)/$(loss)_mean_0.5_30_$(layers)_32_1000_10000_0.0_$(number).jls"
+	namefun(number) = "potential/$(problem)/$(loss)_mean_HAdd_0.5_30_$(layers)_32_1000_10000_0.0_$(number).jls"
 	n = (Symbol(loss*"_pot"), Symbol(loss*"_Hadd"))
 	numbers = filter(isfile ∘ namefun, 1:3)
 	isempty(numbers) && return(NamedTuple{n}((NaN,NaN)))
@@ -181,8 +184,14 @@ function show_results(layers)
 	hcat(DataFrame(problems = problems), df[:,[1,3,5,6]])
 end
 
-for (problem, l, number) in Iterators.product(["blocks", "ferry", "gripper", "npuzzle"], 1:2, 1:3)
-	s = "potential/$(problem)/lstar_mean_0.5_30_$(l)_32_1000_10000_0.0_$(number).jls"
-	d = "potential/$(problem)/lstar2_mean_0.5_30_$(l)_32_1000_10000_0.0_$(number).jls"
-	run(`mv $s $d`)
-end
+# for (problem, l, number) in Iterators.product(["blocks", "ferry", "gripper", "npuzzle"], 1:2, 1:3)
+# 	for loss in ["lstar", "lrt","l2"]
+# 		try 
+# 			s = "potential/$(problem)/$(loss)_mean_0.5_30_$(l)_32_1000_10000_0.0_$(number).jls"
+# 			d = "potential/$(problem)/$(loss)_mean_HAdd_0.5_30_$(l)_32_1000_10000_0.0_$(number).jls"
+# 			run(`mv $s $d`)
+# 		catch me 
+# 			println(me)
+# 		end
+# 	end
+# end

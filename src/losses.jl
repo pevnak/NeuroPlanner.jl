@@ -22,7 +22,7 @@ function L₂MiniBatch(pddle, trajectory::AbstractVector{<:State})
 end
 
 
-function L₂MiniBatch(pddld, problem::Problem, trajectory::AbstractVector{<:State}; goal_aware = true)
+function L₂MiniBatch(pddld, domain::GenericDomain, problem::Problem, trajectory::AbstractVector{<:State}; goal_aware = true)
 	pddle = goal_aware ? add_goalstate(pddld, problem) : pddld
 	L₂MiniBatch(pddle, trajectory)
 end
@@ -236,10 +236,9 @@ function LRTMiniBatch(pddld, domain::GenericDomain, problem::Problem, plan::Abst
 	LRTMiniBatch(pddld, domain, problem, trajectory; goal_aware)
 end
 
-function LRTMiniBatch(pddld, domain::GenericDomain, problem::Problem, plan::AbstractVector{<:Julog.Term}; goal_aware = true)
-	state = initstate(domain, problem)
-	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
-	LRTMiniBatch(pddld, problem, trajectory; goal_aware)
+function LRTMiniBatch(pddld, domain::GenericDomain, problem::Problem, trajectory; goal_aware = true)
+	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem, goal) : pddld
+	LRTMiniBatch(pddle, trajectory)
 end
 
 struct LRTLoss end 
