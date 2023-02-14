@@ -27,6 +27,9 @@ function L₂MiniBatch(pddld, domain::GenericDomain, problem::Problem, trajector
 	L₂MiniBatch(pddle, trajectory)
 end
 
+function L₂MiniBatch(pddld, domain::GenericDomain, problem::Problem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:State}; goal_aware = true)
+	L₂MiniBatch(pddld, domain, problem, trajectory; goal_aware)
+end
 
 function L₂MiniBatch(pddld, domain::GenericDomain, problem::Problem, plan::AbstractVector{<:Julog.Term}; goal_aware = true)
 	state = initstate(domain, problem)
@@ -90,32 +93,54 @@ function LₛMiniBatch(pddld, domain::GenericDomain, problem::Problem, plan::Abs
 end
 
 function LₛMiniBatch(pddld, domain::GenericDomain, problem::Problem, trajectory::AbstractVector{<:State}; goal_aware = true)
+	LₛMiniBatch(pddld, domain, problem, nothing, trajectory; goal_aware)
+end
+
+_next_states(domain, problem, sᵢ, st::RSearchTree) = st.st[hash(sᵢ)]
+function _next_states(domain, problem, sᵢ, st::Nothing) 
+	acts = available(domain, sᵢ)
+	isempty(acts) && return([])
+	hsᵢ = hash(sᵢ)
+	map(acts) do act
+		state = execute(domain, sᵢ, act; check=false)
+		(;state,
+		  id = hash(state),
+		  parent_action = act,
+		  parent_id = hsᵢ
+		 )
+	end
+end
+
+function LₛMiniBatch(pddld, domain::GenericDomain, problem::Problem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:State}; goal_aware = true)
 	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem, goal) : pddld
 	state = trajectory[1]
 	spec = Specification(problem)
-	spec = SymbolicPlanners.simplify_goal(spec, domain, state)
 
-	stateids = Dict(state => (;id = 1, g = 0))
+	stateids = Dict(hash(state) => 1)
+	states = [(g = 0, state = state)]
 	I₊ = Vector{Int64}()
 	I₋ = Vector{Int64}()
 
+	htrajectory = hash.(trajectory)
 	for i in 1:(length(trajectory)-1)
 		sᵢ, sⱼ = trajectory[i], trajectory[i+1]
-		acts = available(domain, sᵢ)
-		isempty(acts) && break 
-		#add states to the the map
-		for act in acts
-			next_state = execute(domain, sᵢ, act; check=false)
-			act_cost = get_cost(spec, domain, sᵢ, act, next_state)
-			next_state ∈ keys(stateids) && continue
-			stateids[next_state] = (; id = length(stateids) + 1, g = stateids[sᵢ].g + act_cost)
+		hsⱼ = hash(sⱼ)
+		gᵢ = states[stateids[hash(sᵢ)]].g
+		next_states = _next_states(domain, problem, sᵢ, st)
+		isempty(next_states) && error("the inner node is not in the search tree")
+		for next_state in next_states
+			act = next_state.parent_action
+			act_cost = get_cost(spec, domain, sᵢ, act, next_state.state)
+			next_state.id ∈ keys(stateids) && continue
+			stateids[next_state.id] = length(stateids) + 1
+			push!(states, (;g = gᵢ + act_cost, state = next_state.state))
 		end
-		@assert sⱼ ∈ keys(stateids)
-		open_set = setdiff(keys(stateids), trajectory)
+		@assert hash(sⱼ) ∈ keys(stateids)
+		open_set = setdiff(keys(stateids), htrajectory)
 
 		for s in open_set
-			push!(I₊, stateids[s].id)
-			push!(I₋, stateids[sⱼ].id)
+			push!(I₊, stateids[s])
+			push!(I₋, stateids[hsⱼ])
 		end
 	end
 	if isempty(I₊)
@@ -125,12 +150,9 @@ function LₛMiniBatch(pddld, domain::GenericDomain, problem::Problem, trajector
 		H₊ = onehotbatch(I₊, 1:length(stateids))
 		H₋ = onehotbatch(I₋, 1:length(stateids))
 	end
-	states = collect(keys(stateids))
-	states = sort(states, lt = (i,j) -> stateids[i].id < stateids[j].id)
-	@assert stateids[states[1]].id == 1
-	@assert stateids[states[end]].id == length(stateids)
-	path_cost = [stateids[s].g for s in states]
-	LₛMiniBatch(batch(map(pddle, states)), H₊, H₋, path_cost, length(trajectory))
+	path_cost = [s.g for s in states]
+	x = batch([pddle(s.state) for s in states])
+	LₛMiniBatch(x, H₊, H₋, path_cost, length(trajectory))
 end
 
 
@@ -233,6 +255,11 @@ end
 function LRTMiniBatch(pddld, domain::GenericDomain, problem::Problem, plan::AbstractVector{<:Julog.Term}; goal_aware = true)
 	state = initstate(domain, problem)
 	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
+	LRTMiniBatch(pddld, domain, problem, trajectory; goal_aware)
+end
+
+
+function LRTMiniBatch(pddld, domain::GenericDomain, problem::Problem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:State}; goal_aware = true)
 	LRTMiniBatch(pddld, domain, problem, trajectory; goal_aware)
 end
 

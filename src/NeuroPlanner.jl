@@ -99,6 +99,7 @@ function _construct_featured_graph(g, vprops, eprops, term2id)
 	fg = FeaturedGraph(g; nf, ef)
 end
 
+include("rsearch_tree.jl")
 include("losses.jl")
 export L₂MiniBatch, UnsolvedL₂, L₂Loss, l₂loss, 
        LₛMiniBatch, UnsolvedLₛ, lₛloss, LₛLoss, 

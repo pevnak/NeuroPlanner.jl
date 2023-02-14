@@ -49,16 +49,26 @@ end
 """
 artificial_goal(target_goal::GenericState, goal::GenericState)
 
-create a substate of `target_goal` with similar predicates as `goal` 
+Create a substate of `target_goal` with similar predicates as `goal`,
+such that the maximal facts between `goal` and `target_goal` are copied 
+and the distribution of types is preserved.
 """
 function artificial_goal(tgoal::GenericState, goal::GenericState)
 	gf = get_facts(goal)
+	gt = get_facts(tgoal)
+
+	new_facts = intersect(gf, gt)
+	gf = setdiff(gf, new_facts)	
+	gt = collect(setdiff(gt, new_facts))
+
 	gn = countmap([f.name for f in gf])
-	gt = collect(get_facts(tgoal))
-	new_facts = mapreduce(vcat, keys(gn)) do k
-		v = gn[k]
-		tt = filter(x -> x.name == k, gt)
-		sample(tt, min(v, length(tt)), replace = false)
+	if !isempty(gn)
+		sampled_facts = mapreduce(vcat, keys(gn)) do k
+			v = gn[k]
+			tt = filter(x -> x.name == k, gt)
+			sample(tt, min(v, length(tt)), replace = false)
+		end
+		new_facts = union(new_facts, sampled_facts)
 	end
 	GenericState(tgoal.types, Set(new_facts))
 end
