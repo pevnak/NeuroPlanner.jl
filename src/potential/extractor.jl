@@ -34,14 +34,18 @@ function LinearExtractor(domain, problem, c_domain, c_state; embed_goal = true)
 	scalar_offsets = tuple([array_offsets[end] + i for i in eachindex(scalar_props)]...)
 	dimension = isempty(scalar_offsets) ? array_offsets[end] : scalar_offsets[end]
 	le = LinearExtractor(domain, c_domain, array_props, array_offsets, scalar_props, scalar_offsets, dimension, nothing)
-	embed_goal ? add_goalstate(le, goalstate(domain, problem)) : le
+	embed_goal ? add_goalstate(le, problem) : le
 end
 
 function initproblem(lx::LinearExtractor, problem; add_goal = true)
 	lx, PDDL.compilestate(lx.c_domain, initstate(lx.domain, problem))
 end
 
-function add_goalstate(lx::LinearExtractor, goal)
+function add_goalstate(lx::LinearExtractor, problem::GenericProblem)
+	add_goalstate(lx, problem, goalstate(lx.domain, problem))
+end
+
+function add_goalstate(lx::LinearExtractor, problem, goal)
 	LinearExtractor(
 		lx.domain,
 		lx.c_domain,

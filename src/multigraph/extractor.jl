@@ -39,7 +39,7 @@ add_goalstate(pddle, problem, goal)
 adds goal state to the extract, such that the goal descripto is always add 
 to the graph.
 """
-function add_goalstate(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem)
+function add_goalstate(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem::GenericProblem)
 	add_goalstate(pddle, problem, goalstate(pddle.domain, problem))
 end
 

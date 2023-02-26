@@ -14,27 +14,52 @@ using DataFrames
 using Serialization
 using PDDL: get_facts
 using NeuroPlanner: artificial_goal
+import NeuroPlanner: add_goalstate
 
 include("problems.jl")
 include("training.jl")
 
-function ffnn(d, odim, nlayers)
-	nlayers == 1 && return(Dense(d,1))
-	nlayers == 2 && return(Chain(Dense(d, odim, relu), Dense(odim,1)))
-	nlayers == 3 && return(Chain(Dense(d, odim, relu), Dense(odim, odim, relu), Dense(odim,1)))
+function ffnn(d, hdim, nlayers,odim = 1)
+	nlayers == 1 && return(Dense(d,1odim))
+	nlayers == 2 && return(Chain(Dense(d, hdim, relu), Dense(hdim,1odim)))
+	nlayers == 3 && return(Chain(Dense(d, hdim, relu), Dense(hdim, hdim, relu), Dense(hdim,1odim)))
 	error("nlayers should be only in [1,3]")
 end
 
 ######
+#	Combined Extractor
+######
+
+struct CombinedExtractor{D,E<:NamedTuple}
+	domain::D
+	extractors::E
+end
+
+add_goalstate(d::CombinedExtractor, problem) = CombinedExtractor(d.domain, map(e -> add_goalstate(e, problem), d.extractors))
+add_goalstate(d::CombinedExtractor, problem, goal) = CombinedExtractor(d.domain, map(e -> add_goalstate(e, problem, goal), d.extractors))
+
+(ex::CombinedExtractor)(s) = map(e -> e(s), ex.extractors)
+
+struct CombinedModel{S,G,P}
+	strips::S 
+	pddl::G
+	final::P
+end
+
+(m::CombinedModel)(x::NamedTuple) = m.final(vcat(m.strips(x.strips),m.pddl(x.pddl)))
+Flux.@functor CombinedModel
+
+######
 # define a NN based solver
 ######
-struct PotentialHeuristic{P,M} <: Heuristic 
-	linex::P
+struct GNNHeuristic{P,M} <: Heuristic 
+	pddle::P
 	model::M
 end
 
-Base.hash(g::PotentialHeuristic, h::UInt) = hash(g.model, hash(g.linex, h))
-SymbolicPlanners.compute(h::PotentialHeuristic, domain::Domain, state::State, spec::Specification) = only(h.model(h.linex(state)))
+GNNHeuristic(pddld, problem, model) = GNNHeuristic(NeuroPlanner.add_goalstate(pddld, problem), model)
+Base.hash(g::GNNHeuristic, h::UInt) = hash(g.model, hash(g.pddle, h))
+SymbolicPlanners.compute(h::GNNHeuristic, domain::Domain, state::State, spec::Specification) = only(h.model(h.pddle(state)))
 
 function solver_stats(sol, solution_time)
 	solved = sol.status == :success
@@ -45,11 +70,11 @@ function solver_stats(sol, solution_time)
 	)
 end 
 
-function solve_problem(linex, problem::GenericProblem, model, init_planner; max_time=30, return_unsolved = false)
-	domain = linex.c_domain
+function solve_problem(pddld, problem::GenericProblem, model, init_planner; max_time=30, return_unsolved = true)
+	domain = pddld.domain
 	state = initstate(domain, problem)
 	goal = PDDL.get_goal(problem)
-	h = PotentialHeuristic(linex, model)
+	h = GNNHeuristic(pddld, problem, model)
 	planner = init_planner(h; max_time, save_search = true)
 	solution_time = @elapsed sol = planner(domain, state, goal)
 	return_unsolved || sol.status == :success || return(nothing)
@@ -92,10 +117,10 @@ function create_training_set_from_tree(linex, problem::GenericProblem, fminibatc
 	minibatches, stats
 end
 
-function fast_sample_provider(linex, problem::GenericProblem, fminibatch, n::Int, trn_heuristic)
-	domain = linex.domain
+function fast_sample_provider(pddld, problem::GenericProblem, fminibatch, n::Int, trn_heuristic)
+	domain = pddld.domain
 	sol, stats = make_search_tree(domain, problem, trn_heuristic)
-	goal = goalstate(linex.domain, problem)
+	goal = goalstate(domain, problem)
 	st = sol.search_tree
 	rst = NeuroPlanner.RSearchTree(st)
 	goal_states = collect(NeuroPlanner.leafs(st))
@@ -104,8 +129,8 @@ function fast_sample_provider(linex, problem::GenericProblem, fminibatch, n::Int
 		node_id = sample(goal_states) 
 		plan, trajectory = SymbolicPlanners.reconstruct(node_id, st)
 		trajectory, plan, agoal = artificial_goal(domain, problem, trajectory, plan, goal)
-		lx = NeuroPlanner.add_goalstate(linex, agoal)
-		fminibatch(lx, domain, problem, rst, trajectory; goal_aware = false)
+		pddle = NeuroPlanner.add_goalstate(pddld, problem, agoal)
+		fminibatch(pddle, domain, problem, rst, trajectory; goal_aware = false)
 	end
 	provider, stats
 end
@@ -135,8 +160,10 @@ opt_type = :mean
 # opt_type = :worst
 epsilon = 0.5
 max_time = 30
-dense_layers = 3
+dense_layers = 2
 dense_dim = 32
+graph_dim = 8
+graph_layers = 2
 training_set_size = 10000
 max_steps = 10000
 max_loss = 0.0
@@ -145,15 +172,14 @@ max_loss = 0.0
 Random.seed!(seed)
 domain_pddl, problem_files, _ = getproblem(problem_name, false)
 loss_fun, fminibatch = NeuroPlanner.getloss(loss_name)
-ofile(s...) = joinpath("potential", problem_name, s...)
-filename = ofile(join([loss_name, opt_type, trn_heuristic, epsilon ,max_time ,dense_layers ,dense_dim ,training_set_size ,max_steps ,max_loss, seed], "_")*".jls")
+ofile(s...) = joinpath("onemazelearn_c", problem_name, s...)
+filename = ofile(join([loss_name, opt_type, trn_heuristic, epsilon, max_time, graph_layers, graph_dim, dense_layers ,dense_dim ,training_set_size ,max_steps ,max_loss, seed], "_")*".jls")
 !isdir(ofile()) && mkpath(ofile())
 
 @show (problem_name, loss_name, seed)
 @show filename
 
 results = DataFrame()
-problem_file = problem_files[32]
 if isfile(filename)
 	results = deserialize(filename)
 	problem_files = setdiff(problem_files, results.problem_file)
@@ -165,24 +191,35 @@ for problem_file in problem_files
 	domain = load_domain(domain_pddl)
 	problem = load_problem(problem_file)
 	c_domain, c_state = compiled(domain, problem)
-	linex = LinearExtractor(domain, problem, c_domain, c_state)
+	pddld = CombinedExtractor(
+		domain,
+		(strips = LinearExtractor(domain, problem, c_domain, c_state),
+		pddl = PDDLExtractor(domain, problem; embed_goal = false),
+		))
+	pddle = add_goalstate(pddld, problem)
 
 	#create model from some problem instance
-	h₀ = linex(c_state)
-	model = ffnn(length(h₀), dense_dim, dense_layers)
+	h₀ = pddle(initstate(domain, problem))
+	model = CombinedModel(
+		ffnn(length(h₀.strips), dense_dim, dense_layers, dense_dim),
+		MultiModel(h₀.pddl, graph_dim, graph_layers, d -> ffnn(d, dense_dim, dense_layers, dense_dim)),
+		ffnn(2*dense_dim, dense_dim, dense_layers)
+		)
+
 	init_planner = (heuristic; kwargs...) -> ForwardPlanner(;heuristic=heuristic, h_mult=1, kwargs...)
-	sol = solve_problem(linex, problem, model, init_planner; max_time = 1)	#warmup the solver
+	solve_problem(pddld, problem, model, init_planner; max_time = 10)	#warmup the solver
+
 
 	# time_trainset = @elapsed training_set, train_stats = create_training_set_from_tree(linex, problem, fminibatch, training_set_size, trn_heuristic)
 	# time_trainset = @elapsed sp1, train_stats = sample_provider(linex, problem, fminibatch, training_set_size, trn_heuristic)
-	time_trainset = @elapsed sp, train_stats = fast_sample_provider(linex, problem, fminibatch, training_set_size, trn_heuristic)
+	time_trainset = @elapsed sp, train_stats = fast_sample_provider(pddld, problem, fminibatch, training_set_size, trn_heuristic)
 	opt = AdaBelief()
 	ps = Flux.params(model)
 
 	# fvals = fill(typemax(Float64), length(training_set))
 	# ttrain = @elapsed train!(x -> loss_fun(model, x), model, ps, opt, training_set, fvals, max_steps; max_loss, ϵ = epsilon, opt_type = Symbol(opt_type))
 	ttrain = @elapsed fval = train!(x -> loss_fun(model, x), model, ps, opt, sp, max_steps)
-	tset = @elapsed test_stats = solve_problem(linex, problem, model, init_planner; max_time, return_unsolved = true).stats
+	tset = @elapsed test_stats = solve_problem(pddld, problem, model, init_planner; max_time, return_unsolved = true).stats
 	push!(results, (;
 		problem_file,
 		test_stats...,
@@ -198,8 +235,8 @@ for problem_file in problem_files
 end
 
 
-function parse_results(problem, loss, layers, trnh, cf)
-	namefun(number) = "potential/$(problem)/$(loss)_mean_$(trnh)_0.5_30_$(layers)_32_10000_10000_0.0_$(number).jls"
+function parse_results(problem, loss, glayers, layers, trnh, cf)
+	namefun(number) = "onemazelearn_c/$(problem)/$(loss)_mean_$(trnh)_0.5_30_$(glayers)_8_$(layers)_32_10000_10000_0.0_$(number).jls"
 	n = (Symbol(loss*"_pot"), Symbol(loss*"_$(trnh)"))
 	numbers = filter(isfile ∘ namefun, 1:3)
 	isempty(numbers) && return(NamedTuple{n}((NaN,NaN)))
@@ -212,42 +249,36 @@ function parse_results(problem, loss, layers, trnh, cf)
 	NamedTuple{n}(tuple(x...))
 end
 
-function common_files(problem, losses, layers, trnh)
-	rfiles = ["potential/$(problem)/$(loss)_mean_$(trnh)_0.5_30_$(layers)_32_10000_10000_0.0_1.jls" for loss in losses]
+function common_files(problem, losses, glayers, layers, trnh)
+	rfiles = ["onemazelearn_c/$(problem)/$(loss)_mean_$(trnh)_0.5_30_$(glayers)_8_$(layers)_32_10000_10000_0.0_1.jls" for loss in losses]
 	rfiles = filter(isfile, rfiles)
 	mapreduce(intersect, rfiles) do f
 		deserialize(f).problem_file
 	end
 end
 
-function show_results(layers, trnh)
+function show_results(glayers, layers, trnh)
 	problems = ["blocks", "ferry", "gripper", "npuzzle"]
 	losses = ["lstar", "lrt","l2"]
 	df = map(problems) do problem
-		cf = Set(common_files(problem, losses, layers, trnh))
+		cf = Set(common_files(problem, losses, glayers, layers, trnh))
 		mapreduce(merge, losses) do l
-			parse_results(problem, l, layers, trnh, cf)
+			parse_results(problem, l, glayers, layers, trnh, cf)
 		end
 	end |> DataFrame;
 	hcat(DataFrame(problems = problems), df[:,[1,3,5,6]])
 end
 
-function show_completion(layers, trnh)
+function show_completion(glayers, layers, trnh)
 	problems = ["blocks", "ferry", "gripper", "npuzzle"]
 	df = map(Iterators.product(problems, ["lstar", "lrt","l2"])) do (problem, l)
-		namefun(number) = "potential/$(problem)/$(l)_mean_$(trnh)_0.5_30_$(layers)_32_10000_10000_0.0_$(number).jls"
+		namefun(number) = "onemazelearn_c/$(problem)/$(l)_mean_$(trnh)_0.5_30_$(glayers)_8_$(layers)_32_10000_10000_0.0_$(number).jls"
 		ns = map(1:1) do i 
 			!isfile(namefun(i)) && return(0)
 			size(deserialize(namefun(i)), 1)
 		end
 		tuple(ns...)
 	end
-end
-
-df = show_results(1, "null")
-for i in 1:3
-	dd = show_results(i, "null")
-	df[:,2:end] .= max.(df[:,2:end], dd[:,2:end])
 end
 
 # for (problem, l, number) in Iterators.product(["blocks", "ferry", "gripper", "npuzzle"], 1:2, 1:3)

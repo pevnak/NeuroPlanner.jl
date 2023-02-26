@@ -7,4 +7,4 @@
 #SBATCH --out=/home/pevnytom/logs/pddl.%j.out
 
 ml Julia/1.8.3-linux-x86_64
-julia -O3 --project=. onemazelearn_g.jl $1 $2 $3 $4
+julia -O3 --project=. onemazelearn_c.jl $1 $2 $3 $4
