@@ -4,16 +4,33 @@ using Flux
 using GraphNeuralNetworks
 using SymbolicPlanners
 using Test
+using Random
 
-domain = load_domain("sokoban.pddl")
-problem = load_problem("s1.pddl")
+# domain = load_domain("sokoban.pddl")
+# problem = load_problem("s1.pddl")
+
+domain = load_domain("../classical-domains/classical/settlers/domain.pddl")
+problem = load_problem("../classical-domains/classical/settlers/p01_pfile1.pddl")
+
+
+domain = load_domain("../classical-domains/classical/depot/domain.pddl")
+problem = load_problem("../classical-domains/classical/depot/pfile1.pddl")
+
+domain = load_domain("../classical-domains/classical/driverlog/domain.pddl")
+problem = load_problem("../classical-domains/classical/driverlog/pfile1.pddl")
+
+domain = load_domain("../classical-domains/classical/briefcaseworld/domain.pddl")
+problem = load_problem("../classical-domains/classical/briefcaseworld/pfile1.pddl")
+
+
+# pddle = PDDLExtractor(domain, problem) 
 
 pddle = PDDLExtractor(domain, problem) 
 state = initstate(domain, problem)
 
 @testset "extraction and basic gradient" begin
 	h₀ = pddle(state)
-	m = MultiModel(h₀, 4, d -> Chain(Dense(d, 32,relu), Dense(32,32)))
+	m = MultiModel(h₀, 4, 2, d -> Chain(Dense(d, 32,relu), Dense(32,32)))
 	ps = Flux.params(m)
 	gs = gradient(() -> sum(m(h₀)), ps)
 	@test all(gs[p] !== nothing for p in ps)
@@ -32,17 +49,17 @@ end
 
 	@testset "forward path" begin 
 		h₀ = pddle(state)
-		m = MultiModel(h₀, 4, d -> Chain(Dense(d, 32,relu), Dense(32,32)))
+		m = MultiModel(h₀, 4, 2, d -> Chain(Dense(d, 32,relu), Dense(32,32)))
 		xx = [pddle(state) for state in sol.trajectory];
 		yy = collect(length(sol.trajectory):-1:1);
 		@test reduce(hcat, map(m, xx)) ≈  m(batch(xx))
-		ii = [7,1,6,2,5,3,4]
+		ii = randperm(length(xx))
 		@test reduce(hcat, map(m, xx[ii])) ≈  m(batch(xx[ii]))
 	end
 
 	@testset "gradient path" begin 
 		h₀ = pddle(state)
-		m = MultiModel(h₀, 4, d -> Chain(Dense(d, 32,relu), Dense(32,1)))
+		m = MultiModel(h₀, 4, 2, d -> Chain(Dense(d, 32,relu), Dense(32,1)))
 		xx = [pddle(state) for state in sol.trajectory];
 		bxx = batch(xx);
 		yy = collect(length(sol.trajectory):-1:1);

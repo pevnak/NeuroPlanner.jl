@@ -8,19 +8,9 @@ struct PDDLExtractor{D,G,DO}
 	domain::DO
 	binary_predicates::Dict{Symbol,Int64}
 	nunanary_predicates::Dict{Symbol,Int64}
+	objtype2id::Dict{Symbol,Int64}
 	term2id::D
 	goal::G
-end
-
-function PDDLExtractor(domain, problem; embed_goal = true)
-	dictmap(x) = Dict(reverse.(enumerate(sort(x))))
-	predicates = collect(domain.predicates)
-	any(kv -> length(kv[2].args) > 2, predicates) && error("Cannot interpret domains with more than binary predicates")
-	binary_predicates = dictmap([kv[1] for kv in predicates if length(kv[2].args) == 2])
-	nunanary_predicates = dictmap([kv[1] for kv in predicates if length(kv[2].args) ≤  1])
-	pddle = PDDLExtractor(domain, binary_predicates, nunanary_predicates, nothing, nothing)
-	!embed_goal && return(pddle)
-	add_goalstate(pddle, problem)
 end
 
 function PDDLExtractor(domain)
@@ -29,7 +19,14 @@ function PDDLExtractor(domain)
 	any(kv -> length(kv[2].args) > 2, predicates) && error("Cannot interpret domains with more than binary predicates")
 	binary_predicates = dictmap([kv[1] for kv in predicates if length(kv[2].args) == 2])
 	nunanary_predicates = dictmap([kv[1] for kv in predicates if length(kv[2].args) ≤  1])
-	PDDLExtractor(domain, binary_predicates, nunanary_predicates, nothing, nothing)
+	objtype2id = Dict(s => i + length(nunanary_predicates) for (i, s) in enumerate(collect(keys(domain.typetree))))
+	PDDLExtractor(domain, binary_predicates, nunanary_predicates, objtype2id, nothing, nothing)
+end
+
+function PDDLExtractor(domain, problem; embed_goal = true)
+	pddld = PDDLExtractor(domain)
+	!embed_goal && return(pddld)
+	add_goalstate(pddld, problem)
 end
 
 """
@@ -46,12 +43,12 @@ end
 function add_goalstate(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem, goal)
 	pddle = specialize(pddle, problem)
 	goal = multigraph(pddle, goal)
-	PDDLExtractor(pddle.domain, pddle.binary_predicates, pddle.nunanary_predicates, pddle.term2id, goal)
+	PDDLExtractor(pddle.domain, pddle.binary_predicates, pddle.nunanary_predicates, pddle.objtype2id, pddle.term2id, goal)
 end
 
 function add_goalstate(pddle::PDDLExtractor{<:Any,<:Nothing}, problem, goal)
 	goal = multigraph(pddle, goal)
-	PDDLExtractor(pddle.domain, pddle.binary_predicates, pddle.nunanary_predicates, pddle.term2id, goal)
+	PDDLExtractor(pddle.domain, pddle.binary_predicates, pddle.nunanary_predicates, pddle.objtype2id, pddle.term2id, goal)
 end
 
 """
@@ -63,7 +60,7 @@ extractor.
 """
 function specialize(pddle::PDDLExtractor{<:Nothing,<:Nothing}, problem)
 	term2id = Dict(v => i for (i, v) in enumerate(problem.objects))
-	PDDLExtractor(pddle.domain, pddle.binary_predicates, pddle.nunanary_predicates, term2id, nothing)
+	PDDLExtractor(pddle.domain, pddle.binary_predicates, pddle.nunanary_predicates, pddle.objtype2id, term2id, nothing)
 end
 
 """
@@ -118,7 +115,7 @@ function multigraph(pddle::PDDLExtractor{<:Dict,<:Nothing}, state)
 end
 
 function multigraph(pddle::PDDLExtractor, state, term2id)
-	vprops = zeros(Float32, length(pddle.nunanary_predicates), length(term2id))
+	vprops = zeros(Float32, length(pddle.nunanary_predicates) + length(pddle.objtype2id), length(term2id))
 	graphs = [Graph(length(term2id)) for _ in 1:length(pddle.binary_predicates)]
 	for f in state.facts
 		a = get_args(f)
@@ -135,6 +132,12 @@ function multigraph(pddle::PDDLExtractor, state, term2id)
 			pid = pddle.nunanary_predicates[f.name]
 			vprops[pid,:] .= 1
 		end
+	end
+
+	for s in state.types
+		i = pddle.objtype2id[s.name]
+		j = pddle.term2id[only(s.args)]
+		vprops[i, j] = 1
 	end
 	foreach(g -> foreach(i -> add_edge!(g, Edge(i,i)), 1:nv(g)), graphs)
 	MultiGraph(graphs, vprops)
