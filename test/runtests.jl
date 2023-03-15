@@ -1,6 +1,7 @@
 using NeuroPlanner
 using PDDL
 using Flux
+using Mill
 using GraphNeuralNetworks
 using SymbolicPlanners
 using Test
@@ -9,30 +10,43 @@ using Random
 # domain = load_domain("sokoban.pddl")
 # problem = load_problem("s1.pddl")
 
-domain = load_domain("../classical-domains/classical/settlers/domain.pddl")
-problem = load_problem("../classical-domains/classical/settlers/p01_pfile1.pddl")
+# domain = load_domain("../classical-domains/classical/settlers/domain.pddl")
+# problem = load_problem("../classical-domains/classical/settlers/p01_pfile1.pddl")
 
 
-domain = load_domain("../classical-domains/classical/depot/domain.pddl")
-problem = load_problem("../classical-domains/classical/depot/pfile1.pddl")
+# domain = load_domain("../classical-domains/classical/depot/domain.pddl")
+# problem = load_problem("../classical-domains/classical/depot/pfile1.pddl")
 
 domain = load_domain("../classical-domains/classical/driverlog/domain.pddl")
 problem = load_problem("../classical-domains/classical/driverlog/pfile1.pddl")
 
-domain = load_domain("../classical-domains/classical/briefcaseworld/domain.pddl")
-problem = load_problem("../classical-domains/classical/briefcaseworld/pfile1.pddl")
+# domain = load_domain("../classical-domains/classical/briefcaseworld/domain.pddl")
+# problem = load_problem("../classical-domains/classical/briefcaseworld/pfile1.pddl")
 
 
 # pddle = PDDLExtractor(domain, problem) 
 
-pddle = PDDLExtractor(domain, problem) 
-state = initstate(domain, problem)
 
-@testset "extraction and basic gradient" begin
+@testset "extraction and basic gradient of MultiModel" begin
+	pddld = PDDLExtractor(domain) 
+	pddle = NeuroPlanner.specialize(pddld, problem) 
+	state = initstate(domain, problem)
 	h₀ = pddle(state)
-	m = MultiModel(h₀, 4, 2, d -> Chain(Dense(d, 32,relu), Dense(32,32)))
+	m = MultiModel(h₀, 4, 1, d -> Dense(d,32))
 	ps = Flux.params(m)
 	gs = gradient(() -> sum(m(h₀)), ps)
+	@test all(gs[p] !== nothing for p in ps)
+end
+
+@testset "extraction and basic gradient of hypergraph" begin
+	ex = HyperExtractor(domain)
+	ex = NeuroPlanner.specialize(ex, problem)
+	gex = NeuroPlanner.add_goalstate(ex, problem)
+	state = initstate(domain, problem)
+	ds = ex(state)
+	model = reflectinmodel(ds, d -> Dense(d,32), SegmentedMean)
+	ps = Flux.params(model)
+	gs = gradient(() -> sum(model(ds)), ps)
 	@test all(gs[p] !== nothing for p in ps)
 end
 

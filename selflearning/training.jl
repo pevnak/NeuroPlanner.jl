@@ -44,19 +44,26 @@ function train!(loss, model, ps::Params, opt::AbstractOptimiser, minibatches, fv
 	fvals
 end
 
-function train!(loss, model, ps::Params, opt::AbstractOptimiser, prepare_minibatch, max_steps)
-	fval = 0.0
-	for _ in 1:max_steps
+function train!(loss, model, ps::Params, opt::AbstractOptimiser, prepare_minibatch, max_steps; reset_fval = 1000, verbose = true, stop_fval=typemin(Float64))
+	fval, n = 0.0, 0
+	for i in 1:max_steps
 		d = prepare_minibatch()
 		l, gs = withgradient(() -> loss(d), ps)
 		!isfinite(l) && error("Loss is $l on data item $j")
 		fval += l
+		n += 1
 		# serialize("/tmp/debug.jls",(model, d))
 		Flux.Optimise.update!(opt, ps, gs)
 		# any(any(isnan.(p)) for p in ps) && error("nan in parameters")
 		# any(any(isinf.(p)) for p in ps) && error("inf in parameters")
+		if mod(i, reset_fval) == 0
+			verbose && println(i,": ", round(fval/n, digits = 3))
+			fval / n < stop_fval && break
+			fval, n = 0.0, 0
+		end
+
 	end
-	fval / max_steps
+	fval / n
 end
 
 """

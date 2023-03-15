@@ -29,6 +29,8 @@ function PDDLExtractor(domain, problem; embed_goal = true)
 	add_goalstate(pddld, problem)
 end
 
+(pddle::PDDLExtractor)(s) = multigraph(pddle, s)
+
 """
 add_goalstate(pddle, problem)
 add_goalstate(pddle, problem, goal)

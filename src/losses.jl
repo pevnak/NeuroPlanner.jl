@@ -49,6 +49,7 @@ end
 struct L₂Loss end 
 l₂loss(model, x, y) = Flux.Losses.mse(vec(model(x)), y)
 l₂loss(model, xy::L₂MiniBatch) = l₂loss(model, xy.x, xy.y)
+l₂loss(model, xy::L₂MiniBatch, surrogate) = l₂loss(model, xy.x, xy.y)
 l₂loss(model, mb::NamedTuple{(:minibatch,:stats)}) = l₂loss(model, mb.minibatch)
 (l::L₂Loss)(args...) = l₂loss(args...)
 
@@ -163,14 +164,15 @@ Minimizes `L*` loss, We want ``f * H₋ .< f * H₊``, which means to minimize c
 """
 struct LₛLoss end 
 
-function lₛloss(model, x, g, H₊, H₋)
+function lₛloss(model, x, g, H₊, H₋, surrogate=softplus)
 	g = reshape(g, 1, :)
 	f = model(x) + g
 	o = f * H₋ - f * H₊
 	isempty(o) && return(zero(eltype(o)))
-	mean(softplus.(o))
+	mean(surrogate.(o))
 end
 lₛloss(model, xy::LₛMiniBatch) = lₛloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋)
+lₛloss(model, xy::LₛMiniBatch, surrogate) = lₛloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋, surrogate)
 lₛloss(model, mb::NamedTuple{(:minibatch,:stats)}) = lₛloss(model, mb.minibatch)
 (l::LₛLoss)(args...) = lₛloss(args...)
 
@@ -216,14 +218,15 @@ struct LgbfsLoss end
 
 (l::LgbfsLoss)(args...) = lgbfsloss(args...)
 
-function lgbfsloss(model, x, g, H₊, H₋)
+function lgbfsloss(model, x, g, H₊, H₋, surrogate=softplus)
 	f = model(x)
 	o = f * H₋ .- f * H₊
 	isempty(o) && return(zero(eltype(o)))
-	mean(softplus.(o))
+	mean(surrogate.(o))
 end
 
 lgbfsloss(model, xy::LgbfsMiniBatch) = lgbfsloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋)
+lgbfsloss(model, xy::LgbfsMiniBatch, surrogate) = lgbfsloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋, surrogate)
 lgbfsloss(model, mb::NamedTuple{(:minibatch,:stats)}) = lgbfsloss(model, mb.minibatch)
 
 
@@ -270,16 +273,27 @@ end
 
 struct LRTLoss end 
 
-function lrtloss(model, x, g, H₊, H₋)
+function lrtloss(model, x, g, H₊, H₋, surrogate = softplus)
 	f = model(x)
 	o = f * H₋ - f * H₊
 	isempty(o) && return(zero(eltype(o)))
-	mean(softplus.(o))
+	mean(surrogate.(o))
 end
 
 lrtloss(model, xy::LRTMiniBatch) = lrtloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋)
+lrtloss(model, xy::LRTMiniBatch, surrogate) = lrtloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋, surrogate)
 lrtloss(model, mb::NamedTuple{(:minibatch,:stats)}) = lrtloss(model, mb.minibatch)
 (l::LRTLoss)(args...) = lrtloss(args...)
+
+
+########
+#	dispatch for loss function
+########
+loss(model, xy::L₂MiniBatch,surrogate=softplus) = l₂loss(model, xy, surrogate)
+loss(model, xy::LₛMiniBatch,surrogate=softplus) = lₛloss(model, xy, surrogate)
+loss(model, xy::LgbfsMiniBatch,surrogate=softplus) = lgbfsloss(model, xy, surrogate)
+loss(model, xy::LRTMiniBatch,surrogate=softplus) = lrtloss(model, xy, surrogate)
+loss(model, xy::Tuple,surrogate=softplus) = sum(map(x -> lossfun(model, x), xy), surrogate)
 
 
 function getloss(name)

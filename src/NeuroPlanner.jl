@@ -9,7 +9,11 @@ using Statistics
 using SymbolicPlanners
 using StatsBase
 using GraphNeuralNetworks
+using Mill
 
+include("hyper/extractor.jl")
+include("hyper/deduplication.jl")
+export HyperExtractor, deduplicate
 include("multigraph/extractor.jl")
 export PDDLExtractor, MultiGraph, MultiGNN, FeaturedMultiGraph, MultiModel, initproblem
 include("potential/extractor.jl")
