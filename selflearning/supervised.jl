@@ -31,18 +31,6 @@ function plan_file(problem_file)
 	joinpath("plans", problem_name, middle_path..., basename(problem_file)[1:end-5]*".jls")
 end
 
-######
-# define a NN based solver
-######
-struct GNNHeuristic{P,M} <: Heuristic 
-	pddle::P
-	model::M
-end
-
-GNNHeuristic(pddld, problem, model) = GNNHeuristic(NeuroPlanner.add_goalstate(pddld, problem), model)
-Base.hash(g::GNNHeuristic, h::UInt) = hash(g.model, hash(g.pddle, h))
-SymbolicPlanners.compute(h::GNNHeuristic, domain::Domain, state::State, spec::Specification) = only(h.model(h.pddle(state)))
-
 function experiment(domain_pddl, train_files, problem_files, filename, loss_fun, fminibatch;max_steps = 10000, max_time = 30, graph_layers = 2, graph_dim = 8, dense_layers = 2, dense_dim = 32)
 	!isdir(dirname(filename)) && mkpath(dirname(filename))
 	domain = load_domain(domain_pddl)

@@ -1,23 +1,3 @@
-module NeuroPlanner
-
-using PDDL
-using Julog
-using Graphs
-using Flux
-using OneHotArrays
-using Statistics
-using SymbolicPlanners
-using StatsBase
-using GraphNeuralNetworks
-using Mill
-
-include("hyper/extractor.jl")
-include("hyper/deduplication.jl")
-export HyperExtractor, deduplicate
-include("multigraph/extractor.jl")
-export PDDLExtractor, MultiGraph, MultiGNN, FeaturedMultiGraph, MultiModel, initproblem
-include("potential/extractor.jl")
-export LinearExtractor
 
 """
 	function Graphs.Graph(state::GenericState)
@@ -101,20 +81,4 @@ function _construct_featured_graph(g, vprops, eprops, term2id)
 		foreach(p -> ef[epmap[p], i] = 1, ps)
 	end
 	fg = FeaturedGraph(g; nf, ef)
-end
-
-include("rsearch_tree.jl")
-include("losses.jl")
-export L₂MiniBatch, UnsolvedL₂, L₂Loss, l₂loss, 
-       LₛMiniBatch, UnsolvedLₛ, lₛloss, LₛLoss, 
-       LRTMiniBatch, lrtloss, LRTLoss, 
-       LgbfsMiniBatch, UnsolvedLgbfs, LgbfsLoss, lgbfsLoss, getloss
-
-include("artificial_goals.jl")
-include("sample_trace.jl")
-export sample_trace, sample_forward_trace, sample_backward_trace, sample_backward_tree, search_tree_from_trajectory
-export BackwardSampler
-include("heuristics.jl")
-export NeuroHeuristic
-
 end
