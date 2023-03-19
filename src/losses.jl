@@ -113,7 +113,7 @@ function _next_states(domain, problem, sᵢ, st::Nothing)
 end
 
 function LₛMiniBatch(pddld, domain::GenericDomain, problem::Problem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:State}; goal_aware = true)
-	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem, goal) : pddld
+	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem) : pddld
 	state = trajectory[1]
 	spec = Specification(problem)
 
@@ -267,7 +267,7 @@ function LRTMiniBatch(pddld, domain::GenericDomain, problem::Problem, st::Union{
 end
 
 function LRTMiniBatch(pddld, domain::GenericDomain, problem::Problem, trajectory; goal_aware = true)
-	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem, goal) : pddld
+	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem) : pddld
 	LRTMiniBatch(pddle, trajectory)
 end
 
@@ -296,12 +296,12 @@ loss(model, xy::LRTMiniBatch,surrogate=softplus) = lrtloss(model, xy, surrogate)
 loss(model, xy::Tuple,surrogate=softplus) = sum(map(x -> lossfun(model, x), xy), surrogate)
 
 
-function getloss(name)
-	name == "l2" && return((L₂Loss(), L₂MiniBatch))
-	name == "l₂" && return((L₂Loss(), L₂MiniBatch))
-	name == "lstar" && return((LₛLoss(), LₛMiniBatch))
-	name == "lₛ" && return((LₛLoss(), LₛMiniBatch))
-	name == "lgbfs" && return((LgbfsLoss(), LgbfsMiniBatch))
-	name == "lrt" && return((LRTLoss(), LRTMiniBatch))
+function minibatchconstructor(name)
+	name == "l2" && return(L₂MiniBatch)
+	name == "l₂" && return(L₂MiniBatch)
+	name == "lstar" && return(LₛMiniBatch)
+	name == "lₛ" && return(LₛMiniBatch)
+	name == "lgbfs" && return(LgbfsMiniBatch)
+	name == "lrt" && return(LRTMiniBatch)
 	error("unknown loss $(name)")
 end

@@ -6,6 +6,7 @@ using GraphNeuralNetworks
 using SymbolicPlanners
 using Test
 using Random
+using NeuralAttentionlib
 
 # domain = load_domain("sokoban.pddl")
 # problem = load_problem("s1.pddl")
@@ -48,7 +49,39 @@ end
 	ps = Flux.params(model)
 	gs = gradient(() -> sum(model(ds)), ps)
 	@test all(gs[p] !== nothing for p in ps)
+
+	# Let's toy with multihead attention
+	x = model.im(ds.data)
+    input_dims = size(x,1)
+	head = 4
+    head_dims = 4
+    output_dims = 32
+
+    mha = MultiheadAttention(head, input_dims, head_dims, output_dims)
+   	model = (;mill = model, mha)
+   	function f(model, ds) 
+   		x = model.mill.im(ds.data)
+   		x = model.mha(x)
+   		model.mill.bm(model.mill.a(x, ds.bags))
+   	end
+	ps = Flux.params(model)
+	gs = gradient(() -> sum(f(model, ds)), ps)
+	@test all(gs[p] !== nothing for p in ps)
 end
+
+    # @testset "deduplication test" begin 
+# 	map(minibatches) do (ds1, ds2)
+# 		plan = deserialize(plan_file(problem_file))
+# 		problem = load_problem(problem_file)
+# 		ds1 = fminibatch(pddld, domain, problem, plan.plan)
+# 		ds2 = @set ds1.x = deduplicate(model, ds1.x)
+# 		gs1 = fcollect(gradient(Base.Fix2(NeuroPlanner.loss, ds1), model))
+# 		gs2 = fcollect(gradient(Base.Fix2(NeuroPlanner.loss, ds1), model))
+# 		gs1 = filter(x -> x isa AbstractArray, gs1)
+# 		gs2 = filter(x -> x isa AbstractArray, gs2)
+# 		all(x ≈ y for (x,y) in zip(gs1, gs2))
+# 	end
+# end
 
 #construct training set for L2 loss
 @testset "testing concatenation for batching" begin 

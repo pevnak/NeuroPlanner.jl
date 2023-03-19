@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "de7f29a917ac09e44bc28b5d952bb8bb6efbbfc5"
+project_hash = "bf806013ee8c1b6ce4fe9b39e51f8354018a9047"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -461,6 +461,11 @@ git-tree-sha1 = "2e99184fca5eb6f075944b04c22edec29beb4778"
 uuid = "7869d1d1-7146-5819-86e3-90919afe41df"
 version = "0.4.7"
 
+[[deps.IfElse]]
+git-tree-sha1 = "debdd00ffef04665ccbb3e150747a77560e8fad1"
+uuid = "615f187c-cbe4-4ef1-ba3b-2fcf58d6d173"
+version = "0.1.1"
+
 [[deps.Inflate]]
 git-tree-sha1 = "5cd07aab533df5170988219191dfad0519391428"
 uuid = "d25df0c9-e2be-5dd7-82c8-3ad0b3e990b9"
@@ -741,8 +746,14 @@ version = "0.4.12"
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
 
+[[deps.NeuralAttentionlib]]
+deps = ["Adapt", "CUDA", "ChainRulesCore", "GPUArraysCore", "LinearAlgebra", "NNlib", "NNlibCUDA", "Requires", "Static"]
+git-tree-sha1 = "d822647497df77ab7aebb57f44d676040bbb877b"
+uuid = "12afc1b8-fad6-47e1-9132-84abc478905f"
+version = "0.2.8"
+
 [[deps.NeuroPlanner]]
-deps = ["Cairo", "Compose", "DataStructures", "Flux", "GraphNeuralNetworks", "GraphPlot", "Graphs", "Julog", "Mill", "OneHotArrays", "PDDL", "Parameters", "Statistics", "StatsBase", "SymbolicPlanners"]
+deps = ["Cairo", "Compose", "DataStructures", "Flux", "GraphNeuralNetworks", "GraphPlot", "Graphs", "Julog", "MLUtils", "Mill", "NeuralAttentionlib", "OneHotArrays", "PDDL", "Parameters", "Setfield", "Statistics", "StatsBase", "SymbolicPlanners"]
 path = ".."
 uuid = "628e68bf-2596-4972-a53b-69fd3c43dbca"
 version = "0.1.0"
@@ -1004,6 +1015,12 @@ deps = ["Setfield", "Test"]
 git-tree-sha1 = "e08a62abc517eb79667d0a29dc08a3b589516bb5"
 uuid = "171d559e-b47b-412a-8079-5efa626c420e"
 version = "0.1.15"
+
+[[deps.Static]]
+deps = ["IfElse"]
+git-tree-sha1 = "08be5ee09a7632c32695d954a602df96a877bf0d"
+uuid = "aedffcd0-7271-4cad-89d0-dc628f76c6d3"
+version = "0.8.6"
 
 [[deps.StaticArrays]]
 deps = ["LinearAlgebra", "Random", "StaticArraysCore", "Statistics"]
