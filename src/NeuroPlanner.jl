@@ -13,6 +13,8 @@ using Mill
 using Setfield
 using MLUtils
 using NeuralAttentionlib
+using HierarchicalUtils
+using ChainRulesCore
 
 """
 initproblem(pddld::HyperExtractor{<:Nothing,<:Nothing}, problem; add_goal = true)
@@ -45,6 +47,8 @@ export sample_trace, sample_forward_trace, sample_backward_trace, sample_backwar
 export BackwardSampler
 include("heuristic.jl")
 export NeuroHeuristic
+
+include("relational/knowledge_base.jl")
 
 MLUtils.batch(xs::AbstractVector{<:AbstractMillNode}) = reduce(catobs, xs)
 end

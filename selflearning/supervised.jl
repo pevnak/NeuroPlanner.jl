@@ -62,13 +62,13 @@ function ffnn(idim, hdim, odim, nlayers)
 	error("nlayers should be only in [1,3]")
 end
 
-# function initmodel(ds::AbstractMillNode; graph_dim, graph_layers, dense_dim, dense_layers, kwargs...)
-# 	reflectinmodel(ds, d -> ffnn(d, graph_dim, graph_dim, graph_layers), SegmentedMeanMax, fsm=Dict("" => d -> ffnn(d, dense_dim, 1, dense_layers)))
-# end
-
-function initmodel(ds::BagNode; kwargs...)
-	HyperMHA(ds; kwargs...)
+function initmodel(ds::AbstractMillNode; graph_dim, graph_layers, dense_dim, dense_layers, kwargs...)
+	reflectinmodel(ds, d -> ffnn(d, graph_dim, graph_dim, graph_layers), SegmentedMeanMax, fsm=Dict("" => d -> ffnn(d, dense_dim, 1, dense_layers)))
 end
+
+# function initmodel(ds::BagNode; kwargs...)
+	# HyperMHA(ds; kwargs...)
+# end
 
 function initmodel(ds::MultiGraph;graph_dim, graph_layers, dense_dim, dense_layers, kwargs...)
 	MultiModel(ds, graph_dim, graph_layers, d -> ffnn(d, dense_dim, 1, dense_layers))
@@ -101,7 +101,7 @@ function experiment(domain_pddl, train_files, problem_files, filename, fminibatc
 		plan = deserialize(plan_file(problem_file))
 		problem = load_problem(problem_file)
 		ds = fminibatch(pddld, domain, problem, plan.plan)
-		@set ds.x = deduplicate(model, ds.x)
+		# @set ds.x.data = deduplicate(model.mill.im, ds.x.data)
 	end
 
 	if isfile(filename[1:end-4]*"_model.jls")

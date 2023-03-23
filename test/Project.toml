@@ -1,10 +1,13 @@
 [deps]
+ChainRulesTestUtils = "cdddcdb0-9152-4a09-a978-84456f9df70a"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 GraphNeuralNetworks = "cffab07f-9bc2-4db1-8861-388f63bf7694"
 Mill = "1d0525e4-8992-11e8-313c-e310e1f6ddea"
+NNlib = "872c559c-99b0-510c-b3b7-b6c96a88d5cd"
 NeuralAttentionlib = "12afc1b8-fad6-47e1-9132-84abc478905f"
 NeuroPlanner = "628e68bf-2596-4972-a53b-69fd3c43dbca"
 PDDL = "2c8894f9-daa1-498a-9e3a-26edd9623db8"
 PlanningDomains = "34fa33c8-33e3-4e77-bac8-de592315aba2"
 SymbolicPlanners = "b6fe5377-9711-4fad-95b0-be4eed71ecbb"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"

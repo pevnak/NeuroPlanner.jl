@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "bf806013ee8c1b6ce4fe9b39e51f8354018a9047"
+project_hash = "7fd2724d506887617d75d0e1a172ef0101a4fbb3"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -122,6 +122,12 @@ deps = ["Compat", "LinearAlgebra", "SparseArrays"]
 git-tree-sha1 = "e7ff6cadf743c098e08fca25c91103ee4303c9bb"
 uuid = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
 version = "1.15.6"
+
+[[deps.ChainRulesTestUtils]]
+deps = ["ChainRulesCore", "Compat", "FiniteDifferences", "LinearAlgebra", "Random", "Test"]
+git-tree-sha1 = "1237bdbcfec728721718ef57dcb855a19c11bf3a"
+uuid = "cdddcdb0-9152-4a09-a978-84456f9df70a"
+version = "1.10.1"
 
 [[deps.ChangesOfVariables]]
 deps = ["ChainRulesCore", "LinearAlgebra", "Test"]
@@ -713,10 +719,10 @@ uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
 version = "2022.2.1"
 
 [[deps.NNlib]]
-deps = ["Adapt", "ChainRulesCore", "LinearAlgebra", "Pkg", "Requires", "Statistics"]
-git-tree-sha1 = "37596c26f107f2fd93818166ed3dab1a2e6b2f05"
+deps = ["Adapt", "ChainRulesCore", "LinearAlgebra", "Pkg", "Random", "Requires", "Statistics"]
+git-tree-sha1 = "33ad5a19dc6730d592d8ce91c14354d758e53b0e"
 uuid = "872c559c-99b0-510c-b3b7-b6c96a88d5cd"
-version = "0.8.11"
+version = "0.8.19"
 
 [[deps.NNlibCUDA]]
 deps = ["Adapt", "CUDA", "LinearAlgebra", "NNlib", "Random", "Statistics"]
@@ -753,7 +759,7 @@ uuid = "12afc1b8-fad6-47e1-9132-84abc478905f"
 version = "0.2.8"
 
 [[deps.NeuroPlanner]]
-deps = ["Cairo", "Compose", "DataStructures", "Flux", "GraphNeuralNetworks", "GraphPlot", "Graphs", "Julog", "MLUtils", "Mill", "NeuralAttentionlib", "OneHotArrays", "PDDL", "Parameters", "Setfield", "Statistics", "StatsBase", "SymbolicPlanners"]
+deps = ["Cairo", "ChainRulesCore", "Compose", "DataStructures", "Flux", "GraphNeuralNetworks", "GraphPlot", "Graphs", "HierarchicalUtils", "Julog", "MLUtils", "Mill", "NeuralAttentionlib", "OneHotArrays", "PDDL", "Parameters", "Setfield", "Statistics", "StatsBase", "SymbolicPlanners"]
 path = ".."
 uuid = "628e68bf-2596-4972-a53b-69fd3c43dbca"
 version = "0.1.0"
@@ -1205,9 +1211,9 @@ version = "1.2.12+3"
 
 [[deps.Zygote]]
 deps = ["AbstractFFTs", "ChainRules", "ChainRulesCore", "DiffRules", "Distributed", "FillArrays", "ForwardDiff", "GPUArrays", "GPUArraysCore", "IRTools", "InteractiveUtils", "LinearAlgebra", "LogExpFunctions", "MacroTools", "NaNMath", "Random", "Requires", "SparseArrays", "SpecialFunctions", "Statistics", "ZygoteRules"]
-git-tree-sha1 = "a6f1287943ac05fae56fa06049d1a7846dfbc65f"
+git-tree-sha1 = "e1af683167eea952684188f5e1e29b9cabc2e5f9"
 uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
-version = "0.6.51"
+version = "0.6.55"
 
 [[deps.ZygoteRules]]
 deps = ["MacroTools"]

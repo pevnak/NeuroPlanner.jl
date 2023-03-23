@@ -69,20 +69,6 @@ end
 	@test all(gs[p] !== nothing for p in ps)
 end
 
-    # @testset "deduplication test" begin 
-# 	map(minibatches) do (ds1, ds2)
-# 		plan = deserialize(plan_file(problem_file))
-# 		problem = load_problem(problem_file)
-# 		ds1 = fminibatch(pddld, domain, problem, plan.plan)
-# 		ds2 = @set ds1.x = deduplicate(model, ds1.x)
-# 		gs1 = fcollect(gradient(Base.Fix2(NeuroPlanner.loss, ds1), model))
-# 		gs2 = fcollect(gradient(Base.Fix2(NeuroPlanner.loss, ds1), model))
-# 		gs1 = filter(x -> x isa AbstractArray, gs1)
-# 		gs2 = filter(x -> x isa AbstractArray, gs2)
-# 		all(x ≈ y for (x,y) in zip(gs1, gs2))
-# 	end
-# end
-
 #construct training set for L2 loss
 @testset "testing concatenation for batching" begin 
 	# get training example by running A* planner with h_add heuristic
@@ -123,4 +109,67 @@ end
 		end;
 		@test all(maximum(abs2.(gs1[p] .- gs2[p])) < 1e-6 for p in ps)
 	end
+end
+
+@testset "testing deduplication" begin 
+    # @testset "deduplication test" begin
+	domain = load_domain(domain_pddl)
+	# pddld = PDDLExtractor(domain)
+	pddld = HyperExtractor(domain)
+
+	#create model from some problem instance
+	model, dedup_model = let 
+		problem = load_problem(first(problem_files))
+		pddle, state = initproblem(pddld, problem)
+		h₀ = pddle(state)
+		model = initmodel(h₀; graph_dim, graph_layers, dense_dim, dense_layers, heads, head_dims)
+		dedup_model = reflectinmodel(h₀, d -> Dense(d,32), SegmentedMean)
+		(model, dedup_model)
+	end
+
+ 
+	minibatches = map(train_files) do problem_file
+		plan = deserialize(plan_file(problem_file))
+		problem = load_problem(problem_file)
+		ds = fminibatch(pddld, domain, problem, plan.plan)
+		ds1 = deepcopy(ds)
+		ds2 =  @set ds.x.data = deduplicate(dedup_model.im, ds.x.data)
+		(;ds1, ds2)
+	end
+
+	m1 = deepcopy(model)
+	m2 = deepcopy(model)
+	ps1 = Flux.params(m1)
+	ps2 = Flux.params(m2)
+	opt1 = ADAM()
+	opt2 = ADAM()
+	debug = nothing
+	@assert(all(p1 ≈ p2 for (p1,p2) in zip(ps1,ps2)))
+	for (i, (ds1, ds2)) in enumerate(minibatches)
+		l1, gs1 = withgradient(() -> NeuroPlanner.loss(m1,ds1), ps1)
+		l2, gs2 = withgradient(() -> NeuroPlanner.loss(m2,ds2), ps2)
+		Δdiff = sum([sum(abs2.(gs1[p1] .- gs2[p2])) for (p1,p2) in zip(ps1,ps2)])
+		diff = sum([sum(abs2.(p1 .- p2)) for (p1,p2) in zip(ps1,ps2)])
+		@show (diff, Δdiff)
+		# if !all(gs1[p1] == gs2[p2] for (p1,p2) in zip(ps1,ps2))
+		# 	debug = (ds1, ds2)
+		# 	println(i," ",l1," ",l2)
+		# 	break
+		# end
+		Flux.Optimise.update!(opt1, ps1, gs1)
+		Flux.Optimise.update!(opt2, ps2, gs2)
+	end
+
+	map(train_files) do problem_file
+		plan = deserialize(plan_file(problem_file))
+		problem = load_problem(problem_file)
+		ds1 = fminibatch(pddld, domain, problem, plan.plan)
+		ds2 = @set ds1.x.data = deduplicate(model.mill.im, ds1.x.data)
+		gs1 = fcollect(gradient(Base.Fix2(NeuroPlanner.loss, ds1), model))
+		gs2 = fcollect(gradient(Base.Fix2(NeuroPlanner.loss, ds1), model))
+		gs1 = filter(x -> x isa AbstractArray, gs1)
+		gs2 = filter(x -> x isa AbstractArray, gs2)
+		all(x ≈ y for (x,y) in zip(gs1, gs2))
+	end
+
 end
