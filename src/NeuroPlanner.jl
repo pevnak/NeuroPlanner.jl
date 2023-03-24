@@ -49,6 +49,7 @@ include("heuristic.jl")
 export NeuroHeuristic
 
 include("relational/knowledge_base.jl")
+include("relational/knowledge_model.jl")
 
 MLUtils.batch(xs::AbstractVector{<:AbstractMillNode}) = reduce(catobs, xs)
 end

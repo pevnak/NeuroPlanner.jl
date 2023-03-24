@@ -43,19 +43,23 @@ extractor.
 """
 function specialize(ex::HyperExtractor, problem)
 	obj2id = Dict(v => i for (i, v) in enumerate(problem.objects))
-	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, obj2id, nothing)
+	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id,  obj2id, nothing)
 end
 
 function (ex::HyperExtractor)(state::GenericState)
 	length(state.types) != length(ex.obj2id) && error("number of objects in state and problem instance does not match")
 	x = nunary_predicates(ex, state)
-	ds = multi_predicates(ex, x, state)
-	# ds = multi_predicates(ex, ds, state)
-	if ex.goal !== nothing
-		px = merge(ds.data, ex.goal.data.data)
-		ds = ProductNode(px)
+	kb = KnowledgeBase((;x1 = x))
+	n = size(x,2)
+	for i in 1:3
+		s = Symbol("x$(i)")
+		o = Symbol("x$(i+1)")
+		ds = multi_predicates(ex, ArrayNode(KBEntry(s, 1:n)), state)
+		kb = append(kb, o, ds)
 	end
-	BagNode(ds, [1:nobs(ds)])
+	s = Symbol("x4")
+	o = Symbol("x5")
+	append(kb, o, BagNode(ArrayNode(KBEntry(s, 1:n)), [1:n]))
 end
 
 function add_goalstate(ex::NoProblemNoGoalHE, problem, goal = goalstate(ex.domain, problem))
@@ -65,8 +69,11 @@ end
 
 function add_goalstate(ex::ProblemNoGoalHE, problem, goal = goalstate(ex.domain, problem))
 	exgoal = ex(goal)
-	ns = map(s -> Symbol("goal_$(s)"), keys(exgoal.data.data))
-	exgoal = BagNode(ProductNode(NamedTuple{ns}(values(exgoal.data.data))), exgoal.bags)
+	
+	# we need to do this recursively on all layers
+	# ns = map(s -> Symbol("goal_$(s)"), keys(exgoal.data.data))
+	# exgoal = BagNode(ProductNode(NamedTuple{ns}(values(exgoal.data.data))), exgoal.bags)
+
 	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.obj2id, exgoal)
 end
 
@@ -110,7 +117,6 @@ function multi_predicates(ex::HyperExtractor, x, state)
 	for f in filter(f -> length(get_args(f)) ≥ 2, get_facts(state))
 		ii = [ex.obj2id[i] for i in get_args(f)]	#arguments to ids
 		p = _predicate(x, ii)
-
 		# We add the predicate to all of its objects
 		for i in ii 
 			d = all_predicates[i]
@@ -127,8 +133,8 @@ function multi_predicates(ex::HyperExtractor, x, state)
 	xs = map(all_predicates) do predicates
 		xx = map(pnames) do pname
 			if !haskey(predicates, pname) 
-				n = length(ex.domain.predicates[pname].args)*size(x, 1)
-				return(BagNode(zeros(Float32, n,0), [0:-1])) # Possibly replace missing with an empty arrity
+				xx = _empty_predicate(ex.domain.predicates[pname], x)
+				return(BagNode(xx, [0:-1])) # Possibly replace missing with an empty arrity
 			else
 				xs = predicates[pname]
 				return(BagNode(reduce(catobs, xs), [1:length(xs)]))
@@ -139,12 +145,12 @@ function multi_predicates(ex::HyperExtractor, x, state)
 	reduce(catobs, xs)
 end
 
-function _predicate(xx::AbstractMatrix, ii)
-	xx = reduce(vcat, [xx[:, i] for i in ii])
-	ArrayNode(reshape(xx, :, 1))	
-end
-
 function _predicate(xx::AbstractMillNode, ii)
 	xs = [xx[i] for i in ii]
+	ProductNode(tuple(xs...))
+end
+
+function _empty_predicate(p::PDDL.Signature, xx::AbstractMillNode)
+	xs = [xx[0:-1] for _ in 1:length(p.argtypes)]
 	ProductNode(tuple(xs...))
 end

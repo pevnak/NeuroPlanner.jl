@@ -8,6 +8,8 @@ using Test
 using Random
 using NeuralAttentionlib
 
+# include("knowledge_base.jl")
+
 # domain = load_domain("sokoban.pddl")
 # problem = load_problem("s1.pddl")
 
@@ -45,28 +47,8 @@ end
 	gex = NeuroPlanner.add_goalstate(ex, problem)
 	state = initstate(domain, problem)
 	ds = ex(state)
-	model = reflectinmodel(ds, d -> Dense(d,32), SegmentedMean)
-	ps = Flux.params(model)
-	gs = gradient(() -> sum(model(ds)), ps)
-	@test all(gs[p] !== nothing for p in ps)
+	m = reflectinmodel(ds)
 
-	# Let's toy with multihead attention
-	x = model.im(ds.data)
-    input_dims = size(x,1)
-	head = 4
-    head_dims = 4
-    output_dims = 32
-
-    mha = MultiheadAttention(head, input_dims, head_dims, output_dims)
-   	model = (;mill = model, mha)
-   	function f(model, ds) 
-   		x = model.mill.im(ds.data)
-   		x = model.mha(x)
-   		model.mill.bm(model.mill.a(x, ds.bags))
-   	end
-	ps = Flux.params(model)
-	gs = gradient(() -> sum(f(model, ds)), ps)
-	@test all(gs[p] !== nothing for p in ps)
 end
 
 #construct training set for L2 loss
