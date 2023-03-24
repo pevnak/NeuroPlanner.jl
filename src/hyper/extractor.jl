@@ -52,10 +52,8 @@ function (ex::HyperExtractor)(state::GenericState)
 	kb = KnowledgeBase((;x1 = x))
 	n = size(x,2)
 	for i in 1:3
-		s = Symbol("x$(i)")
-		o = Symbol("x$(i+1)")
-		ds = multi_predicates(ex, ArrayNode(KBEntry(s, 1:n)), state)
-		kb = append(kb, o, ds)
+		ds = multi_predicates(ex, Symbol("x$(i)"), state)
+		kb = append(kb, Symbol("x$(i+1)"), ds)
 	end
 	s = Symbol("x4")
 	o = Symbol("o")
@@ -122,52 +120,27 @@ function nunary_predicates(ex::HyperExtractor, state)
 	x
 end
 
-"""
-multi_predicates(ex::HyperExtractor, x, state)
-
-Create and HMIL structure encoding predicates with arities higher than 2 as ProductNodes.
-Each object is represented as a collection of predicates it participates in.
-"""
-function multi_predicates(ex::HyperExtractor, x, state)
+function multi_predicates(ex::HyperExtractor, kid::Symbol, state)
 	# Then, we specify the predicates the dirty way
-	all_predicates = [Dict{Symbol, Any}() for _ in 1:length(state.types)]
-	for f in filter(f -> length(get_args(f)) ≥ 2, get_facts(state))
-		ii = [ex.obj2id[i] for i in get_args(f)]	#arguments to ids
-		p = _predicate(x, ii)
-		# We add the predicate to all of its objects
-		for i in ii 
-			d = all_predicates[i]
-			if haskey(d, f.name)
-				push!(d[f.name], p)
-			else
-				d[f.name] = [p]
-			end
-		end
+	ks = ex.multiarg_predicates
+	xs = map(ex.multiarg_predicates) do k 
+		p = ex.domain.predicates[k]
+		preds = filter(f -> f.name == k, get_facts(state))
+		encode_predicates(p, preds, ex.obj2id, kid)
 	end
-	# each new representation of a vertex is composed from a bags of predicates of 
-	# each type 
-	pnames = ex.multiarg_predicates
-	xs = map(all_predicates) do predicates
-		xx = map(pnames) do pname
-			if !haskey(predicates, pname) 
-				xx = _empty_predicate(ex.domain.predicates[pname], x)
-				return(BagNode(xx, [0:-1])) # Possibly replace missing with an empty arrity
-			else
-				xs = predicates[pname]
-				return(BagNode(reduce(catobs, xs), [1:length(xs)]))
-			end
-		end
-		ProductNode(NamedTuple{pnames}(xx))
-	end
-	reduce(catobs, xs)
+	ProductNode(NamedTuple{ks}(xs))
 end
 
-function _predicate(xx::AbstractMillNode, ii)
-	xs = [xx[i] for i in ii]
-	ProductNode(tuple(xs...))
-end
+function encode_predicates(p::PDDL.Signature, preds, obj2id, kid::Symbol)
+	xs = map(1:length(p.args)) do i 
+		ArrayNode(KBEntry(kid, [obj2id[f.args[i]] for f in preds]))
+	end 
 
-function _empty_predicate(p::PDDL.Signature, xx::AbstractMillNode)
-	xs = [xx[0:-1] for _ in 1:length(p.argtypes)]
-	ProductNode(tuple(xs...))
+	bags = [Int[] for _ in 1:length(obj2id)]
+	for (j, f) in enumerate(preds)
+		for a in f.args
+			push!(bags[obj2id[a]], j)
+		end
+	end
+	BagNode(ProductNode(tuple(xs...)), ScatteredBags(bags))
 end

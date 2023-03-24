@@ -59,20 +59,19 @@ Base.getindex(X::KBEntry, idcs)  = _getindex(X, idcs)
 Base.axes(X::KBEntry, d) = d == 1 ? (:) : (1:length(X.ii))
 _getindex(x::KBEntry{E,T}, i) where {E,T} = KBEntry{E,T}(x.ii[i])
 _getindex(x::KBEntry{E,T}, i::Integer) where {E,T} = KBEntry{E,T}(x.ii[i:i])
-Base.hcat(as::T...) where {T <: KBEntry} = reduce(catobs, as)
 Mill.nobs(a::KBEntry) = length(a.ii)
 Mill.catobs(as::KBEntry) = reduce(catobs, as)
 HierarchicalUtils.NodeType(::Type{KBEntry}) = HierarchicalUtils.LeafNode()
 function Mill.catobs(A::KBEntry{E,T}, B::KBEntry{E,T}) where {E,T}
-	KBEntry{E,T}(A.kb, vcat(A.ii, B.ii))
+	error("The catobs is not implemented for \"KBEntry\", as it might not be safe without KnowledgeBase")
 end
 
 function reduce(::typeof(Mill.catobs), As::Tuple{Vararg{KBEntry{E,T}}}) where {E,T}
-	KBEntry{E,T}(reduce(vcat, [a.ii for a in As]))
+    error("The catobs is not implemented for \"KBEntry\", as it might not be safe without KnowledgeBase")
 end
 
 function reduce(::typeof(Mill.catobs), As::Vector{<:KBEntry{E,T}}) where {E,T}
-	KBEntry{E,T}(reduce(vcat, [a.ii for a in As]))
+    error("The catobs is not implemented for \"KBEntry\", as it might not be safe without KnowledgeBase")
 end
 
 function Base.getindex(X::KBEntry{E,T}, idcs...) where {E,T}
