@@ -58,8 +58,9 @@ function (ex::HyperExtractor)(state::GenericState)
 		kb = append(kb, o, ds)
 	end
 	s = Symbol("x4")
-	o = Symbol("x5")
-	append(kb, o, BagNode(ArrayNode(KBEntry(s, 1:n)), [1:n]))
+	o = Symbol("o")
+	kb = append(kb, o, BagNode(ArrayNode(KBEntry(s, 1:n)), [1:n]))
+	addgoal(kb, ex.goal)
 end
 
 function add_goalstate(ex::NoProblemNoGoalHE, problem, goal = goalstate(ex.domain, problem))
@@ -71,10 +72,26 @@ function add_goalstate(ex::ProblemNoGoalHE, problem, goal = goalstate(ex.domain,
 	exgoal = ex(goal)
 	
 	# we need to do this recursively on all layers
-	# ns = map(s -> Symbol("goal_$(s)"), keys(exgoal.data.data))
-	# exgoal = BagNode(ProductNode(NamedTuple{ns}(values(exgoal.data.data))), exgoal.bags)
+	gp = map(enumerate(keys(exgoal.kb))) do (i,k)
+		i == 1 && return(exgoal[k])
+		i == length(exgoal.kb) && return(exgoal[k])
+		eg = exgoal[k]
+		ns = map(s -> Symbol("goal_$(s)"), keys(eg.data))
+		ProductNode(NamedTuple{ns}(values(eg.data)))
+	end
+	exgoal = KnowledgeBase(NamedTuple{keys(exgoal)}(tuple(gp...)))
 
 	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.obj2id, exgoal)
+end
+
+addgoal(kb::KnowledgeBase, ::Nothing) = kb
+
+function addgoal(kb1::KnowledgeBase{KX,V1}, kb2::KnowledgeBase{KX,V2}) where {KX, V1, V2}
+	x = vcat(kb1[:x1], kb2[:x1])
+	gp = map(KX[2:end-1]) do k
+		ProductNode(merge(kb1[k].data, kb2[k].data))
+	end
+	KnowledgeBase(NamedTuple{KX}(tuple(x, gp..., kb1.kb[end])))
 end
 
 """

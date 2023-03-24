@@ -25,13 +25,17 @@ function atoms(kb::KnowledgeBase)
 end
 
 """
-struct KBEntry{E,T}
+struct KBEntry{E,T} <: AbstractMatrix{T}
     ii::Vector{Int}
 end
 
 represent matrix as indices `ii` to items stored in knowledgebase. I.e. The matrix is equal to 
 kb[E][:,ii], where `kb` is some suitable storage, like NamedTuple. The advantage is 
 that the data are stored lazily and instantiated just before use.
+
+E --- is a name of the entry taken from the knowledge base
+T --- is the datatype
+N --- is the number of items in the knowledge base. When
 """
 struct KBEntry{E,T} <: AbstractMatrix{T}
     ii::Vector{Int}
