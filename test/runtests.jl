@@ -8,7 +8,7 @@ using Test
 using Random
 using NeuralAttentionlib
 
-# include("knowledge_base.jl")
+include("knowledge_base.jl")
 
 # domain = load_domain("sokoban.pddl")
 # problem = load_problem("s1.pddl")
@@ -49,6 +49,8 @@ end
 	ds = ex(state)
 	m = reflectinmodel(ds)
 
+	ds = gex(state)
+	m = reflectinmodel(ds)
 end
 
 #construct training set for L2 loss

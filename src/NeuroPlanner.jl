@@ -27,13 +27,19 @@ function initproblem(pddld, problem; add_goal = true)
 end
 
 
+include("relational/knowledge_base.jl")
+include("relational/knowledge_model.jl")
+export KBEntry, KnowledgeBase, append
 include("hyper/extractor.jl")
 include("hyper/deduplication.jl")
 export HyperExtractor, deduplicate
+
 include("hyper/mha.jl")
 export MultiheadAttention
+
 include("multigraph/extractor.jl")
 export PDDLExtractor, MultiGraph, MultiGNN, FeaturedMultiGraph, MultiModel, initproblem
+
 include("potential/extractor.jl")
 export LinearExtractor
 
@@ -47,9 +53,6 @@ export sample_trace, sample_forward_trace, sample_backward_trace, sample_backwar
 export BackwardSampler
 include("heuristic.jl")
 export NeuroHeuristic
-
-include("relational/knowledge_base.jl")
-include("relational/knowledge_model.jl")
 
 MLUtils.batch(xs::AbstractVector{<:AbstractMillNode}) = reduce(catobs, xs)
 end

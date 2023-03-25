@@ -20,58 +20,11 @@ include("solution_tracking.jl")
 include("problems.jl")
 include("training.jl")
 
-
-"""
-struct HyperMHA{MI,MH}
-	mill::MI
-	mha::MH 
-end
-
-Combines hyper-network implemented as a one pass through the Mill model 
-and one multi-head attention layer(though this one might be chain I guess, so effectively
-any number)
-"""
-struct HyperMHA{MI,MH}
-	mill::MI
-	mha::MH 
-end
-
-@functor HyperMHA
-
-function HyperMHA(ds::BagNode; graph_dim, graph_layers, dense_dim, dense_layers, heads, head_dims)
-	mill = reflectinmodel(ds, d -> ffnn(d, graph_dim, graph_dim, graph_layers), SegmentedMeanMax, fsm=Dict("" => d -> ffnn(d, dense_dim, 1, dense_layers)))
-	input_dims = size(mill.im(ds.data),1)
-	mha = MultiheadAttention(heads, input_dims, head_dims, input_dims)
-	HyperMHA(mill, mha)
-end
-
-
-function (m::HyperMHA)(ds::BagNode)
-	x = model.mill.im(ds.data)
-	xᵣ = reshape(x, size(x,1), length(ds.bags[1]), length(ds.bags))
-	xₕ = model.mha(x)
-	xₐ = reshape(xₕ, size(x,1), size(x,2))
-	model.mill.bm(model.mill.a(xₐ, ds.bags))
-end
-
-
 function ffnn(idim, hdim, odim, nlayers)
 	nlayers == 1 && return(Dense(idim,odim))
 	nlayers == 2 && return(Chain(Dense(idim, hdim, relu), Dense(hdim,odim)))
 	nlayers == 3 && return(Chain(Dense(idim, hdim, relu), Dense(hdim, hdim, relu), Dense(odim,odim)))
 	error("nlayers should be only in [1,3]")
-end
-
-function initmodel(ds::AbstractMillNode; graph_dim, graph_layers, dense_dim, dense_layers, kwargs...)
-	reflectinmodel(ds, d -> ffnn(d, graph_dim, graph_dim, graph_layers), SegmentedMeanMax, fsm=Dict("" => d -> ffnn(d, dense_dim, 1, dense_layers)))
-end
-
-# function initmodel(ds::BagNode; kwargs...)
-	# HyperMHA(ds; kwargs...)
-# end
-
-function initmodel(ds::MultiGraph;graph_dim, graph_layers, dense_dim, dense_layers, kwargs...)
-	MultiModel(ds, graph_dim, graph_layers, d -> ffnn(d, dense_dim, 1, dense_layers))
 end
 
 function plan_file(problem_file)
@@ -85,23 +38,23 @@ function experiment(domain_pddl, train_files, problem_files, filename, fminibatc
 	!isdir(dirname(filename)) && mkpath(dirname(filename))
 	domain = load_domain(domain_pddl)
 	# pddld = PDDLExtractor(domain)
-	pddld = HyperExtractor(domain)
+	pddld = HyperExtractor(domain; message_passes = graph_layers)
 
 	#create model from some problem instance
-	model = let 
+	model, dedup_model = let 
 		problem = load_problem(first(problem_files))
 		pddle, state = initproblem(pddld, problem)
 		h₀ = pddle(state)
-		model = initmodel(h₀; graph_dim, graph_layers, dense_dim, dense_layers, heads, head_dims)
-		model
+		model = reflectinmodel(h₀, d -> ffnn(d, dense_dim, dense_dim, dense_layers);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
+		dedup_model = reflectinmodel(h₀, d -> Dense(d,32) ;fsm = Dict("" =>  d -> Dense(d, 32)))
+		model, dedup_model
 	end
-
 
 	minibatches = map(train_files) do problem_file
 		plan = deserialize(plan_file(problem_file))
 		problem = load_problem(problem_file)
 		ds = fminibatch(pddld, domain, problem, plan.plan)
-		# @set ds.x.data = deduplicate(model.mill.im, ds.x.data)
+		@set ds.x = deduplicate(dedup_model, ds.x)
 	end
 
 	if isfile(filename[1:end-4]*"_model.jls")
@@ -138,7 +91,6 @@ seed = 1
 max_steps = 20000
 max_time = 30
 graph_layers = 2
-graph_dim = 8
 dense_layers = 2
 dense_dim = 32
 heads = 4
@@ -151,5 +103,5 @@ train_files = filter(isfile ∘ plan_file, problem_files)
 train_files = sample(train_files, div(length(problem_files), 2), replace = false)
 fminibatch = NeuroPlanner.minibatchconstructor(loss_name)
 
-filename = joinpath("supervised_hyper1", problem_name, join([loss_name, max_steps,  max_time, graph_layers, graph_dim, dense_layers, dense_dim, seed], "_")*".jls")
-experiment(domain_pddl, train_files, problem_files, filename, fminibatch; max_steps, max_time, graph_layers, graph_dim, dense_layers, dense_dim)
+filename = joinpath("supervised_hyper2", problem_name, join([loss_name, max_steps,  max_time, graph_layers, dense_layers, dense_dim, seed], "_")*".jls")
+experiment(domain_pddl, train_files, problem_files, filename, fminibatch; max_steps, max_time, graph_layers, dense_layers, dense_dim)

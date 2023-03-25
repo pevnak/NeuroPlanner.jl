@@ -13,24 +13,25 @@ struct HyperExtractor{DO,D,N,G}
 	multiarg_predicates::NTuple{N,Symbol}
 	nunanary_predicates::Dict{Symbol,Int64}
 	objtype2id::Dict{Symbol,Int64}
+	message_passes::Int
 	obj2id::D
 	goal::G
 end
 
-function HyperExtractor(domain)
+function HyperExtractor(domain; message_passes = 2)
 	dictmap(x) = Dict(reverse.(enumerate(sort(x))))
 	predicates = collect(domain.predicates)
 	multiarg_predicates = tuple([kv[1] for kv in predicates if length(kv[2].args) > 1]...)
 	nunanary_predicates = dictmap([kv[1] for kv in predicates if length(kv[2].args) ≤  1])
 	objtype2id = Dict(s => i + length(nunanary_predicates) for (i, s) in enumerate(collect(keys(domain.typetree))))
-	HyperExtractor(domain, multiarg_predicates, nunanary_predicates, objtype2id, nothing, nothing)
+	HyperExtractor(domain, multiarg_predicates, nunanary_predicates, objtype2id, message_passes, nothing, nothing)
 end
 
 NoProblemNoGoalHE{DO,N} = HyperExtractor{DO,Nothing,N,Nothing} where {DO,N}
 ProblemNoGoalHE{DO,N} = HyperExtractor{DO,D,N,Nothing} where {DO,D<:Dict,N}
 
-function HyperExtractor(domain, problem; embed_goal = true)
-	ex = HyperExtractor(domain)
+function HyperExtractor(domain, problem; embed_goal = true, message_passes = 2)
+	ex = HyperExtractor(domain; message_passes = 2)
 	specialize(ex, problem; embed_goal)
 end
 
@@ -43,7 +44,7 @@ extractor.
 """
 function specialize(ex::HyperExtractor, problem)
 	obj2id = Dict(v => i for (i, v) in enumerate(problem.objects))
-	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id,  obj2id, nothing)
+	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.message_passes, obj2id, nothing)
 end
 
 function (ex::HyperExtractor)(state::GenericState)
@@ -51,7 +52,7 @@ function (ex::HyperExtractor)(state::GenericState)
 	x = nunary_predicates(ex, state)
 	kb = KnowledgeBase((;x1 = x))
 	n = size(x,2)
-	for i in 1:3
+	for i in 1:ex.message_passes
 		ds = multi_predicates(ex, Symbol("x$(i)"), state)
 		kb = append(kb, Symbol("x$(i+1)"), ds)
 	end
@@ -67,19 +68,22 @@ function add_goalstate(ex::NoProblemNoGoalHE, problem, goal = goalstate(ex.domai
 end
 
 function add_goalstate(ex::ProblemNoGoalHE, problem, goal = goalstate(ex.domain, problem))
-	exgoal = ex(goal)
+	exg = ex(goal)
 	
-	# we need to do this recursively on all layers
-	gp = map(enumerate(keys(exgoal.kb))) do (i,k)
-		i == 1 && return(exgoal[k])
-		i == length(exgoal.kb) && return(exgoal[k])
-		eg = exgoal[k]
-		ns = map(s -> Symbol("goal_$(s)"), keys(eg.data))
-		ProductNode(NamedTuple{ns}(values(eg.data)))
+	# we need to add goal as a new predicate
+	ks = keys(exg.kb)
+	gp = map(ks) do k
+		eg = exg[k]
+		if eg isa ProductNode
+			ns = map(s -> Symbol("goal_$(s)"), keys(eg.data))
+			return(ProductNode(NamedTuple{ns}(values(eg.data))))
+		else 
+			return(eg)
+		end
 	end
-	exgoal = KnowledgeBase(NamedTuple{keys(exgoal)}(tuple(gp...)))
+	exg = KnowledgeBase(NamedTuple{ks}(tuple(gp...)))
 
-	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.obj2id, exgoal)
+	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.message_passes, ex.obj2id, exg)
 end
 
 addgoal(kb::KnowledgeBase, ::Nothing) = kb

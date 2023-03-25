@@ -41,21 +41,26 @@ dds.bags.bags ≈ [[1, 2, 1], [2, 3]]
 
 """
 
-deduplicate(model::ArrayModel, ds::ArrayNode) = ds
+deduplicate(kb, model::ArrayModel, ds::ArrayNode) = ds
 
-@generated function deduplicate(model::ProductModel{<:NamedTuple{KM}}, ds::ProductNode{<:NamedTuple{KM}}) where {KM}
+@generated function deduplicate(kb::KnowledgeBase, model::ProductModel{<:NamedTuple{KM}}, ds::ProductNode{<:NamedTuple{KM}}) where {KM}
     chs = map(KM) do k
-        :(deduplicate(model.ms.$k, ds.data.$k))
+        :(deduplicate(kb, model.ms.$k, ds.data.$k))
     end
     quote
         ProductNode(NamedTuple{KM}(tuple($(chs...))))
     end
 end
 
+function deduplicate(kb::KnowledgeBase, model::ProductModel{<:Tuple}, ds::ProductNode{<:Tuple})
+    chs = [deduplicate(kb, m, x) for (m,x) in zip(model.ms, ds.data)]
+    ProductNode((tuple(chs...)))
+end
 
-function deduplicate(model::BagModel, ds::BagNode)
-	subds = deduplicate(model.im, ds.data)
-	o = model.im(subds)
+
+function deduplicate(kb::KnowledgeBase, model::BagModel, ds::BagNode)
+	subds = deduplicate(kb, model.im, ds.data)
+	o = model.im(kb, subds)
 	mask = falses(size(o, 2))
 	index_map = Dict{Int,Int}()
 	ii = duplicated_columns(o)
@@ -71,4 +76,14 @@ function deduplicate(model::BagModel, ds::BagNode)
 		ds.data[mask],
 		ScatteredBags(map(b -> si[b], ds.bags)),
 	)
+end
+
+function deduplicate(model::KnowledgeModel, ds::KnowledgeBase)
+	# Let's first completely evaluate the knowledgebase
+	kb = _apply_layers(ds, model)
+	xs = map(keys(ds)) do k 
+		k ∉ keys(model) && return(ds[k])
+		deduplicate(kb, model[k], ds[k])
+	end 
+	KnowledgeBase(NamedTuple{keys(ds)}(xs))
 end

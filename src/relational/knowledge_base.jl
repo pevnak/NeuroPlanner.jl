@@ -24,6 +24,8 @@ function atoms(kb::KnowledgeBase)
     KnowledgeBase(kb.kb[ks])
 end
 
+MLUtils.batch(xs::Vector{<:KnowledgeBase}) = _catobs_kbs(xs)
+
 """
 struct KBEntry{E,T} <: AbstractMatrix{T}
     ii::Vector{Int}
@@ -58,10 +60,14 @@ Base.Matrix(X::KBEntry) = error("cannot instantiate Matrix from KBEntry without 
 Base.getindex(X::KBEntry, idcs)  = _getindex(X, idcs)
 Base.axes(X::KBEntry, d) = d == 1 ? (:) : (1:length(X.ii))
 _getindex(x::KBEntry{E,T}, i) where {E,T} = KBEntry{E,T}(x.ii[i])
+_getindex(x::KBEntry{E,T}) where {E,T} = x
 _getindex(x::KBEntry{E,T}, i::Integer) where {E,T} = KBEntry{E,T}(x.ii[i:i])
 Mill.nobs(a::KBEntry) = length(a.ii)
-Mill.catobs(as::KBEntry) = reduce(catobs, as)
 HierarchicalUtils.NodeType(::Type{KBEntry}) = HierarchicalUtils.LeafNode()
+
+########
+#   We do not do reduce, as it is potentially very dangerous as it might be dissinchronized with the knowledge base
+########
 function Mill.catobs(A::KBEntry{E,T}, B::KBEntry{E,T}) where {E,T}
 	error("The catobs is not implemented for \"KBEntry\", as it might not be safe without KnowledgeBase")
 end
@@ -74,6 +80,9 @@ function reduce(::typeof(Mill.catobs), As::Vector{<:KBEntry{E,T}}) where {E,T}
     error("The catobs is not implemented for \"KBEntry\", as it might not be safe without KnowledgeBase")
 end
 
+########
+#   THe dangerousness of getindex is questionably and will be removed on first trouble
+########
 function Base.getindex(X::KBEntry{E,T}, idcs...) where {E,T}
 	D = length(X.ii)
 	if first(idcs) isa Colon
@@ -86,19 +95,75 @@ function Base.getindex(X::KBEntry{E,T}, idcs...) where {E,T}
 	_getindex(X, idcs...)
 end
 
-# function ChainRulesCore.rrule(::typeof(Base.Matrix), kb::KnowledgeBase, b::KBEntry)
-#     y = Matrix(kb, b)
-#     println("custom rrule")
-#     function foo_mul_pullback(ȳ)
-#     	@show (typeof(ȳ), size(ȳ))
-#         return(NoTangent(), NoTangent(), NoTangent())
-#     end
-#     return y, foo_mul_pullback
-# end
 
+#########
+# concatenation of knowledge bases
+#########
+
+# Concatenation of knowledge base is difficult, since KBEntries are essentially
+# views into the knowledgebase and therefore we need to ensure that when
+# we concatenate two knowledge bases for batching purposes, we correctly 
+# indexes into the original arrays. An example of a possible  problem 
+# occurs when the knowledge base contains longer array then is the 
+# maximum index in the KBEntry. In this case, problem might happen.
+# The implementation would a very nice user-case for contextual dispatch, 
+# but since Casette or IRTools would take ages to compile, we just manually 
+# copy things by ourselves. On the end, this code is experimental.
+
+reduce(::typeof(Mill.catobs), as::AbstractVector{<:KnowledgeBase}) = _catobs_kbs(as)
+
+function _catobs_kbs(as::AbstractVector{<:KnowledgeBase{KS,VS}}) where {KS,VS}
+    offsets = _compute_offsets(as)
+    vs = map(KS) do k 
+        _catobs_kbs(offsets, [a[k] for a in as])
+    end
+    KnowledgeBase(NamedTuple{KS}(vs))
+end
+
+function _catobs_kbs(offsets, as::AbstractVector{<:AbstractMatrix})
+    reduce(hcat, as)
+end
+
+function _catobs_kbs(offsets, as::AbstractVector{<:ArrayNode})
+    ArrayNode(_catobs_kbs(offsets, [a.data for a in as]))
+end
+
+function _catobs_kbs(offsets, as::AbstractVector{<:KBEntry{E,T}}) where {E,T}
+    i = [a.ii for a in as]
+    ii = reduce(vcat,[a.ii .+ o for (a, o) in zip(as,offsets[E])])
+    KBEntry{E,T}(ii)
+end
+
+function _catobs_kbs(offsets, as::AbstractVector{<:ProductNode{T,<:Nothing}}) where {T}
+    as = [a.data for a in as]
+    xs = T(_catobs_kbs(offsets, [a[i] for a in as]) for i in keys(as[1]))
+    ProductNode(xs)
+end
+ 
+function _catobs_kbs(offsets, as::AbstractVector{<:BagNode})
+    d = [a.data for a in as]
+    bags = reduce(vcat, [n.bags for n in as])
+    BagNode(_catobs_kbs(offsets, d), bags, nothing)
+end
+ 
+function _compute_offsets(as::AbstractVector{<:KnowledgeBase{KS,VS}}) where {KS,VS}
+    o = map(KS) do k 
+        o = 0
+        c = zeros(Int, length(as))
+        for (i,a) in enumerate(as)
+            c[i] = o 
+            o += _numobs(a[k])
+        end
+        return(c)
+    end    
+    NamedTuple{KS}(o)
+end
+
+_numobs(a::AbstractMatrix) = size(a,2)
+_numobs(a::AbstractMillNode) = Mill.nobs(a)
 
 ###########
-#	Let's plumb it to Mill
+#	Plumbing to Mill --- propagation with Knowledge base
 ###########
 function (m::Mill.ArrayModel)(kb::KnowledgeBase, x::ArrayNode{<:KBEntry})
 	xx = Matrix(kb, x.data)
@@ -131,7 +196,7 @@ end
 
 
 ###########
-#	Let's plumb it to Mill
+#   Plumbing to Mill --- making reflect model nice
 ###########
 import Mill: reflectinmodel, _reflectinmodel
 
