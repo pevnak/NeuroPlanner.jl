@@ -28,6 +28,27 @@ function duplicated_columns(x::Matrix{T}) where {T<:Number}
 	ii
 end
 
+"""
+find_duplicates(o)
+
+create a `mask` identifying unique columns in `o` and a map `si`
+mapping indexes original columns in `o` to the new representation in `o[:,mask]`
+It should hold that `o[:,mask][:,[si[i] for i in 1:size(o,2)]] == o`
+"""
+function find_duplicates(o)
+	ii = duplicated_columns(o)
+	mask = falses(size(o, 2))
+	si = zeros(Int, size(o, 2))
+	for (i, k) in enumerate(ii)
+		if !haskey(index_map, k)
+			index_map[k] = length(index_map) + 1
+			mask[i] = true
+		end 
+		si[i] = index_map[k]
+	end
+	mask, si
+end
+
 
 """
 deduplicate(model::BagModel, ds::BagNode)
@@ -42,6 +63,10 @@ dds.bags.bags ≈ [[1, 2, 1], [2, 3]]
 """
 
 deduplicate(kb, model::ArrayModel, ds::ArrayNode) = ds
+
+function deduplicate(kb, model::ArrayModel, ds::ArrayNode{<:KBEntry})
+
+end
 
 @generated function deduplicate(kb::KnowledgeBase, model::ProductModel{<:NamedTuple{KM}}, ds::ProductNode{<:NamedTuple{KM}}) where {KM}
     chs = map(KM) do k
@@ -60,18 +85,7 @@ end
 
 function deduplicate(kb::KnowledgeBase, model::BagModel, ds::BagNode)
 	subds = deduplicate(kb, model.im, ds.data)
-	o = model.im(kb, subds)
-	mask = falses(size(o, 2))
-	index_map = Dict{Int,Int}()
-	ii = duplicated_columns(o)
-	si = zeros(Int, size(o, 2))
-	for (i, k) in enumerate(ii)
-		if !haskey(index_map, k)
-			index_map[k] = length(index_map) + 1
-			mask[i] = true
-		end 
-		si[i] = index_map[k]
-	end
+	mask, si = find_duplicates(model.im(kb, subds))
 	BagNode(
 		ds.data[mask],
 		ScatteredBags(map(b -> si[b], ds.bags)),

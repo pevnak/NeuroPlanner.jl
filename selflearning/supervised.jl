@@ -54,7 +54,8 @@ function experiment(domain_pddl, train_files, problem_files, filename, fminibatc
 		plan = deserialize(plan_file(problem_file))
 		problem = load_problem(problem_file)
 		ds = fminibatch(pddld, domain, problem, plan.plan)
-		@set ds.x = deduplicate(dedup_model, ds.x)
+		# @set ds.x = deduplicate(dedup_model, ds.x)
+		ds
 	end
 
 	if isfile(filename[1:end-4]*"_model.jls")
@@ -75,6 +76,8 @@ function experiment(domain_pddl, train_files, problem_files, filename, fminibatc
 		trajectory = sol.sol.status == :max_time ? nothing : sol.sol.trajectory
 		merge(sol.stats, (;used_in_train, planner = "$(planner)", trajectory, problem_file))
 	end
+	df = DataFrame(vec(stats))
+	mean(df.solved[.!df.used_in_train])
 	serialize(filename, stats)
 end
 
@@ -86,7 +89,6 @@ seed = parse(Int, ARGS[3])
 problem_name = "ferry"
 loss_name = "lstar"
 seed = 1
-
 
 max_steps = 20000
 max_time = 30

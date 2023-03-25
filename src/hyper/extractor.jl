@@ -56,7 +56,7 @@ function (ex::HyperExtractor)(state::GenericState)
 		ds = multi_predicates(ex, Symbol("x$(i)"), state)
 		kb = append(kb, Symbol("x$(i+1)"), ds)
 	end
-	s = Symbol("x4")
+	s = Symbol("x$(ex.message_passes+1)")
 	o = Symbol("o")
 	kb = append(kb, o, BagNode(ArrayNode(KBEntry(s, 1:n)), [1:n]))
 	addgoal(kb, ex.goal)

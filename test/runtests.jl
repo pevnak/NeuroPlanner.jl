@@ -6,7 +6,7 @@ using GraphNeuralNetworks
 using SymbolicPlanners
 using Test
 using Random
-using NeuralAttentionlib
+using PlanningDomains
 
 include("knowledge_base.jl")
 
@@ -26,9 +26,7 @@ problem = load_problem("../classical-domains/classical/driverlog/pfile1.pddl")
 # domain = load_domain("../classical-domains/classical/briefcaseworld/domain.pddl")
 # problem = load_problem("../classical-domains/classical/briefcaseworld/pfile1.pddl")
 
-
 # pddle = PDDLExtractor(domain, problem) 
-
 
 @testset "extraction and basic gradient of MultiModel" begin
 	pddld = PDDLExtractor(domain) 
@@ -95,10 +93,36 @@ end
 	end
 end
 
-@testset "testing deduplication" begin 
+@testset "Integration test without deduplication" begin 
+	domain_name = "barman-sequential-satisficing"
+	ipcyear = "ipc-2014"
+	fminibatch = NeuroPlanner.minibatchconstructor("lstar")
+	domain = load_domain(IPCInstancesRepo,ipcyear, domain_name)
+	pddld = HyperExtractor(domain)
+	problems = list_problems(IPCInstancesRepo, ipcyear, domain_name)
+
+
+	#create model from some problem instance
+	model = let 
+		problem = load_problem(IPCInstancesRepo, ipcyear,domain_name, first(problems))
+		pddle, state = initproblem(pddld, problem)
+		h₀ = pddle(state)
+		reflectinmodel(h₀, d -> Dense(d, 8, relu);fsm = Dict("" =>  d -> Dense(d, 1)))
+	end
+
+	ps = Flux.params(model);
+	for problem_file in problems
+		problem = load_problem(IPCInstancesRepo, ipcyear,domain_name, problem_file)
+		trajectory, plan = NeuroPlanner.sample_forward_trace(domain, problem, 20)
+		ds = fminibatch(pddld, domain, problem, plan)
+		fval, gs = Flux.withgradient(() -> NeuroPlanner.loss(model, ds), ps)
+		@test any(sum(abs.(gs[p])) > 0 for p in ps)
+	end
+end
+
+@testset "Integration test with deduplication" begin 
     # @testset "deduplication test" begin
-	domain = load_domain(domain_pddl)
-	# pddld = PDDLExtractor(domain)
+	domain = load_domain(IPCInstancesRepo,"ipc-2014","barman-sequential-satisficing")
 	pddld = HyperExtractor(domain)
 
 	#create model from some problem instance
@@ -106,18 +130,18 @@ end
 		problem = load_problem(first(problem_files))
 		pddle, state = initproblem(pddld, problem)
 		h₀ = pddle(state)
-		model = initmodel(h₀; graph_dim, graph_layers, dense_dim, dense_layers, heads, head_dims)
-		dedup_model = reflectinmodel(h₀, d -> Dense(d,32), SegmentedMean)
+		model = reflectinmodel(h₀, d -> ffnn(d, dense_dim, dense_dim, dense_layers);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
+		dedup_model = reflectinmodel(h₀, d -> Dense(d,32) ;fsm = Dict("" =>  d -> Dense(d, 32)))
 		(model, dedup_model)
 	end
 
- 
 	minibatches = map(train_files) do problem_file
+		@show problem_file
 		plan = deserialize(plan_file(problem_file))
 		problem = load_problem(problem_file)
 		ds = fminibatch(pddld, domain, problem, plan.plan)
 		ds1 = deepcopy(ds)
-		ds2 =  @set ds.x.data = deduplicate(dedup_model.im, ds.x.data)
+		ds2 =  @set ds.x = deduplicate(dedup_model, ds.x)
 		(;ds1, ds2)
 	end
 

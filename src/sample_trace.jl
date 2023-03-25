@@ -195,7 +195,7 @@ end
 
 function sample_forward_trace(domain, problem, initial_state, depth; remove_cycles = true)
 	state = initial_state
-	plan = []
+	plan = Term[]
 	trajectory = [state]
 	for i in 1:depth
 		acts = available(domain, state)
