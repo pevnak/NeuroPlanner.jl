@@ -13,25 +13,26 @@ struct HyperExtractor{DO,D,N,G}
 	multiarg_predicates::NTuple{N,Symbol}
 	nunanary_predicates::Dict{Symbol,Int64}
 	objtype2id::Dict{Symbol,Int64}
-	message_passes::Int
+	model_params::NamedTuple{(:message_passes, :residual), Tuple{Int64, Bool}}
 	obj2id::D
 	goal::G
 end
 
-function HyperExtractor(domain; message_passes = 2)
+function HyperExtractor(domain; message_passes = 2, residual = true, kwargs...)
+	model_params = (;message_passes = 2, residual = true)
 	dictmap(x) = Dict(reverse.(enumerate(sort(x))))
 	predicates = collect(domain.predicates)
 	multiarg_predicates = tuple([kv[1] for kv in predicates if length(kv[2].args) > 1]...)
 	nunanary_predicates = dictmap([kv[1] for kv in predicates if length(kv[2].args) ≤  1])
 	objtype2id = Dict(s => i + length(nunanary_predicates) for (i, s) in enumerate(collect(keys(domain.typetree))))
-	HyperExtractor(domain, multiarg_predicates, nunanary_predicates, objtype2id, message_passes, nothing, nothing)
+	HyperExtractor(domain, multiarg_predicates, nunanary_predicates, objtype2id, model_params, nothing, nothing)
 end
 
 NoProblemNoGoalHE{DO,N} = HyperExtractor{DO,Nothing,N,Nothing} where {DO,N}
 ProblemNoGoalHE{DO,N} = HyperExtractor{DO,D,N,Nothing} where {DO,D<:Dict,N}
 
-function HyperExtractor(domain, problem; embed_goal = true, message_passes = 2)
-	ex = HyperExtractor(domain; message_passes = 2)
+function HyperExtractor(domain, problem; embed_goal = true, kwargs...)
+	ex = HyperExtractor(domain; kwargs...)
 	specialize(ex, problem; embed_goal)
 end
 
@@ -44,22 +45,33 @@ extractor.
 """
 function specialize(ex::HyperExtractor, problem)
 	obj2id = Dict(v => i for (i, v) in enumerate(problem.objects))
-	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.message_passes, obj2id, nothing)
+	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.model_params, obj2id, nothing)
 end
 
 function (ex::HyperExtractor)(state::GenericState)
 	length(state.types) != length(ex.obj2id) && error("number of objects in state and problem instance does not match")
+	message_passes, residual = ex.model_params
 	x = nunary_predicates(ex, state)
 	kb = KnowledgeBase((;x1 = x))
 	n = size(x,2)
-	for i in 1:ex.message_passes
-		ds = multi_predicates(ex, Symbol("x$(i)"), state)
-		kb = append(kb, Symbol("x$(i+1)"), ds)
+	iᵢ = 1
+	for i in 1:message_passes
+		s = Symbol("x$(iᵢ)")
+		ds = multi_predicates(ex, s , state)
+		kb = append(kb, Symbol("x$(iᵢ+1)"), ds)
+		iᵢ += 1
+		if residual #if there is a residual connection, add it 
+			ds = ProductNode((ArrayNode(KBEntry(Symbol("x$(iᵢ-1)"), 1:n)),
+				ArrayNode(KBEntry(Symbol("x$(iᵢ)"), 1:n))
+				))
+			kb = append(kb, Symbol("x$(iᵢ+1)"), ds)
+			iᵢ += 1
+		end
 	end
-	s = Symbol("x$(ex.message_passes+1)")
+	s = Symbol("x$(iᵢ)")
 	o = Symbol("o")
 	kb = append(kb, o, BagNode(ArrayNode(KBEntry(s, 1:n)), [1:n]))
-	addgoal(kb, ex.goal)
+	addgoal(ex, kb)
 end
 
 function add_goalstate(ex::NoProblemNoGoalHE, problem, goal = goalstate(ex.domain, problem))
@@ -74,7 +86,7 @@ function add_goalstate(ex::ProblemNoGoalHE, problem, goal = goalstate(ex.domain,
 	ks = keys(exg.kb)
 	gp = map(ks) do k
 		eg = exg[k]
-		if eg isa ProductNode
+		if eg isa ProductNode{<:NamedTuple{ex.multiarg_predicates}}
 			ns = map(s -> Symbol("goal_$(s)"), keys(eg.data))
 			return(ProductNode(NamedTuple{ns}(values(eg.data))))
 		else 
@@ -83,15 +95,20 @@ function add_goalstate(ex::ProblemNoGoalHE, problem, goal = goalstate(ex.domain,
 	end
 	exg = KnowledgeBase(NamedTuple{ks}(tuple(gp...)))
 
-	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.message_passes, ex.obj2id, exg)
+	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.model_params, ex.obj2id, exg)
 end
 
-addgoal(kb::KnowledgeBase, ::Nothing) = kb
+addgoal(ex::ProblemNoGoalHE, kb::KnowledgeBase) = kb
 
-function addgoal(kb1::KnowledgeBase{KX,V1}, kb2::KnowledgeBase{KX,V2}) where {KX, V1, V2}
+function addgoal(ex, kb1::KnowledgeBase{KX,V1}) where {KX, V1}
+	kb2 = ex.goal
 	x = vcat(kb1[:x1], kb2[:x1])
 	gp = map(KX[2:end-1]) do k
-		ProductNode(merge(kb1[k].data, kb2[k].data))
+		if kb1[k] isa ProductNode{<:NamedTuple{ex.multiarg_predicates}}
+			ProductNode(merge(kb1[k].data, kb2[k].data))
+		else
+			kb1[k]
+		end
 	end
 	KnowledgeBase(NamedTuple{KX}(tuple(x, gp..., kb1.kb[end])))
 end

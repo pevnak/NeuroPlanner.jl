@@ -16,6 +16,33 @@ using Mill
 using Functors
 using Setfield
 
+###############
+#	Temporal fix of Mill
+###############
+using ChainRulesCore
+import Mill: segmented_sum_back
+using  Mill: ∇dw_segmented_sum!, _weight
+function segmented_sum_back(Δ, y, x, ψ, bags, w)
+   dx = zero(x)
+   dψ = zero(ψ)
+   dw = isnothing(w) ? ZeroTangent() : zero(w)
+   @inbounds for (bi, b) in enumerate(bags)
+       if isempty(b)
+           for i in eachindex(ψ)
+               dψ[i] += Δ[i, bi]
+           end
+       else
+           for j in b
+               for i in 1:size(x, 1)
+                   dx[i, j] += _weight(w, i, j, eltype(x)) * Δ[i, bi]
+                   ∇dw_segmented_sum!(dw, Δ, x, y, w, i, j, bi)
+               end
+           end
+       end
+   end
+   dx, dψ, NoTangent(), dw
+end
+
 include("solution_tracking.jl")
 include("problems.jl")
 include("training.jl")
@@ -34,18 +61,19 @@ function plan_file(problem_file)
 	joinpath("plans", problem_name, middle_path..., basename(problem_file)[1:end-5]*".jls")
 end
 
-function experiment(domain_pddl, train_files, problem_files, filename, fminibatch;max_steps = 10000, max_time = 30, graph_layers = 2, graph_dim = 8, dense_layers = 2, dense_dim = 32)
+function experiment(domain_pddl, train_files, problem_files, filename, fminibatch;max_steps = 10000, max_time = 30, graph_layers = 2, residual = true, graph_dim = 8, dense_layers = 2, dense_dim = 32)
 	!isdir(dirname(filename)) && mkpath(dirname(filename))
 	domain = load_domain(domain_pddl)
 	# pddld = PDDLExtractor(domain)
-	pddld = HyperExtractor(domain; message_passes = graph_layers)
+	pddld = HyperExtractor(domain; message_passes = graph_layers, residual)
 
 	#create model from some problem instance
 	model, dedup_model = let 
 		problem = load_problem(first(problem_files))
 		pddle, state = initproblem(pddld, problem)
 		h₀ = pddle(state)
-		model = reflectinmodel(h₀, d -> ffnn(d, dense_dim, dense_dim, dense_layers);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
+		# model = reflectinmodel(h₀, d -> ffnn(d, dense_dim, dense_dim, dense_layers);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
+		model = reflectinmodel(h₀, d -> Dense(d, dense_dim, relu);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, 2)))
 		dedup_model = reflectinmodel(h₀, d -> Dense(d,32) ;fsm = Dict("" =>  d -> Dense(d, 32)))
 		model, dedup_model
 	end
@@ -54,18 +82,17 @@ function experiment(domain_pddl, train_files, problem_files, filename, fminibatc
 		plan = deserialize(plan_file(problem_file))
 		problem = load_problem(problem_file)
 		ds = fminibatch(pddld, domain, problem, plan.plan)
-		# @set ds.x = deduplicate(dedup_model, ds.x)
-		ds
+		@set ds.x = deduplicate(dedup_model, ds.x)
 	end
 
-	if isfile(filename[1:end-4]*"_model.jls")
-		model = deserialize(filename[1:end-4]*"_model.jls")
-	else
-		opt = AdaBelief()
-		ps = Flux.params(model)
+	# if isfile(filename[1:end-4]*"_model.jls")
+	# 	model = deserialize(filename[1:end-4]*"_model.jls")
+	# else
+		opt = AdaBelief();
+		ps = Flux.params(model);
 		train!(Base.Fix1(NeuroPlanner.loss, model), model, ps, opt, () -> rand(minibatches), max_steps)
-		serialize(filename[1:end-4]*"_model.jls", model)	
-	end
+		# serialize(filename[1:end-4]*"_model.jls", model)	
+	# end
 
 
 	# stats = map(Iterators.product([AStarPlanner, GreedyPlanner], problem_files)) do (planner, problem_file)
@@ -92,11 +119,10 @@ seed = 1
 
 max_steps = 20000
 max_time = 30
-graph_layers = 2
+graph_layers = 1
 dense_layers = 2
+residual = true
 dense_dim = 32
-heads = 4
-head_dims = 4
 
 Random.seed!(seed)
 domain_pddl, problem_files, ofile = getproblem(problem_name, false)

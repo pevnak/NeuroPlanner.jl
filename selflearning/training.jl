@@ -49,7 +49,7 @@ function train!(loss, model, ps::Params, opt::AbstractOptimiser, prepare_minibat
 	for i in 1:max_steps
 		d = prepare_minibatch()
 		l, gs = withgradient(() -> loss(d), ps)
-		!isfinite(l) && error("Loss is $l on data item $j")
+		!isfinite(l) && error("Loss is $l on data item")
 		fval += l
 		n += 1
 		# serialize("/tmp/debug.jls",(model, d))
