@@ -102,3 +102,16 @@ function similarity_of_problems()
 	end
 end
 
+
+"""
+plan_file(problem_file)
+
+a path to a plan of 
+"""
+function plan_file(problem_name, problem_file)
+	middle_path = splitpath(problem_file)[3:end-1]
+	middle_path = filter(∉(["problems"]),middle_path)
+	middle_path = filter(∉(["test"]),middle_path)
+	joinpath("plans", problem_name, middle_path..., basename(problem_file)[1:end-5]*".jls")
+end
+

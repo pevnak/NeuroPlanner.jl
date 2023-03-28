@@ -13,13 +13,13 @@ struct HyperExtractor{DO,D,N,G}
 	multiarg_predicates::NTuple{N,Symbol}
 	nunanary_predicates::Dict{Symbol,Int64}
 	objtype2id::Dict{Symbol,Int64}
-	model_params::NamedTuple{(:message_passes, :residual), Tuple{Int64, Bool}}
+	model_params::NamedTuple{(:message_passes, :residual), Tuple{Int64, Symbol}}
 	obj2id::D
 	goal::G
 end
 
-function HyperExtractor(domain; message_passes = 2, residual = true, kwargs...)
-	model_params = (;message_passes = 2, residual = true)
+function HyperExtractor(domain; message_passes = 2, residual = :dense, kwargs...)
+	model_params = (;message_passes, residual)
 	dictmap(x) = Dict(reverse.(enumerate(sort(x))))
 	predicates = collect(domain.predicates)
 	multiarg_predicates = tuple([kv[1] for kv in predicates if length(kv[2].args) > 1]...)
@@ -55,22 +55,26 @@ function (ex::HyperExtractor)(state::GenericState)
 	kb = KnowledgeBase((;x1 = x))
 	n = size(x,2)
 	iᵢ = 1
+	sₓ = :x1
 	for i in 1:message_passes
-		s = Symbol("x$(iᵢ)")
-		ds = multi_predicates(ex, s , state)
-		kb = append(kb, Symbol("x$(iᵢ+1)"), ds)
+		sₙ = Symbol("gnn_$(iᵢ+1)")
+		ds = multi_predicates(ex, sₓ , state)
+		kb = append(kb, sₙ, ds)
 		iᵢ += 1
-		if residual #if there is a residual connection, add it 
-			ds = ProductNode((ArrayNode(KBEntry(Symbol("x$(iᵢ-1)"), 1:n)),
-				ArrayNode(KBEntry(Symbol("x$(iᵢ)"), 1:n))
+		if residual !== :none #if there is a residual connection, add it 
+			rₙ = Symbol("res_$(iᵢ+1)")
+			ds = ProductNode((ArrayNode(KBEntry(sₓ, 1:n)),
+				ArrayNode(KBEntry(sₙ, 1:n))
 				))
-			kb = append(kb, Symbol("x$(iᵢ+1)"), ds)
+			kb = append(kb, rₙ, ds)
 			iᵢ += 1
+			sₓ = rₙ
+		else 
+			sₓ = sₙ
 		end
 	end
-	s = Symbol("x$(iᵢ)")
-	o = Symbol("o")
-	kb = append(kb, o, BagNode(ArrayNode(KBEntry(s, 1:n)), [1:n]))
+	s = last(keys(kb))
+	kb = append(kb, :o, BagNode(ArrayNode(KBEntry(s, 1:n)), [1:n]))
 	addgoal(ex, kb)
 end
 

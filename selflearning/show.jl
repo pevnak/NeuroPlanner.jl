@@ -11,43 +11,52 @@ using Statistics
 ###########
 #	Collect all stats to one big DataFrame, over which we will perform queries
 ###########
-problem="npuzzle"
-number=1
-loss = "lstar"
-function parse_results(problem, loss; testset = true)
-	numbers = filter(1:3) do number
-		isfile("supervised/$(problem)/$(loss)_40000_30_2_8_2_32_$(number).jls")
-	end
-	if isempty(numbers) 
-		n = (Symbol("$(loss)_astar"), Symbol("$(loss)_gbfs"))
-		return(NamedTuple{n}((NaN,NaN)))
-	end
-	x = map(numbers) do number
-		filename = "supervised/$(problem)/$(loss)_40000_30_2_8_2_32_$(number).jls"
-		stats = deserialize(filename)
-		df = DataFrame(stats[:])
-		da = filter(df) do r 
-			(r.used_in_train !== testset) && (r.planner == "AStarPlanner")
-		end
-		dg = filter(df) do r 
-			(r.used_in_train !== testset) && (r.planner == "GreedyPlanner")
-		end
-		# [mean(da.sol_length), mean(dg.sol_length)]
-		# [mean(da.solved), mean(dg.solved)]
-		[mean(da.expanded), mean(dg.expanded)]
-	end |> mean
-	# x = round.(x, digits = 2)
-	x = round.(x, digits = 0)
-	n = (Symbol("$(loss)_astar"), Symbol("$(loss)_gbfs"))
-	NamedTuple{n}(tuple(x...))
+
+domain_name = "gripper"
+loss_name = "lstar"
+max_steps = 20_000
+max_time = 30
+graph_layers = 1
+dense_dim = 32
+dense_layers = 2
+residual = "none"
+seed = 1
+
+function read_data(;domain_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
+	filename = joinpath("superhyper", domain_name, join([loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_")*".jls")
+	!isfile(filename) && return(DataFrame())
+	df = DataFrame(vec(deserialize(filename)))
+	select!(df, Not(:trajectory))
+	df[:,:domain_name] .= domain_name
+	df[:,:loss_name] .= loss_name
+	df[:,:graph_layers] .= graph_layers
+	df[:,:dense_dim] .= dense_dim
+	df[:,:dense_layers] .= dense_layers
+	df[:,:residual] .= residual
+	df[:,:seed] .= seed
+	df[:,:max_steps] .= max_steps
+	df[:,:max_time] .= max_time
+	df
 end
 
-let 
-	problems = ["blocks", "ferry", "gripper", "npuzzle"]
-	df = map(problems) do problem
-		mapreduce(merge,["lstar","lgbfs","lrt","l2"]) do loss
-			parse_results(problem, loss;testset = true)
-		end
-	end |> DataFrame;
-	hcat(DataFrame(problem = problems),  df[:,1:2:end], df[:,2:2:end])
+problems = ["blocks","ferry","npuzzle","gripper"]
+stats = map(Iterators.product(problems, (4, 8, 16, 32), (1, 2, 3), (:none, :linear, :dense))) do (domain_name, dense_dim, graph_layers, residual)
+	read_data(;domain_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
 end
+df = reduce(vcat, filter(!isempty, vec(stats)))
+
+gdf = DataFrames.groupby(df, [:domain_name, :loss_name, :max_steps,  :max_time, :graph_layers, :residual, :dense_layers, :dense_dim, :seed])
+stats = combine(gdf) do sub_df
+	(;	trn_solved = mean(sub_df.solved[sub_df.used_in_train]),
+     	tst_solved = mean(sub_df.solved[.!sub_df.used_in_train]),
+	)
+end
+
+gdf = DataFrames.groupby(stats, :domain_name)
+a = combine(gdf) do sub_df
+	i = argmax(sub_df.tst_solved)
+	sub_df[i,:]
+end
+
+a[:,[:domain_name, :dense_dim, :graph_layers, :residual, :dense_layers]]
+

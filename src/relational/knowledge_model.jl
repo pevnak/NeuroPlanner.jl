@@ -12,7 +12,7 @@ Base.getindex(km::KnowledgeModel, k::Symbol) = km.layers[k]
 Base.keys(km::KnowledgeModel) = keys(km.layers)
 
 function reflectinmodel(ds::KnowledgeBase{KS,VS}, fm = d -> Dense(d, 10), fa= SegmentedSumMax; fsm=Dict(), 
-	fsa=Dict(), single_key_identity=true, single_scalar_identity=true, all_imputing=false) where {KS,VS}
+	fsa=Dict(), single_key_identity=true, single_scalar_identity=true, all_imputing=false, residual = :dense) where {KS,VS}
 	kb = atoms(ds)
 	layers = NamedTuple{}()
 	for k in KS
@@ -20,6 +20,11 @@ function reflectinmodel(ds::KnowledgeBase{KS,VS}, fm = d -> Dense(d, 10), fa= Se
 		predicate isa AbstractArray && continue
 		m = _reflectinmodel(kb, predicate, fm, fa, k == KS[end] ? fsm : Dict(), k == KS[end] ? fsa : Dict(), "", single_key_identity, single_scalar_identity, all_imputing)[1]
 		xx = m(kb, predicate)
+		if startswith(String(k),"res_") && residual == :linear # kind of suboptimal, since we recompute, but good enough
+			odim = size(xx,1)
+			m = _reflectinmodel(kb, predicate, d -> identity, fa, k == KS[end] ? fsm : Dict("" => d -> Dense(d,odim)), k == KS[end] ? fsa : Dict(), "", single_key_identity, single_scalar_identity, all_imputing)[1]		
+			xx = m(kb, predicate)
+		end
 		kb = append(kb, k, xx)
 		layers = merge(layers, NamedTuple{(k,)}((m,)))
 	end

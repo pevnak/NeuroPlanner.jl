@@ -29,19 +29,29 @@ function duplicated_columns(x::Matrix{T}) where {T<:Number}
 end
 
 """
-struct DeduplicatedData{D} 
+struct DeduplicatingNode{D} 
 	x::D
 	i::Vector{Int}
 end
 A deduplicated data are useful for speeding computation of models, which returns 
 the same answer over multiple observations. The idea is that the result is computed as
-m(ddd::DeduplicatedData) =  m(ddd.x)[:,ddd.colmap], where we assume that m(ddd.x) returns 
+m(ddd::DeduplicatingNode) =  m(ddd.x)[:,ddd.colmap], where we assume that m(ddd.x) returns 
 a matrix.
 """
-struct DeduplicatedData{D}
+struct DeduplicatingNode{D} <: AbstractMillNode
 	x::D
 	colmap::Vector{Int}
 end
+
+Mill.nobs(ds::DeduplicatingNode) = length(ds.colmap)
+Base.getindex(x::DeduplicatingNode, ii) = DeduplicatingNode(x.x, x.colmap[ii])
+HierarchicalUtils.children(n::DeduplicatingNode) = (n.x,)
+function HierarchicalUtils.nodecommshow(io::IO, n::DeduplicatingNode)
+	bytes = Base.format_bytes(Base.summarysize(n.colmap))
+    print(io, " # ", length(n.colmap), " obs, ", bytes)
+end
+
+
 
 function deduplicate_data(model::AbstractMillModel, ds::AbstractMillNode)
 	deduplicate_data(model(ds), ds)
@@ -51,16 +61,15 @@ function deduplicate_data(kb::KnowledgeBase, model::AbstractMillModel, ds::Abstr
 	deduplicate_data(model(kb, ds), ds)
 end
 
-
 function deduplicate_data(output::AbstractMatrix, ds::AbstractMillNode)
 	mask, si = find_duplicates(output)
-	DeduplicatedData(ds[mask], [si[i] for i in 1:Mill.nobs(ds)])
+	DeduplicatingNode(ds[mask], [si[i] for i in 1:Mill.nobs(ds)])
 end
 
 deduplicate_data(model, ds) = ds
 
-(m::AbstractMillModel)(dedu::DeduplicatedData{<:AbstractMillNode}) = m(dedu.x)[:,dedu.colmap]
-(m::AbstractMillModel)(kb::KnowledgeBase, dedu::DeduplicatedData{<:AbstractMillNode}) = m(kb, dedu.x)[:,dedu.colmap]
+(m::AbstractMillModel)(dedu::DeduplicatingNode{<:AbstractMillNode}) = m(dedu.x)[:,dedu.colmap]
+(m::AbstractMillModel)(kb::KnowledgeBase, dedu::DeduplicatingNode{<:AbstractMillNode}) = m(kb, dedu.x)[:,dedu.colmap]
 
 """
 find_duplicates(o)
@@ -96,12 +105,11 @@ dds.data.data ≈ [1 2 2; 2 1 2]
 dds.bags.bags ≈ [[1, 2, 1], [2, 3]]
 
 """
-
-deduplicate(kb, model::ArrayModel, ds::ArrayNode) = ds
+deduplicate(kb, model::ArrayModel, ds::ArrayNode) = deduplicate_data(kb, model, ds)
 
 @generated function deduplicate(kb::KnowledgeBase, model::ProductModel{<:NamedTuple{KM}}, ds::ProductNode{<:NamedTuple{KM}}) where {KM}
     chs = map(KM) do k
-        :(deduplicate(kb, model.ms.$k, ds.data.$k))
+        :(deduplicate_data(kb, model.ms.$k, ds.data.$k))
     end
     quote
         ProductNode(NamedTuple{KM}(tuple($(chs...))))
@@ -109,27 +117,13 @@ deduplicate(kb, model::ArrayModel, ds::ArrayNode) = ds
 end
 
 function deduplicate(kb::KnowledgeBase, model::ProductModel{<:Tuple}, ds::ProductNode{<:Tuple})
-    chs = [deduplicate(kb, m, x) for (m,x) in zip(model.ms, ds.data)]
+    chs = [deduplicate_data(kb, m, x) for (m,x) in zip(model.ms, ds.data)]
     ProductNode((tuple(chs...)))
 end
 
-
 function deduplicate(kb::KnowledgeBase, model::BagModel, ds::BagNode)
-	subds = deduplicate(kb, model.im, ds.data)
-	mask, si = find_duplicates(model.im(kb, subds))
-	BagNode(
-		ds.data[mask],
-		ScatteredBags(map(b -> si[b], ds.bags)),
-	)
-end
-
-function deduplicate(kb::KnowledgeBase, model::BagModel, ds::BagNode)
-	subds = deduplicate(kb, model.im, ds.data)
-	mask, si = find_duplicates(model.im(kb, subds))
-	BagNode(
-		ds.data[mask],
-		ScatteredBags(map(b -> si[b], ds.bags)),
-	)
+	subds = deduplicate_data(kb, model.im, ds.data)
+	BagNode(subds, ds.bags)
 end
 
 function deduplicate(model::KnowledgeModel, ds::KnowledgeBase)
