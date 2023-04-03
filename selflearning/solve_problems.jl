@@ -52,7 +52,8 @@ function solveproblem(domain, problem_file)
 	(sol, t)
 end
 
-problem_name = "gripper"
+["rovers", "optical-telegraphs", "philosophers", "airport-adl", "pipesworld-06", pipesworld-notankage "psr-large", "psr-middle", "freecell", "blocks", "elevators-00-full", "elevators-00-strips", "miconic", "miconic-simpleadl", "schedule", "miconic-fulladl", "logistics00"]
+problem_name = "rovers"
 # problem_name = "blocks"
 domain_pddl, problem_files, _ = getproblem(problem_name, false)
 domain = load_domain(domain_pddl)
@@ -70,13 +71,4 @@ for problem_file in problem_files
 	expanded = sol.expanded
 	!isdir(dirname(f)) && mkpath(dirname(f))
 	serialize(f, (;plan, t, expanded))
-end
-
-
-
-for d in readdir("plans/blocks")
-	for f in readdir("plans/blocks/$(d)")
-		endswith(f,".jls") && continue
-		run(`mv plans/blocks/$(d)/$(f) plans/blocks/$(d)/$(f).jls`)
-	end
 end

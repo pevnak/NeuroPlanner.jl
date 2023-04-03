@@ -56,7 +56,26 @@ gdf = DataFrames.groupby(stats, :domain_name)
 a = combine(gdf) do sub_df
 	i = argmax(sub_df.tst_solved)
 	sub_df[i,:]
+end;
+
+a[:,[:domain_name, :tst_solved, :trn_solved, :dense_dim, :graph_layers, :residual, :dense_layers]]
+
+
+# investigate 
+gdf = DataFrames.groupby(stats, [:domain_name, :dense_dim])
+a = combine(gdf) do sub_df
+	(;average = mean(sub_df.tst_solved), maximum = maximum(sub_df.tst_solved))
 end
 
-a[:,[:domain_name, :dense_dim, :graph_layers, :residual, :dense_layers]]
+gdf = DataFrames.groupby(stats, [:domain_name, :graph_layers])
+a = combine(gdf) do sub_df
+	(;average = mean(sub_df.tst_solved), maximum = maximum(sub_df.tst_solved))
+end
+
+gdf = DataFrames.groupby(stats, [:domain_name, :residual])
+a = combine(gdf) do sub_df
+	(;average = mean(sub_df.tst_solved), maximum = maximum(sub_df.tst_solved))
+end
+
+
 

@@ -43,10 +43,12 @@ function setup_zenotravel()
 	return(domain_pddl, problem_files, ofile)
 end
 
-function setup_ispc(name)
+const WORKING_CLASSIC = Set(["agricola-opt18", "agricola-sat18", "airport-adl", "assembly", "barman-opt11-strips", "barman-opt14-strips", "barman-sat11-strips", "barman-sat14-strips", "blocks", "blocks-3op", "briefcaseworld", "caldera-opt18", "caldera-sat18", "caldera-split-opt18", "caldera-split-sat18", "cavediving", "childsnack-opt14-strips", "childsnack-sat14-strips", "citycar-opt14-adl", "citycar-sat14-adl", "data-network-opt18", "data-network-sat18", "depot", "driverlog", "elevators-00-full", "elevators-00-strips", "elevators-opt11-strips", "elevators-sat11-strips", "ferry", "floortile-opt11-strips", "floortile-opt14-strips", "floortile-sat11-strips", "floortile-sat14-strips", "freecell", "ged-opt14-strips", "ged-sat14-strips", "grid", "gripper", "hanoi", "hiking-opt14-strips", "hiking-sat14-strips", "logistics00", "logistics98", "maintenance-opt14-adl", "maintenance-sat14-adl", "miconic", "miconic-fulladl", "miconic-simpleadl", "movie", "mprime", "mystery", "no-mprime", "no-mystery", "nomystery-opt11-strips", "nomystery-sat11-strips", "nurikabe-opt18", "nurikabe-sat18", "openstacks", "optical-telegraphs", "parking-opt11-strips", "parking-opt14-strips", "parking-sat11-strips", "parking-sat14-strips", "pegsol-opt11-strips", "pegsol-sat11-strips", "philosophers", "pipesworld-06", "pipesworld-notankage", "psr-large", "psr-middle", "rovers", "rovers-02", "satellite", "scanalyzer-opt11-strips", "scanalyzer-sat11-strips", "schedule", "settlers", "settlers-opt18", "settlers-sat18", "snake-opt18", "snake-sat18", "tetris-opt14-strips", "tetris-sat14-strips", "thoughtful-sat14-strips", "tidybot-opt11-strips", "tidybot-opt14-strips", "tidybot-sat11-strips", "tpp", "transport-opt11-strips", "transport-opt14-strips", "transport-sat11-strips", "transport-sat14-strips", "trucks", "tsp", "tyreworld", "visitall-opt11-strips", "visitall-opt14-strips", "visitall-sat11-strips", "visitall-sat14-strips", "woodworking-opt11-strips", "woodworking-sat11-strips", "zenotravel"])
+function setup_classic(name)
 	benchdir(s...) = joinpath("..","classical-domains","classical", name, s...)
 	domain_pddl = benchdir("domain.pddl")
-	problem_files = [benchdir(@sprintf("p%02d.pddl", 1)) for i in 1:20]
+	problem_files  = filter(s -> endswith(s, ".pddl") && s != "domain.pddl", readdir(benchdir()))
+	problem_files = [benchdir(s) for s in problem_files]
 	ofile(s...) = joinpath("results", name, s...)
 	return(domain_pddl, problem_files, ofile)
 end
@@ -57,8 +59,7 @@ function getproblem(problem)
 	problem == "gripper" && return(setup_gripper())
 	problem == "npuzzle" && return(setup_n_puzzle())
 	problem == "zenotravel" && return(setup_zenotravel())
-	standard_ispc = Set(["agricola-sat18","caldera-sat18","woodworking-sat11-strips"])
-	problem ∈ standard_ispc && return(setup_ispc(problem))
+	problem ∈ WORKING_CLASSIC && return(setup_classic(problem))
 	error("unknown problem $(problem)")
 end
 
