@@ -17,13 +17,14 @@ using HierarchicalUtils
 using ChainRulesCore
 
 """
-initproblem(pddld::HyperExtractor{<:Nothing,<:Nothing}, problem; add_goal = true)
+initproblem(ex, problem; add_goal = true)
 
 Specialize extractor for the given problem instance and return init state 
 """
-function initproblem(pddld, problem; add_goal = true)
-	pddle = add_goal ? add_goalstate(pddld, problem) : specialize(pddld, problem)
-	pddle, initstate(pddld.domain, problem)
+function initproblem(ex, problem; add_goal = true)
+	ex = specialize(ex, problem)
+	pddle = add_goal ? add_goalstate(ex, problem) : ex
+	pddle, initstate(ex.domain, problem)
 end
 
 

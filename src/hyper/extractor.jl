@@ -53,6 +53,10 @@ end
 NoProblemNoGoalHE{DO,N} = HyperExtractor{DO,Nothing,N,Nothing} where {DO,N}
 ProblemNoGoalHE{DO,N} = HyperExtractor{DO,D,N,Nothing} where {DO,D<:Dict,N}
 
+isspecialized(ex::HyperExtractor) = ex.obj2id === nothing
+hasgoal(ex::HyperExtractor) = ex.goal === nothing
+
+
 function HyperExtractor(domain, problem; embed_goal = true, kwargs...)
 	ex = HyperExtractor(domain; kwargs...)
 	ex = specialize(ex, problem)
@@ -191,8 +195,8 @@ function encode_predicates(ex::HyperExtractor, pname::Symbol, preds, kid::Symbol
 end
 
 
-function add_goalstate(ex::NoProblemNoGoalHE, problem, goal = goalstate(ex.domain, problem))
-	ex = specialize(ex, problem)
+function add_goalstate(ex::HyperExtractor, problem, goal = goalstate(ex.domain, problem))
+	ex = isspecialized(ex) ? ex : specialize(ex, problem) 
 	add_goalstate(ex, problem, goal)
 end
 
