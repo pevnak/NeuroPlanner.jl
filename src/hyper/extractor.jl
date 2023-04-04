@@ -39,7 +39,7 @@ struct HyperExtractor{DO,D,N,G}
 	goal::G
 end
 
-function HyperExtractor(domain; message_passes = 2, residual = :dense, kwargs...)
+function HyperExtractor(domain; message_passes = 2, residual = :linear, kwargs...)
 	model_params = (;message_passes, residual)
 	dictmap(x) = Dict(reverse.(enumerate(sort(x))))
 	predicates = collect(domain.predicates)
@@ -171,7 +171,7 @@ function multi_predicates(ex::HyperExtractor, kid::Symbol, state)
 	ProductNode(NamedTuple{ks}(xs))
 end
 
-function encode_predicates(ex, pname::Symbol, preds, kid::Symbol)
+function encode_predicates(ex::HyperExtractor, pname::Symbol, preds, kid::Symbol)
 	p = ex.domain.predicates[pname]
 	obj2id = ex.obj2id
 	constmap = ex.constmap

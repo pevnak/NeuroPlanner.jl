@@ -34,6 +34,9 @@ include("hyper/extractor.jl")
 include("hyper/deduplication.jl")
 export HyperExtractor, deduplicate
 
+include("asnets/extractor.jl")
+export ASNet
+
 include("hyper/mha.jl")
 export MultiheadAttention
 

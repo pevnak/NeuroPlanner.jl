@@ -32,7 +32,7 @@ function train!(loss, model, ps::Params, opt::AbstractOptimiser, minibatches, fv
 	for _ in 1:max_steps
 		j = mbsampler()
 		d = prepare_minibatch(minibatches[j])
-		l, gs = withgradient(() -> loss(d), ps)
+		l, gs = withgradient(() -> loss(model, d), ps)
 		!isfinite(l) && error("Loss is $l on data item $j")
 		# serialize("/tmp/debug.jls",(model, d))
 		fvals[j] = l

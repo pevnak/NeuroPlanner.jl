@@ -76,15 +76,11 @@ end
 function update_solution(oldsol::Nothing, newsol::NamedTuple, pddld, problem, fminibatch) 
 	verbose && newsol.stats.solved && println(@green "new solution: $((newsol.stats.sol_length, newsol.stats.expanded))")
 	verbose && !newsol.stats.solved && println(@yellow "not solved: $((newsol.stats.sol_length, newsol.stats.expanded))")
-	(;minibatch = fminibatch(newsol.sol, pddld, problem), stats = newsol.stats)
+	(;minibatch = fminibatch(pddld, pddld.domain, problem, newsol.sol.plan), stats = newsol.stats)
 end
 
 function update_solution(oldsol::NamedTuple, newsol::Nothing, pddld, problem, fminibatch)
 	verbose && println(@red "new is unsolved: $((oldsol.stats.sol_length, oldsol.stats.expanded))")
-	# stats = (;solution_time = oldsol.stats.solution_time,
-	# sol_length = oldsol.stats.sol_length,
-	# expanded = 10*oldsol.stats.expanded, # let's try to increase priority of this poor guy
-	# )
 	oldsol
 end
 

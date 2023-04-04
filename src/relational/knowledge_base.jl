@@ -16,6 +16,8 @@ function Base.show(io::IO, kb::KnowledgeBase{KS, VS}) where {KS, VS}
 	print(io, "KnowledgeBase: (",join(KS, ","),")");
 end
 
+KnowledgeBase() = KnowledgeBase(NamedTuple())
+
 Base.getindex(kb::KnowledgeBase, k::Symbol) = kb.kb[k]
 Base.keys(kb::KnowledgeBase) = keys(kb.kb)
 append(kb::KnowledgeBase, k::Symbol, x) = KnowledgeBase(merge(kb.kb,NamedTuple{(k,)}((x,))))
