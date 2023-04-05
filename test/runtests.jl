@@ -99,7 +99,7 @@ end
 	ipcyear = "ipc-2014"
 	fminibatch = NeuroPlanner.minibatchconstructor("lstar")
 	domain = load_domain(IPCInstancesRepo,ipcyear, domain_name)
-	pddld = HyperExtractor(domain)
+	pddld = HyperExtractor(domain; message_passes = 1, residual = :none)
 	problems = list_problems(IPCInstancesRepo, ipcyear, domain_name)
 
 
@@ -108,11 +108,12 @@ end
 		problem = load_problem(IPCInstancesRepo, ipcyear,domain_name, first(problems))
 		pddle, state = initproblem(pddld, problem)
 		h₀ = pddle(state)
-		reflectinmodel(h₀, d -> Dense(d, 8, relu);fsm = Dict("" =>  d -> Dense(d, 1)))
+		reflectinmodel(h₀, d -> Dense(d, 8), SegmentedSum;fsm = Dict("" =>  d -> Dense(d, 1)))
 	end
 
 	ps = Flux.params(model);
 	for problem_file in problems
+		@show problem_file
 		problem = load_problem(IPCInstancesRepo, ipcyear,domain_name, problem_file)
 		trajectory, plan = NeuroPlanner.sample_forward_trace(domain, problem, 20)
 		ds = fminibatch(pddld, domain, problem, plan)

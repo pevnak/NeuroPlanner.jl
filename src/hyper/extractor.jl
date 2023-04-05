@@ -53,8 +53,8 @@ end
 NoProblemNoGoalHE{DO,N} = HyperExtractor{DO,Nothing,N,Nothing} where {DO,N}
 ProblemNoGoalHE{DO,N} = HyperExtractor{DO,D,N,Nothing} where {DO,D<:Dict,N}
 
-isspecialized(ex::HyperExtractor) = ex.obj2id === nothing
-hasgoal(ex::HyperExtractor) = ex.goal === nothing
+isspecialized(ex::HyperExtractor) = ex.obj2id !== nothing
+hasgoal(ex::HyperExtractor) = ex.goal !== nothing
 
 
 function HyperExtractor(domain, problem; embed_goal = true, kwargs...)
@@ -168,7 +168,7 @@ end
 function multi_predicates(ex::HyperExtractor, kid::Symbol, state)
 	# Then, we specify the predicates the dirty way
 	ks = ex.multiarg_predicates
-	xs = map(ex.multiarg_predicates) do k 
+	xs = map(ks) do k 
 		preds = filter(f -> f.name == k, get_facts(state))
 		encode_predicates(ex, k, preds,  kid)
 	end
@@ -183,24 +183,20 @@ function encode_predicates(ex::HyperExtractor, pname::Symbol, preds, kid::Symbol
 		syms = [f.args[i].name for f in preds]
 		ArrayNode(KBEntry(kid, [obj2id[s] for s in syms]))
 	end 
+	x = ProductNode(tuple(xs...))
 
 	bags = [Int[] for _ in 1:length(obj2id)]
 	for (j, f) in enumerate(preds)
 		for a in f.args
-			a ∉ keys(obj2id) && continue
-			push!(bags[obj2id[a]], j)
+			a.name ∉ keys(obj2id) && continue
+			push!(bags[obj2id[a.name]], j)
 		end
 	end
-	BagNode(ProductNode(tuple(xs...)), ScatteredBags(bags))
+	BagNode(x, ScatteredBags(bags))
 end
-
 
 function add_goalstate(ex::HyperExtractor, problem, goal = goalstate(ex.domain, problem))
 	ex = isspecialized(ex) ? ex : specialize(ex, problem) 
-	add_goalstate(ex, problem, goal)
-end
-
-function add_goalstate(ex::ProblemNoGoalHE, problem, goal = goalstate(ex.domain, problem))
 	exg = ex(goal)
 	
 	# we need to add goal as a new predicate
