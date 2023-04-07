@@ -46,6 +46,7 @@ end
 
 function train!(loss, model, ps::Params, opt::AbstractOptimiser, prepare_minibatch, max_steps; reset_fval = 1000, verbose = true, stop_fval=typemin(Float64), logger = nothing, trn_data = [])
 	fval, n = 0.0, 0
+	last_fval = nothing
 	for i in 1:max_steps
 		d = prepare_minibatch()
 		l, gs = withgradient(() -> loss(model, d), ps)
@@ -57,20 +58,20 @@ function train!(loss, model, ps::Params, opt::AbstractOptimiser, prepare_minibat
 		# any(any(isnan.(p)) for p in ps) && error("nan in parameters")
 		# any(any(isinf.(p)) for p in ps) && error("inf in parameters")
 		if mod(i, reset_fval) == 0
-			verbose && println(i,": ", round(fval/n, digits = 3))
+			last_fval = fval / n
+			verbose && println(i,": ", round(last_fval, digits = 3))
 			if logger !== nothing
-				log_value(logger, "fval", fval / n; step=i)
+				log_value(logger, "fval", last_fval; step=i)
 				if !isempty(trn_data)
 					f = mean(loss(model, d, x -> x > 0) for d in trn_data)
 					log_value(logger, "f01", f; step=i)
 				end
 			end
-			fval / n < stop_fval && break
+			last_fval < stop_fval && break
 			fval, n = 0.0, 0
 		end
-
 	end
-	fval / n
+	n > 0 ? fval / n : last_fval
 end
 
 """

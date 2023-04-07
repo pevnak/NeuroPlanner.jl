@@ -15,26 +15,26 @@ struct UnsolvedL₂{S,D,P}
 	problem::P 
 end
 
-function L₂MiniBatch(pddle, trajectory::AbstractVector{<:State})
+function L₂MiniBatch(pddle, trajectory::AbstractVector{<:GenericState})
 	L₂MiniBatch(batch(map(pddle, trajectory)),
      collect(length(trajectory):-1:1),
      )
 end
 
 
-function L₂MiniBatch(pddld, domain::GenericDomain, problem::Problem, trajectory::AbstractVector{<:State}; goal_aware = true)
+function L₂MiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, trajectory::AbstractVector{<:GenericState}; goal_aware = true)
 	pddle = goal_aware ? add_goalstate(pddld, problem) : pddld
 	L₂MiniBatch(pddle, trajectory)
 end
 
-function L₂MiniBatch(pddld, domain::GenericDomain, problem::Problem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:State}; goal_aware = true)
+function L₂MiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:GenericState}; goal_aware = true)
 	L₂MiniBatch(pddld, domain, problem, trajectory; goal_aware)
 end
 
-function L₂MiniBatch(pddld, domain::GenericDomain, problem::Problem, plan::AbstractVector{<:Julog.Term}; goal_aware = true)
+function L₂MiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; goal_aware = true)
 	state = initstate(domain, problem)
 	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
-	L₂MiniBatch(pddld, problem, trajectory; goal_aware)
+	L₂MiniBatch(pddld, domain, problem, trajectory; goal_aware)
 end
 
 
@@ -71,7 +71,7 @@ struct UnsolvedLₛ{S,D,P}
 end
 
 
-function LₛMiniBatch(sol, pddld, problem::Problem)
+function LₛMiniBatch(sol, pddld, problem::GenericProblem)
 	sol.search_tree === nothing && error("solve the problem with `save_search=true` to keep the search tree")
 	sol.status != :success && return(UnsolvedLₛ(sol, pddld, problem))
 	pddle = NeuroPlanner.initproblem(pddld, problem)[1]
@@ -87,13 +87,13 @@ function prepare_minibatch(mb::UnsolvedLₛ)
 	LₛMiniBatch(sol, pddle, trajectory)
 end
 
-function LₛMiniBatch(pddld, domain::GenericDomain, problem::Problem, plan::AbstractVector{<:Julog.Term}; goal_aware = true)
+function LₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; goal_aware = true)
 	state = initstate(domain, problem)
 	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
 	LₛMiniBatch(pddld, domain, problem, trajectory; goal_aware)
 end
 
-function LₛMiniBatch(pddld, domain::GenericDomain, problem::Problem, trajectory::AbstractVector{<:State}; goal_aware = true)
+function LₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, trajectory::AbstractVector{<:GenericState}; goal_aware = true)
 	LₛMiniBatch(pddld, domain, problem, nothing, trajectory; goal_aware)
 end
 
@@ -112,7 +112,7 @@ function _next_states(domain, problem, sᵢ, st::Nothing)
 	end
 end
 
-function LₛMiniBatch(pddld, domain::GenericDomain, problem::Problem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:State}; goal_aware = true)
+function LₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:GenericState}; goal_aware = true)
 	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem) : pddld
 	state = trajectory[1]
 	spec = Specification(problem)
@@ -193,7 +193,7 @@ struct UnsolvedLgbfs{S,D,P}
 	problem::P 
 end
 
-function LgbfsMiniBatch(pddld, domain::GenericDomain, problem::Problem, trajectory; goal_aware = true)
+function LgbfsMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, trajectory; goal_aware = true)
 	l = LₛMiniBatch(pddld, domain, problem, trajectory; goal_aware)
 	LgbfsMiniBatch(l.x, l.H₊, l.H₋, l.path_cost, l.sol_length)	
 end
@@ -238,7 +238,7 @@ struct LRTMiniBatch{X,H,Y}
 	sol_length::Int64
 end
 
-function LRTMiniBatch(pddle, trajectory::AbstractVector{<:State})
+function LRTMiniBatch(pddle, trajectory::AbstractVector{<:GenericState})
 	n = length(trajectory)
 	if n < 2
 		H₊ = onehotbatch([], 1:n)
@@ -255,18 +255,18 @@ function LRTMiniBatch(pddle, trajectory::AbstractVector{<:State})
      )
 end
 
-function LRTMiniBatch(pddld, domain::GenericDomain, problem::Problem, plan::AbstractVector{<:Julog.Term}; goal_aware = true)
+function LRTMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; goal_aware = true)
 	state = initstate(domain, problem)
 	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
 	LRTMiniBatch(pddld, domain, problem, trajectory; goal_aware)
 end
 
 
-function LRTMiniBatch(pddld, domain::GenericDomain, problem::Problem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:State}; goal_aware = true)
+function LRTMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:GenericState}; goal_aware = true)
 	LRTMiniBatch(pddld, domain, problem, trajectory; goal_aware)
 end
 
-function LRTMiniBatch(pddld, domain::GenericDomain, problem::Problem, trajectory; goal_aware = true)
+function LRTMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, trajectory; goal_aware = true)
 	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem) : pddld
 	LRTMiniBatch(pddle, trajectory)
 end

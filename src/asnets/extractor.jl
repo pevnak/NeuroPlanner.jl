@@ -158,6 +158,10 @@ function ground(p::Compound, assignment::Dict)
 	Compound(p.name, [assignment[k] for k in p.args])
 end
 
+function ground(p::Const, assignment::Dict)
+	p
+end
+
 """
 extract_predicates(action)
 
@@ -169,6 +173,10 @@ end
 
 function extract_predicates(p::Compound)
 	p.name ∈ (:and, :not, :or) && return(reduce(union, extract_predicates.(p.args)))
+	[p] 
+end
+
+function extract_predicates(p::Const)
 	[p] 
 end
 

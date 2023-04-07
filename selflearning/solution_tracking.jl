@@ -7,13 +7,15 @@ function solve_problem(pddld, problem::GenericProblem, model, init_planner; max_
 	domain = pddld.domain
 	pddle, state = NeuroPlanner.initproblem(pddld, problem)
 	goal = PDDL.get_goal(problem)
-	planner = init_planner(NeuroHeuristic(pddld, problem, model); max_time, save_search = true)
+	hfun = NeuroHeuristic(pddld, problem, model)
+	planner = init_planner(hfun; max_time, save_search = true)
 	solution_time = @elapsed sol = planner(domain, state, goal)
 	return_unsolved || sol.status == :success || return(nothing)
 	stats = (;solution_time, 
 		sol_length = length(sol.trajectory),
 		expanded = sol.expanded,
-		solved = sol.status == :success
+		solved = sol.status == :success,
+		time_in_heuristic = hfun.t[]
 		)
 	(;sol, stats)
 end
