@@ -8,7 +8,6 @@ using OneHotArrays
 using Statistics
 using SymbolicPlanners
 using StatsBase
-using GraphNeuralNetworks
 using Mill
 using Setfield
 using MLUtils
@@ -34,15 +33,14 @@ export KBEntry, KnowledgeBase, append
 include("hyper/extractor.jl")
 include("hyper/deduplication.jl")
 export HyperExtractor, deduplicate
+include("hyper/mha.jl")
+export MultiheadAttention
 
 include("asnets/extractor.jl")
 export ASNet
 
-include("hyper/mha.jl")
-export MultiheadAttention
-
-include("multigraph/extractor.jl")
-export PDDLExtractor, MultiGraph, MultiGNN, FeaturedMultiGraph, MultiModel, initproblem
+include("hgnn/extractor.jl")
+export ASNet
 
 include("potential/extractor.jl")
 export LinearExtractor

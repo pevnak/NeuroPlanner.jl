@@ -124,7 +124,7 @@ arch_name = "asnet"
 	domain_pddl, problem_files, ofile = getproblem(domain_name, false)
 	# problem_files = filter(s -> isfile(plan_file(domain_name, s)), problem_files)
 	train_files = filter(s -> isfile(plan_file(domain_name, s)), problem_files)
-	train_files = sample(train_files, div(length(problem_files), 2), replace = false)
+	train_files = sample(train_files, min(div(length(problem_files), 2), length(train_files)), replace = false)
 	fminibatch = NeuroPlanner.minibatchconstructor(loss_name)
 	hnet = archs[arch_name]
 

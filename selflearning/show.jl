@@ -65,7 +65,6 @@ end
 
 max_steps = 10_000
 max_time = 30
-dense_dim = 32
 dense_layers = 2
 seed = 1
 problems = ["blocks","ferry","npuzzle","gripper"]
@@ -81,11 +80,21 @@ stats = combine(gdf) do sub_df
 	)
 end
 
-# investigate 
-gdf = DataFrames.groupby(stats, [:domain_name, :arch_name])
-a = combine(gdf) do sub_df
-	(;average = mean(sub_df.tst_solved), maximum = maximum(sub_df.tst_solved))
+dfs = map(unique(df.loss_name)) do ln 
+	df1 = filter(r -> r.loss_name == ln, df)
+	dfs = map(unique(df1.arch_name)) do an 
+		df2 = filter(r -> r.arch_name == an, df1)
+		gdf = DataFrames.groupby(stats, :domain_name)
+		a = combine(gdf) do sub_df
+			# (;average = mean(sub_df.tst_solved), maximum = maximum(sub_df.tst_solved))
+			DataFrame("$ln $an" => [maximum(df2.tst_solved)])
+		end
+	end
+	leftjoin(dfs..., on = :domain_name)
 end
+leftjoin(dfs..., on = :domain_name)
+
+# investigate 
 
 gdf = DataFrames.groupby(stats, [:domain_name, :graph_layers])
 a = combine(gdf) do sub_df
