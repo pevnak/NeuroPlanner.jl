@@ -26,9 +26,7 @@ end
 
 function specialize(ex::ASNet, problem)
 	# map containing lists of objects of the same type
-	type2obs = map(unique(values(problem.objtypes))) do k 
-		k => [n for (n,v) in problem.objtypes if v == k]
-	end |> Dict
+	type2obs = type2objects(ex.domain, problem)
 
 	# create a map mapping predicates to their ID, which is pr
 	predicates = mapreduce(union, values(ex.domain.predicates)) do p 
@@ -54,6 +52,62 @@ function specialize(ex::ASNet, problem)
 	kb = append(kb, :o, BagNode(ArrayNode(KBEntry(s, 1:n)), [1:n]))
 
 	ASNet(ex.domain, type2obs, ex.model_params, predicate2id, kb, nothing)
+end
+
+"""
+type2objects(domain, problem)
+
+create a map of types to `problem.objects` including the type hierarchy 
+
+example
+```julia
+julia> domain.typetree
+Dict{Symbol, Vector{Symbol}} with 6 entries:
+  :count                  => []
+  Symbol("fast-elevator") => []
+  :elevator               => [Symbol("slow-elevator"), Symbol("fast-elevator")]
+  :passenger              => []
+  :object                 => [:elevator, :passenger, :count]
+  Symbol("slow-elevator") => []
+
+
+julia> problem.objtypes
+Dict{Const, Symbol} with 19 entries:
+  fast0   => Symbol("fast-elevator")
+  p0      => :passenger
+  n4      => :count
+  slow1-0 => Symbol("slow-elevator")
+  p1      => :passenger
+  p2      => :passenger
+  p4      => :passenger
+  n1      => :count
+  p3      => :passenger
+  n3      => :count
+  slow0-0 => Symbol("slow-elevator")
+  n0      => :count
+  n2      => :count
+
+julia> type2objects(domain, problem)
+Dict{Symbol, Vector{Const}} with 6 entries:
+  :count                  => [n4, n1, n3, n0, n2]
+  Symbol("fast-elevator") => [fast0, fast1]
+  :passenger              => [p0, p1, p2, p4, p3]
+  :elevator               => [slow1-0, slow0-0, fast0, fast1]
+  Symbol("slow-elevator") => [slow1-0, slow0-0]
+  :object                 => [slow1-0, slow0-0, fast0, fast1, p0, p1, p2, p4, p3, n…
+```
+"""
+function type2objects(domain, problem)
+	#first create a direct descendants
+	type2obs = map(unique(values(problem.objtypes))) do k 
+		k => [n for (n,v) in problem.objtypes if v == k]
+	end |> Dict
+
+	for (k, v) in domain.typetree
+		isempty(v) && continue
+		type2obs[k] = reduce(union, [type2obs[i] for i in v])
+	end
+	type2obs
 end
 
 function add_goalstate(ex::ASNet, problem, goal = goalstate(ex.domain, problem))
@@ -138,8 +192,11 @@ allgrounding(action, type2obs; unique_args = true)
 create all possible grounding of predicates in `action` while assuming objects with types in `type2obs` 
 """
 function allgrounding(action::GenericAction, type2obs::Dict; unique_args = true)
-	# for all possible grounding of arguments, ground the predicates
 	predicates = extract_predicates(action)
+	allgrounding(action, predicates, type2obs; unique_args)
+end
+
+function allgrounding(action::GenericAction, predicates::Vector{<:Term}, type2obs::Dict; unique_args = true)
 	types = [type2obs[k] for k in action.types]
 	assignments = vec(collect(Iterators.product(types...)))
 	unique_args && filter!(v -> length(unique(v)) == length(v), assignments) 

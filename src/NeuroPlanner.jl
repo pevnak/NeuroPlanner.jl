@@ -25,6 +25,7 @@ function initproblem(ex, problem; add_goal = true)
 	pddle = add_goal ? add_goalstate(ex, problem) : ex
 	pddle, initstate(ex.domain, problem)
 end
+export initproblem
 
 
 include("relational/knowledge_base.jl")
@@ -40,7 +41,7 @@ include("asnets/extractor.jl")
 export ASNet
 
 include("hgnn/extractor.jl")
-export ASNet
+export HGNNLite, HGNN
 
 include("potential/extractor.jl")
 export LinearExtractor

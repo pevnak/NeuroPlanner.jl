@@ -7,6 +7,7 @@ using CSV
 using DataFrames
 using HypothesisTests
 using Statistics
+using PrettyTables
 
 ###########
 #	Collect all stats to one big DataFrame, over which we will perform queries
@@ -67,32 +68,43 @@ max_steps = 10_000
 max_time = 30
 dense_layers = 2
 seed = 1
-problems = ["blocks","ferry","npuzzle","gripper"]
-stats = map(Iterators.product(("asnet","pddl"), ("lstar","l2"), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual)
+problems = ["blocks","ferry","npuzzle","gripper", "spanner","elevators_00","elevators_11"]
+# stats = map(Iterators.product(("asnet","pddl", "hgnnlite", "hgnn"), ("lstar","l2"), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual)
+stats = map(Iterators.product(("pddl",), ("lstar","l2"), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual)
 	read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
-end
+end;
 df = reduce(vcat, filter(!isempty, vec(stats)))
 
 gdf = DataFrames.groupby(df, [:domain_name, :arch_name, :loss_name, :max_steps,  :max_time, :graph_layers, :residual, :dense_layers, :dense_dim, :seed])
 stats = combine(gdf) do sub_df
 	(;	trn_solved = mean(sub_df.solved[sub_df.used_in_train]),
      	tst_solved = mean(sub_df.solved[.!sub_df.used_in_train]),
+     	expanded = mean(sub_df.expanded[.!sub_df.used_in_train]),
+     	time_in_heuristic = mean(sub_df.time_in_heuristic[.!sub_df.used_in_train]),
+     	solved_problems = size(sub_df, 1),
 	)
 end
 
-dfs = map(unique(df.loss_name)) do ln 
-	df1 = filter(r -> r.loss_name == ln, df)
-	dfs = map(unique(df1.arch_name)) do an 
-		df2 = filter(r -> r.arch_name == an, df1)
-		gdf = DataFrames.groupby(stats, :domain_name)
-		a = combine(gdf) do sub_df
-			# (;average = mean(sub_df.tst_solved), maximum = maximum(sub_df.tst_solved))
-			DataFrame("$ln $an" => [maximum(df2.tst_solved)])
+function show_stats(key)
+	dfs = map(unique(df.loss_name)) do ln 
+		df1 = filter(r -> r.loss_name == ln, stats)
+		dfs = mapreduce((args...) -> leftjoin(args..., on = :domain_name), unique(df1.arch_name)) do an 
+			df2 = filter(r -> r.arch_name == an, df1)
+			gdf = DataFrames.groupby(df2, :domain_name)
+			a = combine(gdf) do sub_df
+				(;average = mean(sub_df.tst_solved), maximum = maximum(sub_df.tst_solved))
+				i = argmax(sub_df.trn_solved)
+				DataFrame("$ln $an" => [sub_df[!,key][i]])
+			end
 		end
-	end
+		dfs
+	end;
 	leftjoin(dfs..., on = :domain_name)
 end
-leftjoin(dfs..., on = :domain_name)
+
+show_stats(:tst_solved)
+show_stats(:expanded)
+
 
 # investigate 
 

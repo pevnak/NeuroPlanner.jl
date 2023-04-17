@@ -108,10 +108,10 @@ add_residual_layer(kb::KnowledgeBase, inputs::Tuple{Symbol}, n::Int)
 
 adds a residual layer mixing `inputs` in `kb` KnowledgeBase over `n` items
 """
-function add_residual_layer(kb::KnowledgeBase, inputs::NTuple{N,Symbol}, n::Int) where {N}
+function add_residual_layer(kb::KnowledgeBase, inputs::NTuple{N,Symbol}, n::Int, prefix = "res") where {N}
 	childs = map(s -> ArrayNode(KBEntry(s, 1:n)), inputs)
 	ds = ProductNode(childs)
-	append(kb, layer_name(kb, "res"), ds)
+	append(kb, layer_name(kb, prefix), ds)
 end
 
 """

@@ -28,17 +28,6 @@ function ffnn(idim, hdim, odim, nlayers)
 	error("nlayers should be only in [1,3]")
 end
 
-######
-# define a NN based solver
-######
-struct GNNHeuristic{P,M} <: Heuristic 
-	pddle::P
-	model::M
-end
-
-GNNHeuristic(pddld, problem, model) = GNNHeuristic(NeuroPlanner.add_goalstate(pddld, problem), model)
-Base.hash(g::GNNHeuristic, h::UInt) = hash(g.model, hash(g.pddle, h))
-SymbolicPlanners.compute(h::GNNHeuristic, domain::Domain, state::State, spec::Specification) = only(h.model(h.pddle(state)))
 function dedup_fmb(dedup_model, fminibatch, args...)
 	ds = fminibatch(args...)
 	@set ds.x = deduplicate(dedup_model, ds.x)
@@ -104,30 +93,6 @@ function experiment(domain_pddl, problem_files, fminibatch, planner; opt_type = 
 	all_solutions
 end
 
-# Let's make configuration ephemeral
-domain_name = ARGS[1]
-# configuration = ARGS[2]
-
-domain_name = "ferry"
-seed = 1
-double_maxtime = false
-loss_name = "lstar"
-planner_name = "astar"
-solve_solved = false
-stop_after = 32
-max_steps = 2000
-opt_type = :worst
-opt_type = :mean
-epsilon = 0.5
-max_loss = 0.0
-max_time = 30
-graph_layers = 2
-dense_layers = 2
-dense_dim = 32
-sort_by_complexity = true
-artificial_goals = false
-residual = :linear
-
 # js = open(JSON.parse, "configurations/$(configuration).json", "r")
 # seed = js["seed"]
 # double_maxtime = js["double_maxtime"]
@@ -147,12 +112,54 @@ residual = :linear
 # sort_by_complexity = js["sort_by_complexity"]
 # artificial_goals = js["artificial_goals"]
 
+
+"""
+ArgParse example implemented in Comonicon.
+
+# Arguments
+
+- `problem_name`: a name of the problem to solve ("ferry", "gripper", "blocks", "npuzzle")
+- `arch_name`: an architecture of the neural network implementing heuristic("asnet", "pddl")
+- `loss_name`: 
+
+# Options
+
+- `--max_steps <Int>`: maximum number of steps of SGD algorithm (default 10_000)
+- `--max_time <Int>`:  maximum steps of the planner used for evaluation (default 30)
+- `--graph_layers <Int>`:  maximum number of layers of (H)GNN (default 1)
+- `--dense_dim <Int>`:  dimension of all hidden layers, even those realizing graph convolutions (default  32)
+- `--dense_layers <Int>`:  number of layers of dense network after pooling vertices (default 32)
+- `--residual <String>`:  residual connections between graph convolutions (none / dense / linear)
+
+max_steps = 10_000; max_time = 30; graph_layers = 1; dense_dim = 32; dense_layers = 2; residual = "none"; seed = 1
+domain_name = "ferry"
+loss_name = "l2"
+arch_name = "hgnn"
+"""
+
+@main function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
+		dense_dim::Int = 32, dense_layers::Int = 2, residual::String = "none", seed::Int = 1)
+	Random.seed!(seed)
+	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, dense_dim, dense_layers, residual, seed)
+	archs = Dict("asnet" => ASNet, "pddl" => HyperExtractor, "hgnnlite" => HGNNLite, "hgnn" => HGNN)
+	residual = Symbol(residual)
+	domain_pddl, problem_files = getproblem(domain_name, false)
+	# problem_files = filter(s -> isfile(plan_file(domain_name, s)), problem_files)
+	train_files = filter(s -> isfile(plan_file(domain_name, s)), problem_files)
+	train_files = sample(train_files, min(div(length(problem_files), 2), length(train_files)), replace = false)
+	fminibatch = NeuroPlanner.minibatchconstructor(loss_name)
+	hnet = archs[arch_name]
+
+	filename = joinpath("super", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+	experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch; max_steps, max_time, graph_layers, residual, dense_layers, dense_dim, settings)
+end
+
 Random.seed!(seed)
-domain_pddl, problem_files, ofile = getproblem(domain_name, sort_by_complexity)
+domain_pddl, problem_files = getproblem(domain_name, sort_by_complexity)
 planner = (planner_name == "astar") ? AStarPlanner : GreedyPlanner
 fminibatch = NeuroPlanner.minibatchconstructor(loss_name)
 # filename = ofile("$(configuration).jls")
-filename = joinpath("selfhyper", domain_name, join([loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_")*".jls")
+filename = joinpath("selflearning", domain_name, join([loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_")*".jls")
 experiment(domain_pddl, problem_files, fminibatch, planner; double_maxtime, filename, solve_solved, stop_after, max_steps, max_loss, max_time, opt_type, residual, epsilon, artificial_goals, graph_layers, dense_layers, dense_dim)
 
 
