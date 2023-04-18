@@ -801,7 +801,7 @@ uuid = "12afc1b8-fad6-47e1-9132-84abc478905f"
 version = "0.2.8"
 
 [[deps.NeuroPlanner]]
-deps = ["Cairo", "ChainRulesCore", "Compose", "DataStructures", "Flux", "GraphNeuralNetworks", "GraphPlot", "Graphs", "HierarchicalUtils", "Julog", "MLUtils", "Mill", "NeuralAttentionlib", "OneHotArrays", "PDDL", "Parameters", "Setfield", "Statistics", "StatsBase", "SymbolicPlanners"]
+deps = ["Cairo", "ChainRulesCore", "Compose", "DataStructures", "Flux", "GraphPlot", "Graphs", "HierarchicalUtils", "Julog", "MLUtils", "Mill", "NeuralAttentionlib", "OneHotArrays", "PDDL", "Parameters", "Setfield", "Statistics", "StatsBase", "SymbolicPlanners"]
 path = ".."
 uuid = "628e68bf-2596-4972-a53b-69fd3c43dbca"
 version = "0.1.0"

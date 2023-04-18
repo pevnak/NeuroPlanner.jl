@@ -38,7 +38,7 @@ end
 
 
 function setup_problem(problem_name)
-	sdir(s...) = joinpath("..","problems",problem_name,s...)
+	sdir(s...) = joinpath("..","domains",problem_name,s...)
 	domain_pddl = sdir("domain.pddl")
 	problem_files = [sdir(f) for f in readdir(sdir()) if endswith(f,".pddl") && f !== "domain.pddl"]
 	return(domain_pddl, problem_files)
@@ -93,7 +93,7 @@ function accomodate_leah_plans(problem_name)
 	benchdir(s...) = joinpath("benchmarks", problem_name, s...)
 	domain_pddl = benchdir("domain.pddl")
 	problem_files = filter(s -> endswith(s, ".pddl") && (s != "domain.pddl"), readdir(benchdir()))
-	sdir(s...) = joinpath("..","problems",problem_name, s...)
+	sdir(s...) = joinpath("..","domains",problem_name, s...)
 	!isdir(sdir()) && mkpath(sdir())
 	run(`cp $(domain_pddl) $(sdir("domain.pddl"))`)
 	for ifile in problem_files
@@ -126,7 +126,7 @@ end
 function systematize(problem)
 	domain_pddl, problem_files = getproblem(problem)
 	problem_name = split(domain_pddl,"/")[2]
-	sdir(s...) = joinpath("..","problems",problem_name, s...)
+	sdir(s...) = joinpath("..","domains",problem_name, s...)
 	!isdir(sdir()) && mkpath(sdir())
 	run(`cp $(domain_pddl) $(sdir("domain.pddl"))`)
 	for ifile in problem_files

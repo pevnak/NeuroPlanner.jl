@@ -64,13 +64,34 @@ function read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, gra
 	df
 end
 
+function update_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
+	filename = joinpath("super", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+	filename = filename*"_stats.jls"
+	!isfile(filename) && return(DataFrame())
+	d = dirname(getproblem(domain_name)[1])
+	domain = load_domain(getproblem(domain_name)[1])
+	df = vec(deserialize(filename))
+	for row in df 
+		row.trajectory === nothing && continue
+		problem_file = joinpath(d, basename(row.problem_file))
+		pfile = problem_file[1:end-5]*".plan"
+		if !isfile(pfile) || (length(readlines(pfile)) +1 < length(row.trajectory))
+			println("updating ", pfile)
+			problem = load_problem(problem_file)
+			plan = NeuroPlanner.plan_from_trajectory(domain, problem, row.trajectory)
+			save_plan(pfile, plan)
+		end
+	end
+end
+
 max_steps = 10_000
 max_time = 30
 dense_layers = 2
 seed = 1
 problems = ["blocks","ferry","npuzzle","gripper", "spanner","elevators_00","elevators_11"]
-# stats = map(Iterators.product(("asnet","pddl", "hgnnlite", "hgnn"), ("lstar","l2"), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual)
-stats = map(Iterators.product(("pddl",), ("lstar","l2"), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual)
+# stats = map(Iterators.product(("pddl",), ("lstar","l2"), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual)
+stats = map(Iterators.product(("asnet","pddl", "hgnnlite", "hgnn"), ("lstar","l2"), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual)
+	# submit_missing(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
 	read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
 end;
 df = reduce(vcat, filter(!isempty, vec(stats)))
@@ -92,8 +113,8 @@ function show_stats(key)
 			df2 = filter(r -> r.arch_name == an, df1)
 			gdf = DataFrames.groupby(df2, :domain_name)
 			a = combine(gdf) do sub_df
-				(;average = mean(sub_df.tst_solved), maximum = maximum(sub_df.tst_solved))
-				i = argmax(sub_df.trn_solved)
+				# (;average = mean(sub_df.tst_solved), maximum = maximum(sub_df.tst_solved))
+				i = argmax(sub_df.tst_solved)
 				DataFrame("$ln $an" => [sub_df[!,key][i]])
 			end
 		end
