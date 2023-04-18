@@ -33,6 +33,7 @@ include("relational/knowledge_model.jl")
 export KBEntry, KnowledgeBase, append
 include("hyper/extractor.jl")
 include("hyper/deduplication.jl")
+include("hyper/dedu_matrix.jl")
 export HyperExtractor, deduplicate
 include("hyper/mha.jl")
 export MultiheadAttention

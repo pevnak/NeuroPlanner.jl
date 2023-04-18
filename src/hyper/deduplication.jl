@@ -1,31 +1,30 @@
-"""
-duplicated_columns(x::Matrix{T}) where {T<:Number}
-
-find duplicated columns in matrix x
-
-```julia
-julia> duplicated_columns([1 2 1 2 2; 2 1 2 1 2])
-5-element Vector{Int64}:
- 1
- 2
- 1
- 2
- 5
-```
 
 """
-function duplicated_columns(x::Matrix{T}) where {T<:Number}
+find_duplicates(o)
+
+create a `mask` identifying unique columns in `o` and a map `si`
+mapping indexes original columns in `o` to the new representation in `o[:,mask]`
+It should hold that `o[:,mask][:,[si[i] for i in 1:size(o,2)]] == o`
+"""
+function find_duplicates(x)
 	rows, cols = size(x)
-	ii = collect(1:cols)
-	for j in 2:cols 
-		for k in 1:j
+	si = Vector{Int}(undef, cols)
+	unique_cols = Vector{Bool}(undef, cols)
+	new_index = 1
+	@inbounds for j in 1:cols 
+		si[j] = new_index
+		unique_cols[j] = true
+		for k in 1:(j-1)
+			!unique_cols[k] && continue
 			if all(x[r,k] == x[r,j] for r in 1:rows)
-				ii[j] = k
+				si[j] = si[k]
+				unique_cols[j] = false
 				break
 			end
 		end
+		new_index += unique_cols[j]
 	end
-	ii
+	unique_cols, si
 end
 
 """
@@ -51,8 +50,6 @@ function HierarchicalUtils.nodecommshow(io::IO, n::DeduplicatingNode)
     print(io, " # ", length(n.colmap), " obs, ", bytes)
 end
 
-
-
 function deduplicate_data(model::AbstractMillModel, ds::AbstractMillNode)
 	deduplicate_data(model(ds), ds)
 end
@@ -70,28 +67,6 @@ deduplicate_data(model, ds) = ds
 
 (m::AbstractMillModel)(dedu::DeduplicatingNode{<:AbstractMillNode}) = m(dedu.x)[:,dedu.colmap]
 (m::AbstractMillModel)(kb::KnowledgeBase, dedu::DeduplicatingNode{<:AbstractMillNode}) = m(kb, dedu.x)[:,dedu.colmap]
-
-"""
-find_duplicates(o)
-
-create a `mask` identifying unique columns in `o` and a map `si`
-mapping indexes original columns in `o` to the new representation in `o[:,mask]`
-It should hold that `o[:,mask][:,[si[i] for i in 1:size(o,2)]] == o`
-"""
-function find_duplicates(o)
-	ii = duplicated_columns(o)
-	mask = falses(size(o, 2))
-	si = zeros(Int, size(o, 2))
-	index_map = Dict{Int,Int}()
-	for (i, k) in enumerate(ii)
-		if !haskey(index_map, k)
-			index_map[k] = length(index_map) + 1
-			mask[i] = true
-		end 
-		si[i] = index_map[k]
-	end
-	mask, si
-end
 
 
 """

@@ -57,7 +57,7 @@ end
 
 function getproblem(problem)
 	problem == "blocks" && return(setup_problem("blocks-slaney"))
-	problem == "ferry" && return(setup_problem("blocks-ferry"))
+	problem == "ferry" && return(setup_problem("ferry"))
 	problem == "gripper" && return(setup_problem("gripper"))
 	problem == "npuzzle" && return(setup_problem("n-puzzle"))
 	problem == "zenotravel" && return(setup_problem("zenotravel"))
