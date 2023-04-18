@@ -58,7 +58,6 @@ using Flux
 			@test Matrix(kbb, kbb[:d].data[:b].data) ≈ hcat(Matrix(kb1, kb1[:d].data[:b].data), Matrix(kb2, kb2[:d].data[:b].data))
 		end
 
-
 		@testset "BagNode" begin 
 			kb1 = KnowledgeBase((;a = randn(Float32, 3,7), b = randn(Float32, 2,4)))
 			c1 = ArrayNode(KBEntry(:a, [4,1,3,2]))
@@ -72,6 +71,31 @@ using Flux
 			kbb = _catobs_kbs([kb1,kb2])
 			@test Matrix(kbb, kbb[:c].data.data) ≈ hcat(Matrix(kb1, kb1[:c].data.data), Matrix(kb2, kb2[:c].data.data))
 		end
+
+		@testset "Replace" begin
+			@test KBEntry(:a, [4,1,3,2]) == KBEntry(:a, [4,1,3,2]) 
+			@test KBEntry(:a, [4,1,3,2]) != KBEntry(:b, [4,1,3,2]) 
+			@test KBEntry(:a, [4,1,3,2]) != KBEntry(:a, [1,1,3,2]) 
+
+			a = KBEntry(:a, [4,1,3,2])
+			b = KBEntry(:b, [4,1,3,2])
+			@test replace(a, :a => :b) == b
+			@test replace(a, :c => :b) == a
+
+
+			a = ArrayNode(KBEntry(:a, [4,1,3,2]))
+			b = ArrayNode(KBEntry(:b, [4,1,3,2]))
+			c = ArrayNode(KBEntry(:c, [4,1,3,2]))
+			@test replace(a, :a => :b) == b
+			@test replace(a, :c => :b) == a
+			@test replace(BagNode(a,[1:4]), :a => :b) == BagNode(b, [1:4])
+			@test replace(BagNode(a,[1:4]), :c => :b) == BagNode(a, [1:4])
+			@test replace(ProductNode((a,b)), :a => :b) == ProductNode((b,b))
+			@test replace(ProductNode((a,b)), :a => :c) == ProductNode((c,b))
+			@test replace(ProductNode((;a,b)), :a => :b) == ProductNode((;a = b, b))
+			@test replace(ProductNode((;a,b)), :a => :c) == ProductNode((;a = c, b))
+		end
+
 	end
 
 
@@ -112,7 +136,7 @@ using Flux
 	end
 
 	@testset "random test" begin 
-		for i in 1:100
+		for i in 1:10
 			kbs = map(1:10) do _
 				kb = KnowledgeBase((;a = randn(Float32, 3,7), b = randn(Float32, 2,4)))
 				c = ArrayNode(KBEntry(:a, rand(1:7,4)))

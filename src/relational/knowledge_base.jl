@@ -1,5 +1,6 @@
 import Base.*
 import Base.reduce
+import Base.==
 
 """
 struct KnowledgeBase{KB<:NamedTuple}
@@ -61,6 +62,10 @@ Base.Matrix(kb::KnowledgeBase, X::KBEntry{E,T}) where {E,T}  = kb[E][:,X.ii]
 Base.Matrix(X::KBEntry) = error("cannot instantiate Matrix from KBEntry without a KnowledgeBase, use Matrix(kb::KnowledgeBase, A::KBEntry)")
 Base.getindex(X::KBEntry, idcs)  = _getindex(X, idcs)
 Base.axes(X::KBEntry, d) = d == 1 ? (:) : (1:length(X.ii))
+function ==(a::KBEntry{A,<:Any},b::KBEntry{B,<:Any}) where {A,B}
+    A != B && return(false)
+    return(a.ii == b.ii)
+end
 _getindex(x::KBEntry{E,T}, i) where {E,T} = KBEntry{E,T}(x.ii[i])
 _getindex(x::KBEntry{E,T}) where {E,T} = x
 _getindex(x::KBEntry{E,T}, i::Integer) where {E,T} = KBEntry{E,T}(x.ii[i:i])
@@ -244,3 +249,19 @@ function _reflectinmodel(kb::KnowledgeBase, x::ArrayNode, fm, fa, fsm, fsa, s, s
     m = Mill._make_imputing(xx, m, ai)
     m, size(m(kb, x), 1)
 end
+
+
+###########
+#  replacement in mill structures.
+###########
+
+function Base.replace(x::KBEntry{E,T}, ps::Pair{Symbol,Symbol}...) where {E,T}
+    for (a, b) in ps 
+        E == a && return(KBEntry{b,T}(x.ii))
+    end
+    return(x)
+end
+
+Base.replace(x::ArrayNode, ps::Pair{Symbol,Symbol}...) = ArrayNode(replace(x.data, ps...), x.metadata) 
+Base.replace(x::BagNode, ps::Pair{Symbol,Symbol}...) = BagNode(replace(x.data, ps...), x.bags, x.metadata)
+Base.replace(x::ProductNode, ps::Pair{Symbol,Symbol}...) = ProductNode(map(k -> replace(k,ps...), x.data), x.metadata)
