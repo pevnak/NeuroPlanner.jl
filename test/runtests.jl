@@ -8,6 +8,11 @@ using Random
 using PlanningDomains
 using Setfield
 
+_isapprox(a::NamedTuple,b::NamedTuple) = all(_isapprox(a[k], b[k]) for k in keys(a))
+_isapprox(a::Tuple, b::Tuple) = all(_isapprox(a[k], b[k]) for k in keys(a))
+_isapprox(a::AbstractArray, b::AbstractArray) = a ≈ b
+_isapprox(a::Nothing, b::Nothing) = true
+
 include("dedu_matrix.jl")
 include("knowledge_base.jl")
 

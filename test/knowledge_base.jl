@@ -135,6 +135,21 @@ using Flux
 		end
 	end
 
+	@testset "Random catobs test" begin 
+		for i in 1:10
+			kbs = map(1:10) do _
+				kb = KnowledgeBase((;a = randn(Float32, 3,7), b = randn(Float32, 2,4)))
+				c = ArrayNode(KBEntry(:a, rand(1:7,4)))
+				d = ArrayNode(KBEntry(:b, rand(1:4,4)))
+				n = rand(0:4)
+				bags = Mill.length2bags([n, 4 - n])
+				append(kb, :d, BagNode(ProductNode((a = c, b = d)), bags))
+			end
+			m = reflectinmodel(kbs[1])
+			@test reduce(hcat, map(m, kbs)) ≈ m(reduce(catobs, kbs))
+		end
+	end
+
 	@testset "Deduplication" begin
 		@testset "DeduplicatedMatrix" begin 
 			kb = KnowledgeBase((;a = [1 1 2 2 3 3]))
@@ -171,21 +186,6 @@ using Flux
 			@test dekb[:c] isa NeuroPlanner.DeduplicatingNode
 			@test dekb[:c].colmap == [1,2,3,3,4,5]
 			@test _isapprox(gradient(model -> sum(sin.(model(kb))), m)[1], gradient(model -> sum(sin.(model(dekb))), m)[1])
-		end
-	end
-
-	@testset "random test" begin 
-		for i in 1:10
-			kbs = map(1:10) do _
-				kb = KnowledgeBase((;a = randn(Float32, 3,7), b = randn(Float32, 2,4)))
-				c = ArrayNode(KBEntry(:a, rand(1:7,4)))
-				d = ArrayNode(KBEntry(:b, rand(1:4,4)))
-				n = rand(0:4)
-				bags = Mill.length2bags([n, 4 - n])
-				append(kb, :d, BagNode(ProductNode((a = c, b = d)), bags))
-			end
-			m = reflectinmodel(kbs[1])
-			@test reduce(hcat, map(m, kbs)) ≈ m(reduce(catobs, kbs))
 		end
 	end
 end
