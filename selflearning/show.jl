@@ -90,7 +90,7 @@ dense_layers = 2
 seed = 1
 problems = ["blocks","ferry","npuzzle","gripper", "spanner","elevators_00","elevators_11"]
 # stats = map(Iterators.product(("pddl",), ("lstar","l2"), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual)
-stats = map(Iterators.product(("asnet","pddl", "hgnnlite", "hgnn"), ("lstar","l2"), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual)
+stats = map(Iterators.product(("asnet","pddl", "hgnnlite", "hgnn"), ("lstar","l2"), problems, (4, 8, 16), (1, 2), (:none, :linear))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual)
 	# submit_missing(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
 	read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
 end;

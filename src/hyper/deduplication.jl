@@ -10,12 +10,12 @@ function find_duplicates(x::AbstractMatrix)
 	rows, cols = size(x)
 	si = Vector{Int}(undef, cols)
 	unique_cols = Vector{Bool}(undef, cols)
+	unique_idxs = Vector{Int}()
 	new_index = 1
 	@inbounds for j in 1:cols 
 		si[j] = new_index
 		unique_cols[j] = true
-		for k in 1:(j-1)
-			!unique_cols[k] && continue
+		for k in unique_idxs
 			if all(x[r,k] == x[r,j] for r in 1:rows)
 				si[j] = si[k]
 				unique_cols[j] = false
@@ -23,6 +23,7 @@ function find_duplicates(x::AbstractMatrix)
 			end
 		end
 		new_index += unique_cols[j]
+		unique_cols[j] && push!(unique_idxs, j)
 	end
 	unique_cols, si
 end
@@ -31,12 +32,12 @@ function find_duplicates(x::AbstractVector)
 	cols = length(x)
 	si = Vector{Int}(undef, cols)
 	unique_cols = Vector{Bool}(undef, cols)
+	unique_idxs = Vector{Int}()
 	new_index = 1
 	@inbounds for j in 1:cols 
 		si[j] = new_index
 		unique_cols[j] = true
-		for k in 1:(j-1)
-			!unique_cols[k] && continue
+		for k in unique_idxs
 			if x[k] == x[j]
 				si[j] = si[k]
 				unique_cols[j] = false
@@ -44,9 +45,11 @@ function find_duplicates(x::AbstractVector)
 			end
 		end
 		new_index += unique_cols[j]
+		unique_cols[j] && push!(unique_idxs, j)
 	end
 	unique_cols, si
 end
+
 
 """
 struct DeduplicatingNode{D} 
@@ -73,8 +76,10 @@ function HierarchicalUtils.nodecommshow(io::IO, n::DeduplicatingNode)
     print(io, " # ", length(n.ii), " obs, ", bytes)
 end
 
-(m::AbstractMillModel)(dedu::DeduplicatingNode{<:AbstractMillNode}) = m(dedu.x)[:,dedu.ii]
-(m::AbstractMillModel)(kb::KnowledgeBase, dedu::DeduplicatingNode{<:AbstractMillNode}) = m(kb, dedu.x)[:,dedu.ii]
+(m::AbstractMillModel)(dedu::DeduplicatingNode{<:AbstractMillNode}) = DeduplicatedMatrix(m(dedu.x), dedu.ii)
+(m::AbstractMillModel)(kb::KnowledgeBase, dedu::DeduplicatingNode{<:AbstractMillNode}) =  DeduplicatedMatrix(m(kb, dedu.x), dedu.ii)
+# (m::AbstractMillModel)(dedu::DeduplicatingNode{<:AbstractMillNode}) = m(dedu.x)[:,dedu.ii]
+# (m::AbstractMillModel)(kb::KnowledgeBase, dedu::DeduplicatingNode{<:AbstractMillNode}) = m(kb, dedu.x)[:,dedu.ii]
 
 function deduplicate(kb::KnowledgeBase)
 	for k in keys(kb)

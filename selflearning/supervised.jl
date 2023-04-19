@@ -29,6 +29,10 @@ function ffnn(idim, hdim, odim, nlayers)
 	error("nlayers should be only in [1,3]")
 end
 
+W20AStarPlanner(heuristic::Heuristic; kwargs...) = ForwardPlanner(;heuristic, h_mult=2, kwargs...)
+W15AStarPlanner(heuristic::Heuristic; kwargs...) = ForwardPlanner(;heuristic, h_mult=1.5, kwargs...)
+
+
 function tblogger(filename; min_level::LogLevel=Info, step_increment = 1)
 	!isdir(dirname(filename)) && mkpath(dirname(filename))
     logdir = dirname(filename)
@@ -79,7 +83,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 		model
 	end
 
-	stats = map(Iterators.product([AStarPlanner], problem_files)) do (planner, problem_file)
+	stats = map(Iterators.product([AStarPlanner, GreedyPlanner, W15AStarPlanner, W20AStarPlanner], problem_files)) do (planner, problem_file)
 		used_in_train = problem_file ∈ train_files
 		@show problem_file
 		sol = solve_problem(pddld, problem_file, model, planner; return_unsolved = true)
