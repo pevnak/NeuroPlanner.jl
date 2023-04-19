@@ -103,7 +103,8 @@ function type2objects(domain, problem)
 		k => [n for (n,v) in problem.objtypes if v == k]
 	end |> Dict
 
-	for (k, v) in domain.typetree
+	kv = sort(collect(domain.typetree), lt = (i,j) -> i[1] ∈ j[2])
+	for (k, v) in kv
 		isempty(v) && continue
 		type2obs[k] = reduce(union, [type2obs[i] for i in v])
 	end

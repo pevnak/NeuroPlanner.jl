@@ -16,7 +16,7 @@ using NeuroPlanner: DeduplicatedMatrix
 	for m in (Dense(2,3), Chain(Dense(2,3),Dense(3,2)))
 		@test m(dx) isa DeduplicatedMatrix
 		@test m(dx) ≈ m(x)
-		@test _isapprox(gradient(m -> sum(m(x)), m)[1], gradient(m -> sum(m(dx)), m)[1])
+		@test _isapprox(gradient(m -> sum(m(x)), m), gradient(m -> sum(m(dx)), m))
 	end
 end
 

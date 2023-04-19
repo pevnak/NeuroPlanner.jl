@@ -160,19 +160,19 @@ using Flux
 		@testset "ArrayNode" begin 
 			kb = KnowledgeBase((;a = Float32[1 1 2 2 3 3], b = ArrayNode(KBEntry(:a, 1:6))))
 			m = reflectinmodel(kb, d -> Dense(d,10), SegmentedMean)
-			dekb = NeuroPlanner._deduplicate(kb)
+			dekb = NeuroPlanner.deduplicate(kb)
 			@test dekb[:a] == DeduplicatedMatrix(kb[:a])
-			@test dekb[:b].colmap == [1,1,2,2,3,3]
+			@test dekb[:b].ii == [1,1,2,2,3,3]
 			@test m(dekb) ≈ m(kb)
 		end
 
 		@testset "BagNode" begin 
 			kb = KnowledgeBase((;a = Float32[1 1 2 2 3 3], b = BagNode(ArrayNode(KBEntry(:a, 1:6)), [1:2,3:3,4:4,5:6])))
 			m = reflectinmodel(kb, d -> Dense(d,10), SegmentedMean)
-			dekb = NeuroPlanner._deduplicate(kb)
+			dekb = NeuroPlanner.deduplicate(kb)
 			@test m(dekb) ≈ m(kb)
 			@test dekb[:b] isa NeuroPlanner.DeduplicatingNode
-			@test dekb[:b].colmap == [1,2,2,3]
+			@test dekb[:b].ii == [1,2,2,3]
 			@test _isapprox(gradient(model -> sum(sin.(model(kb))), m)[1], gradient(model -> sum(sin.(model(dekb))), m)[1])
 		end
 
@@ -181,10 +181,23 @@ using Flux
 			b = Float32[1 2 2 2 2 3]
 			kb = KnowledgeBase((;a, b, c = ProductNode((KBEntry(:a, 1:6), KBEntry(:b, 1:6),))))
 			m = reflectinmodel(kb, d -> Dense(d,10), SegmentedMean)
-			dekb = replace(kb, :c, NeuroPlanner._deduplicate(kb, kb[:c])[1])
+			dekb = NeuroPlanner.deduplicate(kb)
 			@test m(dekb) ≈ m(kb)
 			@test dekb[:c] isa NeuroPlanner.DeduplicatingNode
-			@test dekb[:c].colmap == [1,2,3,3,4,5]
+			@test dekb[:c].ii == [1,2,3,3,4,5]
+			@test _isapprox(gradient(model -> sum(sin.(model(kb))), m)[1], gradient(model -> sum(sin.(model(dekb))), m)[1])
+		end
+
+		@testset "More complicated problem" begin 
+			a = Float32[1 1 2 2 3 3]
+			b = Float32[1 1 2 2 3 3]
+			kb = KnowledgeBase((;a, b, 
+				c = ProductNode((KBEntry(:a, 1:6), KBEntry(:b, 1:6),)),
+				d = BagNode(KBEntry(:c, [1,1,2,2,3,3]), [1:2,1:2,3:4,4:5,4:5]),
+			))
+			m = reflectinmodel(kb, d -> Dense(d,10), SegmentedMean)
+			dekb = deduplicate(kb)
+			@test m(dekb) ≈ m(kb)
 			@test _isapprox(gradient(model -> sum(sin.(model(kb))), m)[1], gradient(model -> sum(sin.(model(dekb))), m)[1])
 		end
 	end

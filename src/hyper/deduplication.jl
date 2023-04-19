@@ -51,93 +51,32 @@ end
 """
 struct DeduplicatingNode{D} 
 	x::D
-	i::Vector{Int}
+	ii::Vector{Int}
 end
 A deduplicated data are useful for speeding computation of models, which returns 
 the same answer over multiple observations. The idea is that the result is computed as
-m(ddd::DeduplicatingNode) =  m(ddd.x)[:,ddd.colmap], where we assume that m(ddd.x) returns 
+m(ddd::DeduplicatingNode) =  m(ddd.x)[:,ddd.ii], where we assume that m(ddd.x) returns 
 a matrix.
 """
 struct DeduplicatingNode{D} <: AbstractMillNode
 	x::D
-	colmap::Vector{Int}
+	ii::Vector{Int}
 end
 
-Mill.nobs(ds::DeduplicatingNode) = length(ds.colmap)
-Base.getindex(x::DeduplicatingNode, ii) = DeduplicatingNode(x.x, x.colmap[ii])
-Base.getindex(x::DeduplicatingNode, ii::Vector{Bool}) = DeduplicatingNode(x.x, x.colmap[ii])
-Base.getindex(x::DeduplicatingNode, ii::Vector{Int}) = DeduplicatingNode(x.x, x.colmap[ii])
+Mill.nobs(ds::DeduplicatingNode) = length(ds.ii)
+Base.getindex(x::DeduplicatingNode, ii) = DeduplicatingNode(x.x, x.ii[ii])
+Base.getindex(x::DeduplicatingNode, ii::Vector{Bool}) = DeduplicatingNode(x.x, x.ii[ii])
+Base.getindex(x::DeduplicatingNode, ii::Vector{Int}) = DeduplicatingNode(x.x, x.ii[ii])
 HierarchicalUtils.children(n::DeduplicatingNode) = (n.x,)
 function HierarchicalUtils.nodecommshow(io::IO, n::DeduplicatingNode)
-	bytes = Base.format_bytes(Base.summarysize(n.colmap))
-    print(io, " # ", length(n.colmap), " obs, ", bytes)
+	bytes = Base.format_bytes(Base.summarysize(n.ii))
+    print(io, " # ", length(n.ii), " obs, ", bytes)
 end
 
-function deduplicate_data(model::AbstractMillModel, ds::AbstractMillNode)
-	deduplicate_data(model(ds), ds)
-end
+(m::AbstractMillModel)(dedu::DeduplicatingNode{<:AbstractMillNode}) = m(dedu.x)[:,dedu.ii]
+(m::AbstractMillModel)(kb::KnowledgeBase, dedu::DeduplicatingNode{<:AbstractMillNode}) = m(kb, dedu.x)[:,dedu.ii]
 
-function deduplicate_data(kb::KnowledgeBase, model::AbstractMillModel, ds::AbstractMillNode)
-	deduplicate_data(model(kb, ds), ds)
-end
-
-function deduplicate_data(output::AbstractMatrix, ds::AbstractMillNode)
-	mask, si = find_duplicates(output)
-	DeduplicatingNode(ds[mask], [si[i] for i in 1:Mill.nobs(ds)])
-end
-
-deduplicate_data(model, ds) = ds
-
-(m::AbstractMillModel)(dedu::DeduplicatingNode{<:AbstractMillNode}) = m(dedu.x)[:,dedu.colmap]
-(m::AbstractMillModel)(kb::KnowledgeBase, dedu::DeduplicatingNode{<:AbstractMillNode}) = m(kb, dedu.x)[:,dedu.colmap]
-
-
-"""
-deduplicate(model::BagModel, ds::BagNode)
-
-remove duplicates in instances of BagNodes for 
-ds = BagNode(ArrayNode([1 2 1 2 2; 2 1 2 1 2]), [1:3,4:5])
-model = reflectinmodel(ds, d -> Dense(d,32), SegmentedMean) 
-dds = deduplicate(model, ds)
-dds.data.data ≈ [1 2 2; 2 1 2]
-dds.bags.bags ≈ [[1, 2, 1], [2, 3]]
-
-"""
-deduplicate(kb, model::ArrayModel, ds::ArrayNode) = deduplicate_data(kb, model, ds)
-
-@generated function deduplicate(kb::KnowledgeBase, model::ProductModel{<:NamedTuple{KM}}, ds::ProductNode{<:NamedTuple{KM}}) where {KM}
-    chs = map(KM) do k
-        :(deduplicate_data(kb, model.ms.$k, ds.data.$k))
-    end
-    quote
-        ProductNode(NamedTuple{KM}(tuple($(chs...))))
-    end
-end
-
-function deduplicate(kb::KnowledgeBase, model::ProductModel{<:Tuple}, ds::ProductNode{<:Tuple})
-    chs = [deduplicate_data(kb, m, x) for (m,x) in zip(model.ms, ds.data)]
-    ProductNode((tuple(chs...)))
-end
-
-function deduplicate(kb::KnowledgeBase, model::BagModel, ds::BagNode)
-	subds = deduplicate_data(kb, model.im, ds.data)
-	BagNode(subds, ds.bags)
-end
-
-function deduplicate(model::KnowledgeModel, kb::KnowledgeBase)
-	# Let's first completely evaluate the knowledgebase
-	kb = _apply_layers(kb, model)
-	xs = map(keys(kb)) do k 
-		k ∉ keys(model) && return(kb[k])
-		dedu = deduplicate(kb, model[k], kb[k])
-		deduplicate_data(kb[k], dedu)
-	end 
-	KnowledgeBase(NamedTuple{keys(kb)}(xs))
-end
-
-
-
-function _deduplicate(kb::KnowledgeBase)
+function deduplicate(kb::KnowledgeBase)
 	for k in keys(kb)
 		kb = replace(kb, k, _deduplicate(kb, kb[k])[1])
 	end
@@ -149,18 +88,9 @@ function _deduplicate(kb::KnowledgeBase, x::AbstractMatrix)
 	o, o.ii
 end
 
-# function _deduplicate(kb::KnowledgeBase, ds::KBEntry{K}) where {K}
-# 	x = kb[K]
-# 	@assert x isa DeduplicatedMatrix # this is absolutely dirty
-# 	ii = find_duplicates(x.ii[ds.ii])[2]
-# 	o = KBEntry{K}(ii)
-# 	o, o.ii
-# end
-
-
 function _deduplicate(kb::KnowledgeBase, ds::ArrayNode{<:KBEntry{K}}) where {K}
 	x = kb[K]
-	mask, ii = x isa DeduplicatedMatrix ? find_duplicates(x.ii[ds.data.ii]) : find_duplicates(x)
+	mask, ii = (x isa DeduplicatedMatrix || x isa DeduplicatingNode) ? find_duplicates(x.ii[ds.data.ii]) : find_duplicates(x)
 	dedu_ds = DeduplicatingNode(ds[mask], ii)
 	dedu_ds, ii
 end

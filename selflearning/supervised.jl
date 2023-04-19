@@ -55,14 +55,12 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 	model = if isfile(filename*"_model.jls")
 		deserialize(filename*"_model.jls")
 	else
-		model, dedup_model = let 
+		model = let 
 			problem = load_problem(first(train_files))
 			pddle, state = initproblem(pddld, problem)
 			h₀ = pddle(state)
 			# model = reflectinmodel(h₀, d -> ffnn(d, dense_dim, dense_dim, dense_layers);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
-			model = reflectinmodel(h₀, d -> Dense(d, dense_dim, relu);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
-			dedup_model = reflectinmodel(h₀, d -> Dense(d,32) ;fsm = Dict("" =>  d -> Dense(d, 32)))
-			model, dedup_model
+			reflectinmodel(h₀, d -> Dense(d, dense_dim, relu);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
 		end
 
 		logger=tblogger(filename*"_events.pb")
@@ -70,7 +68,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			plan = load_plan(problem_file)
 			problem = load_problem(problem_file)
 			ds = fminibatch(pddld, domain, problem, plan)
-			@set ds.x = deduplicate(dedup_model, ds.x)
+			@set ds.x = deduplicate(ds.x)
 		end
 		log_value(logger, "time_minibatch", t; step=0)
 		opt = AdaBelief();
