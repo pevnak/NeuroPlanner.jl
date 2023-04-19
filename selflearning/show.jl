@@ -97,7 +97,7 @@ end;
 df = reduce(vcat, filter(!isempty, vec(stats)))
 
 gdf = DataFrames.groupby(df, [:domain_name, :arch_name, :loss_name, :max_steps,  :max_time, :graph_layers, :residual, :dense_layers, :dense_dim, :seed])
-stats = combine(gdf) do sub_df
+combined_stats = combine(gdf) do sub_df
 	(;	trn_solved = mean(sub_df.solved[sub_df.used_in_train]),
      	tst_solved = mean(sub_df.solved[.!sub_df.used_in_train]),
      	expanded = mean(sub_df.expanded[.!sub_df.used_in_train]),
@@ -106,9 +106,9 @@ stats = combine(gdf) do sub_df
 	)
 end
 
-function show_stats(key)
+function show_stats(combined_stats, df, key)
 	dfs = map(unique(df.loss_name)) do ln 
-		df1 = filter(r -> r.loss_name == ln, stats)
+		df1 = filter(r -> r.loss_name == ln, combined_stats)
 		dfs = mapreduce((args...) -> leftjoin(args..., on = :domain_name), unique(df1.arch_name)) do an 
 			df2 = filter(r -> r.arch_name == an, df1)
 			gdf = DataFrames.groupby(df2, :domain_name)
@@ -123,8 +123,8 @@ function show_stats(key)
 	leftjoin(dfs..., on = :domain_name)
 end
 
-show_stats(:tst_solved)
-show_stats(:expanded)
+show_stats(combined_stats, df, :tst_solved)
+show_stats(combined_stats, df, :expanded)
 
 
 # investigate 

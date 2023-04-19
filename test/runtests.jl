@@ -8,6 +8,7 @@ using Random
 using PlanningDomains
 using Setfield
 
+include("dedu_matrix.jl")
 include("knowledge_base.jl")
 
 # domain = load_domain("sokoban.pddl")

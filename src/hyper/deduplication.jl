@@ -6,7 +6,7 @@ create a `mask` identifying unique columns in `o` and a map `si`
 mapping indexes original columns in `o` to the new representation in `o[:,mask]`
 It should hold that `o[:,mask][:,[si[i] for i in 1:size(o,2)]] == o`
 """
-function find_duplicates(x)
+function find_duplicates(x::AbstractMatrix)
 	rows, cols = size(x)
 	si = Vector{Int}(undef, cols)
 	unique_cols = Vector{Bool}(undef, cols)
@@ -17,6 +17,27 @@ function find_duplicates(x)
 		for k in 1:(j-1)
 			!unique_cols[k] && continue
 			if all(x[r,k] == x[r,j] for r in 1:rows)
+				si[j] = si[k]
+				unique_cols[j] = false
+				break
+			end
+		end
+		new_index += unique_cols[j]
+	end
+	unique_cols, si
+end
+
+function find_duplicates(x::AbstractVector)
+	cols = length(x)
+	si = Vector{Int}(undef, cols)
+	unique_cols = Vector{Bool}(undef, cols)
+	new_index = 1
+	@inbounds for j in 1:cols 
+		si[j] = new_index
+		unique_cols[j] = true
+		for k in 1:(j-1)
+			!unique_cols[k] && continue
+			if x[k] == x[j]
 				si[j] = si[k]
 				unique_cols[j] = false
 				break
@@ -44,6 +65,8 @@ end
 
 Mill.nobs(ds::DeduplicatingNode) = length(ds.colmap)
 Base.getindex(x::DeduplicatingNode, ii) = DeduplicatingNode(x.x, x.colmap[ii])
+Base.getindex(x::DeduplicatingNode, ii::Vector{Bool}) = DeduplicatingNode(x.x, x.colmap[ii])
+Base.getindex(x::DeduplicatingNode, ii::Vector{Int}) = DeduplicatingNode(x.x, x.colmap[ii])
 HierarchicalUtils.children(n::DeduplicatingNode) = (n.x,)
 function HierarchicalUtils.nodecommshow(io::IO, n::DeduplicatingNode)
 	bytes = Base.format_bytes(Base.summarysize(n.colmap))
@@ -101,13 +124,62 @@ function deduplicate(kb::KnowledgeBase, model::BagModel, ds::BagNode)
 	BagNode(subds, ds.bags)
 end
 
-function deduplicate(model::KnowledgeModel, ds::KnowledgeBase)
+function deduplicate(model::KnowledgeModel, kb::KnowledgeBase)
 	# Let's first completely evaluate the knowledgebase
-	kb = _apply_layers(ds, model)
-	xs = map(keys(ds)) do k 
-		k ∉ keys(model) && return(ds[k])
-		dedu = deduplicate(kb, model[k], ds[k])
+	kb = _apply_layers(kb, model)
+	xs = map(keys(kb)) do k 
+		k ∉ keys(model) && return(kb[k])
+		dedu = deduplicate(kb, model[k], kb[k])
 		deduplicate_data(kb[k], dedu)
 	end 
-	KnowledgeBase(NamedTuple{keys(ds)}(xs))
+	KnowledgeBase(NamedTuple{keys(kb)}(xs))
 end
+
+
+
+function _deduplicate(kb::KnowledgeBase)
+	for k in keys(kb)
+		kb = replace(kb, k, _deduplicate(kb, kb[k])[1])
+	end
+	kb
+end
+
+function _deduplicate(kb::KnowledgeBase, x::AbstractMatrix) 
+	o = DeduplicatedMatrix(x)
+	o, o.ii
+end
+
+# function _deduplicate(kb::KnowledgeBase, ds::KBEntry{K}) where {K}
+# 	x = kb[K]
+# 	@assert x isa DeduplicatedMatrix # this is absolutely dirty
+# 	ii = find_duplicates(x.ii[ds.ii])[2]
+# 	o = KBEntry{K}(ii)
+# 	o, o.ii
+# end
+
+
+function _deduplicate(kb::KnowledgeBase, ds::ArrayNode{<:KBEntry{K}}) where {K}
+	x = kb[K]
+	mask, ii = x isa DeduplicatedMatrix ? find_duplicates(x.ii[ds.data.ii]) : find_duplicates(x)
+	dedu_ds = DeduplicatingNode(ds[mask], ii)
+	dedu_ds, ii
+end
+
+function _deduplicate(kb::KnowledgeBase, ds::BagNode)
+	z, ii = _deduplicate(kb, ds.data)
+	mapped_bags = [sort(ii[b]) for b in ds.bags]
+	mask, ii = find_duplicates(mapped_bags)
+	dedu_bn = z isa DeduplicatingNode ? BagNode(z.x, mapped_bags[mask]) : BagNode(z, ds.bags[mask])
+	dedu_ds = DeduplicatingNode(dedu_bn, ii)
+	dedu_ds, ii
+end
+
+function _deduplicate(kb::KnowledgeBase, ds::ProductNode)
+	xs = map(x -> _deduplicate(kb, x), ds.data)
+	mask, ii = find_duplicates(vcat(map(x -> x[2]', xs)...))
+	dedu_ds = ProductNode(map(x -> x[1][mask], xs))
+	dedu_ds = DeduplicatingNode(dedu_ds, ii)
+	dedu_ds, ii
+end
+
+

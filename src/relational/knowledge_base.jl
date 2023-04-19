@@ -22,6 +22,16 @@ KnowledgeBase() = KnowledgeBase(NamedTuple())
 Base.getindex(kb::KnowledgeBase, k::Symbol) = kb.kb[k]
 Base.keys(kb::KnowledgeBase) = keys(kb.kb)
 append(kb::KnowledgeBase, k::Symbol, x) = KnowledgeBase(merge(kb.kb,NamedTuple{(k,)}((x,))))
+function Base.replace(kb::KnowledgeBase, k::Symbol, v)
+    l = Setfield.PropertyLens{:kb}() ∘ Setfield.PropertyLens{k}()
+    set(kb, l, v)
+end
+
+"""
+atoms(kb::KnowledgeBase)
+
+keys of items in knowledgebase that evaluates to true
+"""
 function atoms(kb::KnowledgeBase)
     ks = filter(k -> kb[k] isa AbstractArray, keys(kb))
     KnowledgeBase(kb.kb[ks])
