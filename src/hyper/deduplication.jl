@@ -6,46 +6,17 @@ create a `mask` identifying unique columns in `o` and a map `si`
 mapping indexes original columns in `o` to the new representation in `o[:,mask]`
 It should hold that `o[:,mask][:,[si[i] for i in 1:size(o,2)]] == o`
 """
-function find_duplicates(x::AbstractMatrix)
-	rows, cols = size(x)
-	si = Vector{Int}(undef, cols)
-	unique_cols = Vector{Bool}(undef, cols)
-	unique_idxs = Vector{Int}()
-	new_index = 1
-	@inbounds for j in 1:cols 
-		si[j] = new_index
-		unique_cols[j] = true
-		for k in unique_idxs
-			if all(x[r,k] == x[r,j] for r in 1:rows)
-				si[j] = si[k]
-				unique_cols[j] = false
-				break
-			end
-		end
-		new_index += unique_cols[j]
-		unique_cols[j] && push!(unique_idxs, j)
-	end
-	unique_cols, si
-end
+find_duplicates(x::AbstractMatrix) = find_duplicates(vec(mapslices(hash, x, dims = 1)))
 
 function find_duplicates(x::AbstractVector)
 	cols = length(x)
 	si = Vector{Int}(undef, cols)
 	unique_cols = Vector{Bool}(undef, cols)
-	unique_idxs = Vector{Int}()
-	new_index = 1
+	di = Dict{eltype(x),Integer}()
 	@inbounds for j in 1:cols 
-		si[j] = new_index
-		unique_cols[j] = true
-		for k in unique_idxs
-			if x[k] == x[j]
-				si[j] = si[k]
-				unique_cols[j] = false
-				break
-			end
-		end
-		new_index += unique_cols[j]
-		unique_cols[j] && push!(unique_idxs, j)
+		n = length(di)
+		si[j] = get!(di, x[j], n + 1)
+		unique_cols[j] = n < length(di)
 	end
 	unique_cols, si
 end

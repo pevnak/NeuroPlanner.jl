@@ -9,6 +9,23 @@ using HypothesisTests
 using Statistics
 using PrettyTables
 
+function show_stats(combined_stats, key)
+	dfs = map(unique(combined_stats.loss_name)) do ln 
+		df1 = filter(r -> r.loss_name == ln, combined_stats)
+		dfs = mapreduce((args...) -> outerjoin(args..., on = :domain_name), unique(df1.arch_name)) do an 
+			df2 = filter(r -> r.arch_name == an, df1)
+			gdf = DataFrames.groupby(df2, :domain_name)
+			a = combine(gdf) do sub_df
+				# (;average = mean(sub_df.tst_solved), maximum = maximum(sub_df.tst_solved))
+				i = argmax(sub_df.tst_solved)
+				DataFrame("$ln $an" => [sub_df[!,key][i]])
+			end
+		end
+		dfs
+	end;
+	leftjoin(dfs..., on = :domain_name)
+end
+
 ###########
 #	Collect all stats to one big DataFrame, over which we will perform queries
 ###########
@@ -90,13 +107,13 @@ dense_layers = 2
 seed = 1
 problems = ["blocks","ferry","npuzzle","gripper", "spanner","elevators_00","elevators_11"]
 # stats = map(Iterators.product(("pddl",), ("lstar","l2"), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual)
-stats = map(Iterators.product(("asnet","pddl", "hgnnlite", "hgnn"), ("lstar","l2"), problems, (4, 8, 16), (1, 2), (:none, :linear))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual)
+stats = map(Iterators.product(("asnet","pddl", "hgnnlite", "hgnn"), ("lstar","l2"), problems, (4, 8), (1, 2), (:none, :linear))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual)
 	# submit_missing(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
 	read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
 end;
 df = reduce(vcat, filter(!isempty, vec(stats)))
 
-gdf = DataFrames.groupby(df, [:domain_name, :arch_name, :loss_name, :max_steps,  :max_time, :graph_layers, :residual, :dense_layers, :dense_dim, :seed])
+gdf = DataFrames.groupby(df, [:domain_name, :arch_name, :loss_name, :planner, :max_steps,  :max_time, :graph_layers, :residual, :dense_layers, :dense_dim, :seed])
 combined_stats = combine(gdf) do sub_df
 	(;	trn_solved = mean(sub_df.solved[sub_df.used_in_train]),
      	tst_solved = mean(sub_df.solved[.!sub_df.used_in_train]),
@@ -106,24 +123,7 @@ combined_stats = combine(gdf) do sub_df
 	)
 end
 
-function show_stats(combined_stats, df, key)
-	dfs = map(unique(df.loss_name)) do ln 
-		df1 = filter(r -> r.loss_name == ln, combined_stats)
-		dfs = mapreduce((args...) -> leftjoin(args..., on = :domain_name), unique(df1.arch_name)) do an 
-			df2 = filter(r -> r.arch_name == an, df1)
-			gdf = DataFrames.groupby(df2, :domain_name)
-			a = combine(gdf) do sub_df
-				# (;average = mean(sub_df.tst_solved), maximum = maximum(sub_df.tst_solved))
-				i = argmax(sub_df.tst_solved)
-				DataFrame("$ln $an" => [sub_df[!,key][i]])
-			end
-		end
-		dfs
-	end;
-	leftjoin(dfs..., on = :domain_name)
-end
-
-show_stats(combined_stats, df, :tst_solved)
+show_stats(filter(r -> r.planner == "AStarPlanner", combined_stats), :tst_solved)
 show_stats(combined_stats, df, :expanded)
 
 
