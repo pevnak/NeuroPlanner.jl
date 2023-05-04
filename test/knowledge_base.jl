@@ -109,6 +109,7 @@ using Flux
 			@test m(kb, ds) ≈ m.m(Matrix(kb, a))
 			@test gradient(kb -> sum(sin.(Matrix(kb, a))), kb)[1][:kb][:a] ≈ gradient(x -> sum(sin.(x)), kb[:a])[1]
 			@test gradient(kb -> sum(sin.(m(kb, ds))), kb)[1][:kb][:a] ≈  gradient(x -> sum(sin.(m.m(x))), kb[:a])[1]
+			@test gradient(x -> sum(sin.(m.m(x))), kb[:a])[1]
 		end
 
 		@testset "Full stack " begin

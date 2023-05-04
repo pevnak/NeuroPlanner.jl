@@ -5,6 +5,8 @@ find_duplicates(o)
 create a `mask` identifying unique columns in `o` and a map `si`
 mapping indexes original columns in `o` to the new representation in `o[:,mask]`
 It should hold that `o[:,mask][:,[si[i] for i in 1:size(o,2)]] == o`
+
+The implementation is based on hashing columns
 """
 find_duplicates(x::AbstractMatrix) = find_duplicates(vec(mapslices(hash, x, dims = 1)))
 
@@ -72,6 +74,13 @@ function _deduplicate(kb::KnowledgeBase, ds::ArrayNode{<:KBEntry{K}}) where {K}
 end
 
 function _deduplicate(kb::KnowledgeBase, ds::BagNode)
+	if Mill.nobs(ds.data) == 0 
+		@assert all(isempty(b) for b in ds.bags) "All bags should be empty when instances are empty"
+		dedu_bn = BagNode(ds.data, [0:-1])
+		ii = ones(Int, Mill.nobs(ds))
+		dedu_ds = DeduplicatingNode(dedu_bn, ii)
+		return(dedu_ds, ii)
+	end
 	z, ii = _deduplicate(kb, ds.data)
 	mapped_bags = [sort(ii[b]) for b in ds.bags]
 	mask, ii = find_duplicates(mapped_bags)

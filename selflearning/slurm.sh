@@ -7,4 +7,4 @@
 #SBATCH --out=/home/pevnytom/logs/pddl.%j.out
 
 ml Julia/1.8.3-linux-x86_64
-julia -O3 --project=. supervised.jl $1 $6 $5 --dense-dim $2 --graph-layers $3  --residual $4
+julia -O3 --project=. supervised.jl $1 $6 $5 --dense-dim $2 --graph-layers $3  --residual $4 --seed $7

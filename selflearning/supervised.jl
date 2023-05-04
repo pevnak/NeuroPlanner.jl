@@ -21,31 +21,7 @@ using TensorBoardLogger
 include("solution_tracking.jl")
 include("problems.jl")
 include("training.jl")
-
-function ffnn(idim, hdim, odim, nlayers)
-	nlayers == 1 && return(Dense(idim,odim))
-	nlayers == 2 && return(Chain(Dense(idim, hdim, relu), Dense(hdim,odim)))
-	nlayers == 3 && return(Chain(Dense(idim, hdim, relu), Dense(hdim, hdim, relu), Dense(odim,odim)))
-	error("nlayers should be only in [1,3]")
-end
-
-W20AStarPlanner(heuristic::Heuristic; kwargs...) = ForwardPlanner(;heuristic, h_mult=2, kwargs...)
-W15AStarPlanner(heuristic::Heuristic; kwargs...) = ForwardPlanner(;heuristic, h_mult=1.5, kwargs...)
-
-
-function tblogger(filename; min_level::LogLevel=Info, step_increment = 1)
-	!isdir(dirname(filename)) && mkpath(dirname(filename))
-    logdir = dirname(filename)
-
-    evfile     = open(filename, "w")
-    ev_0 = TensorBoardLogger.Event(wall_time=time(), step=0, file_version="brain.Event:2")
-    TensorBoardLogger.write_event(evfile, ev_0)
-
-    all_files  = Dict(filename => evfile)
-    start_step = 0
-
-    TBLogger{typeof(logdir), typeof(evfile)}(logdir, evfile, all_files, start_step, step_increment, min_level)
-end
+include("utils.jl")
 
 function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch;max_steps = 10000, max_time = 30, graph_layers = 2, residual = true, dense_layers = 2, dense_dim = 32, settings = nothing)
 	!isdir(dirname(filename)) && mkpath(dirname(filename))
@@ -69,10 +45,13 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 
 		logger=tblogger(filename*"_events.pb")
 		t = @elapsed minibatches = map(train_files) do problem_file
+			println("creating sample from problem: ",problem_file)
 			plan = load_plan(problem_file)
 			problem = load_problem(problem_file)
 			ds = fminibatch(pddld, domain, problem, plan)
-			@set ds.x = deduplicate(ds.x)
+			ds = @set ds.x = deduplicate(ds.x)
+			GC.gc(true)
+			ds
 		end
 		log_value(logger, "time_minibatch", t; step=0)
 		opt = AdaBelief();
@@ -114,8 +93,8 @@ ArgParse example implemented in Comonicon.
 - `--dense_layers <Int>`:  number of layers of dense network after pooling vertices (default 32)
 - `--residual <String>`:  residual connections between graph convolutions (none / dense / linear)
 
-max_steps = 10_000; max_time = 30; graph_layers = 1; dense_dim = 32; dense_layers = 2; residual = "none"; seed = 1
-domain_name = "elevators_00"
+max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
+domain_name = "gripper"
 loss_name = "lstar"
 arch_name = "hgnn"
 """

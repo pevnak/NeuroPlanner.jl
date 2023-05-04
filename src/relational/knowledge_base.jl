@@ -82,6 +82,8 @@ _getindex(x::KBEntry{E,T}, i::Integer) where {E,T} = KBEntry{E,T}(x.ii[i:i])
 Mill.nobs(a::KBEntry) = length(a.ii)
 HierarchicalUtils.NodeType(::Type{KBEntry}) = HierarchicalUtils.LeafNode()
 
+ChainRulesCore.ProjectTo(x::KBEntry{E,T}) where {E,T} = ProjectTo{KBEntry}(;E,T,ii = x.ii)
+
 ########
 #   We do not do reduce, as it is potentially very dangerous as it might be dissinchronized with the knowledge base
 ########
