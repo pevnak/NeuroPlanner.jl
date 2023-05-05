@@ -13,3 +13,9 @@ function SymbolicPlanners.compute(h::NeuroHeuristic, domain::Domain, state::Stat
 	h.t[] += @elapsed r = only(h.model(h.pddle(state)))
 	r
 end
+
+using NeuroPlanner: LevinModel
+function SymbolicPlanners.compute(h::NeuroHeuristic{<:LevinASNet, <:LevinModel}, domain::Domain, state::State, spec::Specification) 
+	h.t[] += @elapsed r = h.model(h.pddle(state))
+	(only(r[1]), vec(r[2]))
+end

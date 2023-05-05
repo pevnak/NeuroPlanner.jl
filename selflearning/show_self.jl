@@ -36,9 +36,16 @@ data = map(Iterators.product(["lstar","l2"], problems)) do (loss_name, problem)
 	Symbol("$(problem) $(loss_name)") => read_data(problem, loss_name)
 end |> vec |> DataFrame
 
+stats = map(Iterators.product(["lstar","l2"], problems)) do (loss_name, problem)
+	(problem, loss_name) => read_data(problem, loss_name)
+end |> vec
+header = ([x[1][1] for x in stats], [x[1][2] for x in stats])
+data = hcat([x[2] for x in stats]...)
+
 
 function high(data, i, j)
 	iseven(j) ? (data[i,j-1] < data[i,j]) : (data[i,j] > data[i,j+1])
 end
 
+pretty_table(data; header, backend = Val(:text), highlighters = (Highlighter(high, crayon"yellow"),))
 pretty_table(data, backend = Val(:latex), highlighters = (LatexHighlighter(high, "textbf"),))

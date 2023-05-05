@@ -5,11 +5,10 @@ verbose::Bool = true
 
 function solve_problem(pddld, problem::GenericProblem, model, init_planner; max_time=30, return_unsolved = false)
 	domain = pddld.domain
-	pddle, state = NeuroPlanner.initproblem(pddld, problem)
-	goal = PDDL.get_goal(problem)
+	state₀ = initstate(domain, problem)
 	hfun = NeuroHeuristic(pddld, problem, model)
 	planner = init_planner(hfun; max_time, save_search = true)
-	solution_time = @elapsed sol = planner(domain, state, goal)
+	solution_time = @elapsed sol = planner(domain, state₀, PDDL.get_goal(problem))
 	return_unsolved || sol.status == :success || return(nothing)
 	stats = (;solution_time, 
 		sol_length = length(sol.trajectory),

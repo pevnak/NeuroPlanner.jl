@@ -8,7 +8,7 @@ using Random
 using PlanningDomains
 using Setfield
 using ChainRulesCore
-using Yota
+# using Yota
 
 _isapprox(a::NamedTuple,b::NamedTuple; tol = 1e-5) = all(_isapprox(a[k], b[k]; tol) for k in keys(a))
 _isapprox(a::Tangent,b::NamedTuple; tol = 1e-5) = all(_isapprox(a[k], b[k]; tol) for k in keys(b))

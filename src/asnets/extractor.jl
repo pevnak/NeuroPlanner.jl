@@ -188,19 +188,18 @@ end
 
 
 """
-allgrounding(action, type2obs; unique_args = true)
+allgrounding(action, type2obs)
 
 create all possible grounding of predicates in `action` while assuming objects with types in `type2obs` 
 """
-function allgrounding(action::GenericAction, type2obs::Dict; unique_args = true)
+function allgrounding(action::GenericAction, type2obs::Dict)
 	predicates = extract_predicates(action)
-	allgrounding(action, predicates, type2obs; unique_args)
+	allgrounding(action, predicates, type2obs)
 end
 
-function allgrounding(action::GenericAction, predicates::Vector{<:Term}, type2obs::Dict; unique_args = true)
+function allgrounding(action::GenericAction, predicates::Vector{<:Term}, type2obs::Dict)
 	types = [type2obs[k] for k in action.types]
 	assignments = vec(collect(Iterators.product(types...)))
-	unique_args && filter!(v -> length(unique(v)) == length(v), assignments) 
 	as = map(assignments) do v 
 		assignment = Dict(zip(action.args, v))
 		[ground(p, assignment) for p in predicates]

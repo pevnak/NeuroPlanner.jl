@@ -308,5 +308,6 @@ function minibatchconstructor(name)
 	name == "lₛ" && return(LₛMiniBatch)
 	name == "lgbfs" && return(LgbfsMiniBatch)
 	name == "lrt" && return(LRTMiniBatch)
+	name == "levinloss" && return(LevinMiniBatch)
 	error("unknown loss $(name)")
 end

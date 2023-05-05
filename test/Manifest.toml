@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "54883a6d39483b795fd9e891bd5cdc675d54b220"
+project_hash = "f4051819fbfd1373387ed72aa42e2aea605ba645"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -717,9 +717,9 @@ version = "0.4.17"
 
 [[deps.MLUtils]]
 deps = ["ChainRulesCore", "Compat", "DataAPI", "DelimitedFiles", "FLoops", "FoldsThreads", "NNlib", "Random", "ShowCases", "SimpleTraits", "Statistics", "StatsBase", "Tables", "Transducers"]
-git-tree-sha1 = "f69cdbb5b7c630c02481d81d50eac43697084fe0"
+git-tree-sha1 = "ca31739905ddb08c59758726e22b9e25d0d1521b"
 uuid = "f1d291b0-491e-4a28-83b9-f70985020b54"
-version = "0.4.1"
+version = "0.4.2"
 
 [[deps.MacroTools]]
 deps = ["Markdown", "Random"]

@@ -12,6 +12,7 @@ using Mill
 using Setfield
 using MLUtils
 using NeuralAttentionlib
+using DataStructures
 using HierarchicalUtils
 using ChainRulesCore
 
@@ -40,6 +41,11 @@ export MultiheadAttention
 
 include("asnets/extractor.jl")
 export ASNet
+
+include("levin_asnet/extractor.jl")
+include("levin_asnet/loss.jl")
+include("levin_asnet/bfs_planner.jl")
+export LevinASNet, BFSPlanner
 
 include("hgnn/extractor.jl")
 export HGNNLite, HGNN
