@@ -32,11 +32,11 @@ end
 
 # problems = filter(s -> isdir("selflearning",s), readdir("selflearning"))
 problems = ["blocks", "elevators_00", "ferry", "gripper", "npuzzle", "spanner"]
-data = map(Iterators.product(["lstar","l2"], problems)) do (loss_name, problem)
+data = map(Iterators.product(["lstar","l2", "levin"], problems)) do (loss_name, problem)
 	Symbol("$(problem) $(loss_name)") => read_data(problem, loss_name)
 end |> vec |> DataFrame
 
-stats = map(Iterators.product(["lstar","l2"], problems)) do (loss_name, problem)
+stats = map(Iterators.product(["lstar","l2", "levin"], problems)) do (loss_name, problem)
 	(problem, loss_name) => read_data(problem, loss_name)
 end |> vec
 header = ([x[1][1] for x in stats], [x[1][2] for x in stats])
@@ -44,7 +44,9 @@ data = hcat([x[2] for x in stats]...)
 
 
 function high(data, i, j)
-	iseven(j) ? (data[i,j-1] < data[i,j]) : (data[i,j] > data[i,j+1])
+	k = (j - 1) ÷ 3
+	s = argmax(data[i,3*k+s] for s in 1:3)
+	s == mod(j - 1, 3) + 1
 end
 
 pretty_table(data; header, backend = Val(:text), highlighters = (Highlighter(high, crayon"yellow"),))

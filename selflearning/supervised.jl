@@ -49,9 +49,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			plan = load_plan(problem_file)
 			problem = load_problem(problem_file)
 			ds = fminibatch(pddld, domain, problem, plan)
-			ds = @set ds.x = deduplicate(ds.x)
-			GC.gc(true)
-			ds
+			@set ds.x = deduplicate(ds.x)
 		end
 		log_value(logger, "time_minibatch", t; step=0)
 		opt = AdaBelief();
@@ -61,8 +59,9 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 		serialize(filename*"_model.jls", model)	
 		model
 	end
+	planners = model isa NeuroPlanner.LevinModel ? [BFSPlanner] : [AStarPlanner, GreedyPlanner, W15AStarPlanner, W20AStarPlanner]
 
-	stats = map(Iterators.product([AStarPlanner, GreedyPlanner, W15AStarPlanner, W20AStarPlanner], problem_files)) do (planner, problem_file)
+	stats = map(Iterators.product(planners, problem_files)) do (planner, problem_file)
 		used_in_train = problem_file ∈ train_files
 		@show problem_file
 		sol = solve_problem(pddld, problem_file, model, planner; return_unsolved = true)
@@ -80,7 +79,7 @@ ArgParse example implemented in Comonicon.
 
 # Arguments
 
-- `problem_name`: a name of the problem to solve ("ferry", "gripper", "blocks", "npuzzle")
+- `problem_name`: a name of the problem to solve ("ferry", "gripper", "blocks", "npuzzle", "elevator_00")
 - `arch_name`: an architecture of the neural network implementing heuristic("asnet", "pddl")
 - `loss_name`: 
 
@@ -94,16 +93,17 @@ ArgParse example implemented in Comonicon.
 - `--residual <String>`:  residual connections between graph convolutions (none / dense / linear)
 
 max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
-domain_name = "gripper"
-loss_name = "lstar"
-arch_name = "hgnn"
+domain_name = "ferry"
+loss_name = "levinloss"
+arch_name = "levinasnet"
 """
 
 @main function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
 		dense_dim::Int = 32, dense_layers::Int = 2, residual::String = "none", seed::Int = 1)
 	Random.seed!(seed)
 	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, dense_dim, dense_layers, residual, seed)
-	archs = Dict("asnet" => ASNet, "pddl" => HyperExtractor, "hgnnlite" => HGNNLite, "hgnn" => HGNN)
+	@show settings
+	archs = Dict("asnet" => ASNet, "pddl" => HyperExtractor, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
 	residual = Symbol(residual)
 	domain_pddl, problem_files = getproblem(domain_name, false)
 	# problem_files = filter(s -> isfile(plan_file(domain_name, s)), problem_files)
@@ -115,3 +115,4 @@ arch_name = "hgnn"
 	filename = joinpath("super", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
 	experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch; max_steps, max_time, graph_layers, residual, dense_layers, dense_dim, settings)
 end
+

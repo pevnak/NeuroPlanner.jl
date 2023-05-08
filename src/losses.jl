@@ -161,14 +161,6 @@ function LₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, st
 	LₛMiniBatch(x, H₊, H₋, path_cost, length(trajectory))
 end
 
-
-"""
-LₛLoss(x, g, H₊, H₋)
-
-Minimizes `L*` loss, We want ``f * H₋ .< f * H₊``, which means to minimize cases when ``f * H₋ .> f * H₊``
-"""
-struct LₛLoss end 
-
 function lₛloss(model, x, g, H₊, H₋, surrogate=softplus)
 	g = reshape(g, 1, :)
 	f = model(x) + g
@@ -179,10 +171,9 @@ end
 lₛloss(model, xy::LₛMiniBatch) = lₛloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋)
 lₛloss(model, xy::LₛMiniBatch, surrogate) = lₛloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋, surrogate)
 lₛloss(model, mb::NamedTuple{(:minibatch,:stats)}) = lₛloss(model, mb.minibatch)
-(l::LₛLoss)(args...) = lₛloss(args...)
 
 #############
-#	Lstar Losses
+#	LGBFS Losses
 #############
 struct LgbfsMiniBatch{X,H,Y}
 	x::X 
@@ -234,7 +225,9 @@ lgbfsloss(model, xy::LgbfsMiniBatch) = lgbfsloss(model, xy.x, xy.path_cost, xy.H
 lgbfsloss(model, xy::LgbfsMiniBatch, surrogate) = lgbfsloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋, surrogate)
 lgbfsloss(model, mb::NamedTuple{(:minibatch,:stats)}) = lgbfsloss(model, mb.minibatch)
 
-
+#########
+#	LRT loss enforcing ordering on the trajectory
+#########
 struct LRTMiniBatch{X,H,Y}
 	x::X 
 	H₊::H 
@@ -276,8 +269,6 @@ function LRTMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, tra
 	LRTMiniBatch(pddle, trajectory)
 end
 
-struct LRTLoss end 
-
 function lrtloss(model, x, g, H₊, H₋, surrogate = softplus)
 	f = model(x)
 	o = f * H₋ - f * H₊
@@ -285,11 +276,99 @@ function lrtloss(model, x, g, H₊, H₋, surrogate = softplus)
 	mean(surrogate.(o))
 end
 
-lrtloss(model, xy::LRTMiniBatch) = lrtloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋)
-lrtloss(model, xy::LRTMiniBatch, surrogate) = lrtloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋, surrogate)
-lrtloss(model, mb::NamedTuple{(:minibatch,:stats)}) = lrtloss(model, mb.minibatch)
-(l::LRTLoss)(args...) = lrtloss(args...)
+lrtloss(model, xy::LRTMiniBatch, surrogate = softplus) = lrtloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋)
 
+
+########
+#	BellmanLoss
+########
+"""
+A bellman loss function combining inequalities in the expanded actions with L2 loss 
+as proposed in 
+Ståhlberg, Simon, Blai Bonet, and Hector Geffner. "Learning Generalized Policies without Supervision Using GNNs.", 2022
+Equation (14)
+"""
+struct BellmanMiniBatch{X,H,Y}
+	x::X 
+	H₊::H 
+	H₋::H 
+	path_cost::Y
+	trajectory_states::Vector{Int}
+	cost_to_goal::Vector{Float32}
+	sol_length::Int64
+end
+
+function BellmanMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:GenericState}; goal_aware = true, max_branch = typemax(Int))
+	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem) : pddld
+	state = trajectory[1]
+	spec = Specification(problem)
+
+	stateids = Dict(hash(state) => 1)
+	states = [(g = 0, state = state)]
+	I₊ = Vector{Int64}()
+	I₋ = Vector{Int64}()
+
+	htrajectory = hash.(trajectory)
+	for i in 1:(length(trajectory)-1)
+		sᵢ, sⱼ = trajectory[i], trajectory[i+1]
+		hsⱼ = hash(sⱼ)
+		gᵢ = states[stateids[hash(sᵢ)]].g
+		next_states = _next_states(domain, problem, sᵢ, st)
+		if length(next_states) > max_branch # limit the branching factor is not excessive
+			ii = findall(s -> s.state == sⱼ, next_states)
+			ii = union(ii, sample(1:length(next_states), max_branch, replace = false))
+			next_states = next_states[ii]
+		end
+		isempty(next_states) && error("the inner node is not in the search tree")
+		for next_state in next_states
+			act = next_state.parent_action
+			act_cost = get_cost(spec, domain, sᵢ, act, next_state.state)
+			next_state.id ∈ keys(stateids) && continue
+			stateids[next_state.id] = length(stateids) + 1
+			push!(states, (;g = gᵢ + act_cost, state = next_state.state))
+		end
+		@assert hash(sⱼ) ∈ keys(stateids) "next state on the trajectory is not in the oppen list"
+
+		for s in setdiff([x.id for x in next_states], [hsⱼ])
+			push!(I₊, stateids[s])
+			push!(I₋, stateids[hsⱼ])
+		end
+	end
+	if isempty(I₊)
+		H₊ = onehotbatch([], 1:length(stateids))
+		H₋ = onehotbatch([], 1:length(stateids))
+	else
+		H₊ = onehotbatch(I₊, 1:length(stateids))
+		H₋ = onehotbatch(I₋, 1:length(stateids))
+	end
+	path_cost = [s.g for s in states]
+	x = batch([pddle(s.state) for s in states])
+	trajectory_states = [stateids[hash(s)] for s in trajectory]
+	cost_to_goal = Float32.(collect(length(trajectory):-1:1))
+	BellmanMiniBatch(x, H₊, H₋, path_cost, trajectory_states, cost_to_goal, length(trajectory))
+end
+
+function BellmanMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; goal_aware = true, max_branch = typemax(Int))
+	state = initstate(domain, problem)
+	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
+	BellmanMiniBatch(pddld, domain, problem, trajectory; goal_aware, max_branch)
+end
+
+function BellmanMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, trajectory::AbstractVector{<:GenericState}; goal_aware = true, max_branch = typemax(Int))
+	BellmanMiniBatch(pddld, domain, problem, nothing, trajectory; goal_aware, max_branch)
+end
+
+
+function bellmanloss(model, x, g, H₊, H₋, trajectory_states, cost_to_goal, surrogate=softplus)
+	f = model(x)
+	o = f * H₋ .- f * H₊
+	isempty(o) && return(zero(eltype(o)))
+	vs = cost_to_goal
+	v = f[trajectory_states]
+	mean(surrogate.(o)) + mean(max.(0, vs - v) + max.(0, v - 2*vs))
+end
+
+bellmanloss(model, xy::BellmanMiniBatch, surrogate = softplus) = bellmanloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋, xy.trajectory_states, xy.cost_to_goal)
 
 ########
 #	dispatch for loss function
@@ -298,6 +377,7 @@ loss(model, xy::L₂MiniBatch,surrogate=softplus) = l₂loss(model, xy, surrogat
 loss(model, xy::LₛMiniBatch,surrogate=softplus) = lₛloss(model, xy, surrogate)
 loss(model, xy::LgbfsMiniBatch,surrogate=softplus) = lgbfsloss(model, xy, surrogate)
 loss(model, xy::LRTMiniBatch,surrogate=softplus) = lrtloss(model, xy, surrogate)
+loss(model, xy::BellmanMiniBatch,surrogate=softplus) = bellmanloss(model, xy, surrogate)
 loss(model, xy::Tuple,surrogate=softplus) = sum(map(x -> lossfun(model, x), xy), surrogate)
 
 
@@ -308,6 +388,7 @@ function minibatchconstructor(name)
 	name == "lₛ" && return(LₛMiniBatch)
 	name == "lgbfs" && return(LgbfsMiniBatch)
 	name == "lrt" && return(LRTMiniBatch)
+	name == "bellman" && return(BellmanMiniBatch)
 	name == "levinloss" && return(LevinMiniBatch)
 	error("unknown loss $(name)")
 end

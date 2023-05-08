@@ -2,6 +2,8 @@ using Flux: Params
 using Flux.Optimise: AbstractOptimiser
 using Flux.Zygote: withgradient
 
+debug_data = nothing
+
 """
 function train!(loss, ps::Params, opt::AbstractOptimiser, minibatches, fvals, max_steps; ϵ = 0.5, max_loss = 0.0, opt_type = :worstcase, kwargs...)
 function train!(loss, ps::Params, opt::AbstractOptimiser, minibatches, fvals, mbsampler, max_steps, max_loss)
@@ -16,47 +18,55 @@ optimizes the `loss` with respect to parameters `ps` using optimiser `opt`
 opt_type --- type of optimization: either `:mean` error or `:worst`-case error
 `ϵ` --- exploration in worst-case optimization
 """
-function train!(loss, model, ps::Params, opt::AbstractOptimiser, minibatches, fvals, steps; ϵ = 0.5, max_loss = 0.0, opt_type = :worst, kwargs...)
+function train!(loss, model, ps::Params, opt::AbstractOptimiser, minibatches, fvals, steps; ϵ = 0.5, max_loss = 0.0, opt_type = :worst, debug = false, kwargs...)
 	if opt_type == :worst
 		worst_sampler() = sample_minibatch(fvals, ϵ)
-		train!(loss, model, ps, opt, minibatches, fvals, worst_sampler, steps, max_loss)
+		train!(loss, model, ps, opt, minibatches, fvals, worst_sampler, steps, max_loss, debug)
 	elseif opt_type == :mean
 		mean_sampler() = rand(1:length(minibatches))
-		train!(loss, model, ps, opt, minibatches, fvals, mean_sampler, steps, max_loss)
+		train!(loss, model, ps, opt, minibatches, fvals, mean_sampler, steps, max_loss, debug)
 	else
 		error("unknown type of optimization $(opt_type), supported is `:worst` and `:mean`")
 	end
 end
 
-function train!(loss, model, ps::Params, opt::AbstractOptimiser, minibatches, fvals, mbsampler, max_steps, max_loss)
+function train!(loss, model, ps::Params, opt::AbstractOptimiser, minibatches, fvals, mbsampler, max_steps, max_loss, debug )
 	for _ in 1:max_steps
 		j = mbsampler()
 		d = prepare_minibatch(minibatches[j])
 		l, gs = withgradient(() -> loss(model, d), ps)
 		!isfinite(l) && error("Loss is $l on data item $j")
-		# serialize("/tmp/debug.jls",(model, d))
 		fvals[j] = l
+		if debug 
+			@show l
+			global debug_data
+			debug_data = deepcopy((model, d))
+			isinvalid(gs) && error("gradient is isinvalid")
+		end
 		Flux.Optimise.update!(opt, ps, gs)
-		# any(any(isnan.(p)) for p in ps) && error("nan in parameters")
-		# any(any(isinf.(p)) for p in ps) && error("inf in parameters")
 		all(l ≤ max_loss for l in fvals) && break
 	end
 	fvals
 end
 
-function train!(loss, model, ps::Params, opt::AbstractOptimiser, prepare_minibatch, max_steps; reset_fval = 1000, verbose = true, stop_fval=typemin(Float64), logger = nothing, trn_data = [])
+function train!(loss, model, ps::Params, opt::AbstractOptimiser, prepare_minibatch, max_steps; reset_fval = 1000, verbose = true, stop_fval=typemin(Float64), logger = nothing, trn_data = [], debug = false)
 	fval, n = 0.0, 0
 	last_fval = nothing
 	for i in 1:max_steps
+		global debug_data
 		d = prepare_minibatch()
 		l, gs = withgradient(() -> loss(model, d), ps)
+		if debug 
+			@show l
+			global debug_data
+			debug_data = deepcopy((model, d))
+			isinvalid(gs) && error("gradient is isinvalid")
+		end
 		!isfinite(l) && error("Loss is $l on data item")
 		fval += l
 		n += 1
-		# serialize("/tmp/debug.jls",(model, d))
+		# serialize("/home/tomas.pevny/tmp/debug.jls",(model, d))
 		Flux.Optimise.update!(opt, ps, gs)
-		# any(any(isnan.(p)) for p in ps) && error("nan in parameters")
-		# any(any(isinf.(p)) for p in ps) && error("inf in parameters")
 		if mod(i, reset_fval) == 0
 			last_fval = fval / n
 			verbose && println(i,": ", round(last_fval, digits = 3))
@@ -100,7 +110,3 @@ isinvalid(x::Number) = isinf(x) || isnan(x)
 isinvalid(x::Tuple) = any(map(isinvalid, x))
 isinvalid(x::NamedTuple) = any(map(isinvalid, x))
 isinvalid(x::Nothing) = false
-
-function isinvalid(l::NamedTuple{(:dense_x, :dense_e, :bias, :a, :σ, :negative_slope, :channel, :heads, :concat, :add_self_loops)})
-	any(map(isinvalid,( l.dense_x, l.dense_e, l.bias, l.a)))
-end

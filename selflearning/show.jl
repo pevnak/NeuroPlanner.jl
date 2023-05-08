@@ -12,9 +12,8 @@ using PrettyTables
 function lexargmax(a, b)
 	@assert length(a) == length(b)
 	function _lt(i,j)
-		a[i] < a[j] && return(true)
 		a[i] == a[j] && return(b[i] < b[j])
-		return(false)
+		a[i] < a[j]
 	end
 	first(sort(1:length(a), lt = _lt, rev = true))
 end
@@ -35,8 +34,8 @@ function show_stats(combined_stats, key)
 
 					# i = subsub_df[argmax(subsub_df.tst_solved_fold1),k2]
 					# j = subsub_df[argmax(subsub_df.tst_solved_fold2),k1]
-					i = subsub_df[lexargmax(subsub_df.tst_solved_fold1, -subsub_df.expanded_fold1),k2]
-					j = subsub_df[lexargmax(subsub_df.tst_solved_fold2, -subsub_df.expanded_fold2),k1]
+					i = subsub_df[lexargmax(subsub_df.tst_solved_fold1, -subsub_df.sol_length_fold1),k2]
+					j = subsub_df[lexargmax(subsub_df.tst_solved_fold2, -subsub_df.sol_length_fold2),k1]
 					(i+j) / 2
 				end |> mean
 				DataFrame("$ln $an" => [v])
@@ -128,7 +127,13 @@ dense_layers = 2
 seed = 1
 problems = ["blocks","ferry","npuzzle","gripper", "spanner","elevators_00","elevators_11"]
 # stats = map(Iterators.product(("asnet","pddl", "hgnnlite", "hgnn"), ("lstar","l2","lrt","lgbfs"), problems, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
-stats = map(Iterators.product(("hgnn",), ("lstar","l2","lrt","lgbfs"), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+stats = map(Iterators.product(("levinasnet",), ("levinloss",), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+	# submit_missing(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
+	read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
+end;
+df = reduce(vcat, filter(!isempty, vec(stats)))
+
+stats = map(Iterators.product(("hgnn",), ("bellman",), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
 	# submit_missing(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
 	read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
 end;
@@ -154,12 +159,13 @@ combined_stats = combine(gdf) do sub_df
 	)
 end
 
-# dd = show_stats(filter(r -> r.planner == "GreedyPlanner", combined_stats), :tst_solved)
 dd = show_stats(filter(r -> r.planner == "AStarPlanner", combined_stats), :tst_solved)
-ii = filter(s -> endswith(s,"hgnn"), names(dd))
-dd[:,["domain_name",ii...]]
 
-ii = filter(s -> endswith(s,"pddl"), names(dd))
+# dd = show_stats(filter(r -> r.planner == "GreedyPlanner", combined_stats), :tst_solved)
+# dd = show_stats(filter(r -> r.planner == "AStarPlanner", combined_stats), :tst_solved)
+ii = filter(s -> endswith(s,"hgnn"), names(dd));
 dd[:,["domain_name",ii...]]
-ii = filter(s -> endswith(s,"asnet"), names(dd))
+ii = filter(s -> endswith(s,"asnet"), names(dd));
+dd[:,["domain_name",ii...]]
+ii = filter(s -> endswith(s,"pddl"), names(dd));
 dd[:,["domain_name",ii...]]

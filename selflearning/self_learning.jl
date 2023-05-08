@@ -118,8 +118,8 @@ planner_name = "astar"
 		max_epochs::Int = 10, max_sim_time::Int = Int(23.5*3600))
 	Random.seed!(seed)
 	settings = (;domain_name, arch_name, loss_name, planner_name, max_steps, max_time, graph_layers, dense_dim, dense_layers, residual, opt_type, epsilon, max_loss, sort_by_complexity, artificial_goals, double_maxtime, solve_solved, stop_after, seed)
-	archs = Dict("asnet" => ASNet, "pddl" => HyperExtractor, "hgnnlite" => HGNNLite, "hgnn" => HGNN)
-	planners = Dict("astar" => AStarPlanner,)
+	archs = Dict("asnet" => ASNet, "pddl" => HyperExtractor, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
+	planners = Dict("astar" => AStarPlanner, "bfs" => BFSPlanner,)
 	planner = planners[planner_name]
 	residual = Symbol(residual)
 	domain_pddl, problem_files = getproblem(domain_name, false)
