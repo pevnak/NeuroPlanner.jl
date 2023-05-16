@@ -45,11 +45,14 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 
 		logger=tblogger(filename*"_events.pb")
 		t = @elapsed minibatches = map(train_files) do problem_file
+			@show problem_file
 			println("creating sample from problem: ",problem_file)
 			plan = load_plan(problem_file)
 			problem = load_problem(problem_file)
 			ds = fminibatch(pddld, domain, problem, plan)
-			@set ds.x = deduplicate(ds.x)
+			dedu = @set ds.x = deduplicate(ds.x)
+			println("original: ",Base.summarysize(ds), " dedupped: ", Base.summarysize(dedu))
+			dedu
 		end
 		log_value(logger, "time_minibatch", t; step=0)
 		opt = AdaBelief();

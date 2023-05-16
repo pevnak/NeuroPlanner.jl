@@ -288,12 +288,11 @@ as proposed in
 Ståhlberg, Simon, Blai Bonet, and Hector Geffner. "Learning Generalized Policies without Supervision Using GNNs.", 2022
 Equation (14)
 """
-struct BellmanMiniBatch{X,H,Y}
+struct BellmanMiniBatch{X,Y}
 	x::X 
-	H₊::H 
-	H₋::H 
 	path_cost::Y
 	trajectory_states::Vector{Int}
+	child_states::Vector{Vector{Int}}
 	cost_to_goal::Vector{Float32}
 	sol_length::Int64
 end
@@ -305,8 +304,8 @@ function BellmanMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem,
 
 	stateids = Dict(hash(state) => 1)
 	states = [(g = 0, state = state)]
-	I₊ = Vector{Int64}()
-	I₋ = Vector{Int64}()
+	trajectory_states = Vector{Int}()
+	child_states = Vector{Vector{Int}}()
 
 	htrajectory = hash.(trajectory)
 	for i in 1:(length(trajectory)-1)
@@ -329,23 +328,13 @@ function BellmanMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem,
 		end
 		@assert hash(sⱼ) ∈ keys(stateids) "next state on the trajectory is not in the oppen list"
 
-		for s in setdiff([x.id for x in next_states], [hsⱼ])
-			push!(I₊, stateids[s])
-			push!(I₋, stateids[hsⱼ])
-		end
-	end
-	if isempty(I₊)
-		H₊ = onehotbatch([], 1:length(stateids))
-		H₋ = onehotbatch([], 1:length(stateids))
-	else
-		H₊ = onehotbatch(I₊, 1:length(stateids))
-		H₋ = onehotbatch(I₋, 1:length(stateids))
+		push!(child_states, [stateids[x.id] for x in next_states])
 	end
 	path_cost = [s.g for s in states]
 	x = batch([pddle(s.state) for s in states])
 	trajectory_states = [stateids[hash(s)] for s in trajectory]
 	cost_to_goal = Float32.(collect(length(trajectory):-1:1))
-	BellmanMiniBatch(x, H₊, H₋, path_cost, trajectory_states, cost_to_goal, length(trajectory))
+	BellmanMiniBatch(x, path_cost, trajectory_states, child_states, cost_to_goal, length(trajectory))
 end
 
 function BellmanMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; goal_aware = true, max_branch = typemax(Int))
@@ -359,16 +348,19 @@ function BellmanMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem,
 end
 
 
-function bellmanloss(model, x, g, H₊, H₋, trajectory_states, cost_to_goal, surrogate=softplus)
+function bellmanloss(model, x, g, trajectory_states, child_states, cost_to_goal, surrogate=softplus)
 	f = model(x)
-	o = f * H₋ .- f * H₊
-	isempty(o) && return(zero(eltype(o)))
-	vs = cost_to_goal
 	v = f[trajectory_states]
-	mean(surrogate.(o)) + mean(max.(0, vs - v) + max.(0, v - 2*vs))
+	vs = cost_to_goal
+	reg = mean(max.(0, vs - v) + max.(0, v - 2*vs))
+	isempty(child_states) && return(reg)
+	h = map(1:length(child_states)) do i 
+		max(1 + minimum(f[child_states[i]]) - f[trajectory_states[i]], 0)
+	end
+	mean(h) + reg 
 end
 
-bellmanloss(model, xy::BellmanMiniBatch, surrogate = softplus) = bellmanloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋, xy.trajectory_states, xy.cost_to_goal)
+bellmanloss(model, xy::BellmanMiniBatch, surrogate = softplus) = bellmanloss(model, xy.x, xy.path_cost, xy.trajectory_states, xy.child_states, xy.cost_to_goal)
 
 ########
 #	dispatch for loss function
