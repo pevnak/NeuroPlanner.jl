@@ -286,7 +286,7 @@ lrtloss(model, xy::LRTMiniBatch, surrogate = softplus) = lrtloss(model, xy.x, xy
 A bellman loss function combining inequalities in the expanded actions with L2 loss 
 as proposed in 
 Ståhlberg, Simon, Blai Bonet, and Hector Geffner. "Learning Generalized Policies without Supervision Using GNNs.", 2022
-Equation (14)
+Equation (15)
 """
 struct BellmanMiniBatch{X,Y}
 	x::X 
