@@ -106,6 +106,43 @@ function accomodate_leah_plans(problem_name)
 	end
 end
 
+function merge_ferber_problems(problem_name)
+	benchdir(s...) = joinpath("benchmarks", problem_name, s...)
+	domain_pddl = benchdir("domain.pddl")
+	problem_files = filter(s -> endswith(s, ".pddl") && (s != "domain.pddl"), readdir(benchdir()))
+	sdir(s...) = joinpath("..","domains",problem_name, s...)
+	!isdir(sdir()) && mkpath(sdir())
+	run(`cp $(domain_pddl) $(sdir("domain.pddl"))`)
+	for ifile in problem_files
+		ofile = sdir(ifile)
+		run(`cp $(benchdir(ifile)) $(ofile)`)
+		pfile = benchdir("sol"*ifile[5:end-5])
+		if isfile(pfile)
+			run(`cp $(pfile) $(sdir(plan_file(ifile)))`)
+		end
+	end
+end
+
+hashfile(f) = open(hash ∘ read, f, "r")
+
+function merge_ferber_problems()
+	domains = filter(s -> isdir("../ferber/"*s), readdir("../ferber/"))
+	for domain in domains
+		sub_problems = filter(s -> isdir(joinpath("../ferber", domain, s)), readdir("../ferber/"*domain))
+		domain_files = unique(hashfile, joinpath("../ferber", domain, sub_problem,"domain.pddl") for sub_problem in sub_problems); 
+		length(domain_files) == 1 || println("domain.pddl files in $(domain)  are different")
+		ispath("../domains/$(domain)") && error("$(domain) exists")
+		mkpath("../domains/$(domain)")
+		run(`cp $(joinpath("../ferber", domain, first(sub_problems),"domain.pddl")) ../domains/$(domain)/domain.pddl`)
+		for sub_problem in sub_problems
+			for s in readdir(joinpath("../ferber", domain, sub_problem))
+				match(r"^p[0-9]+.pddl", s) === nothing && continue
+				run(`cp $(joinpath("../ferber", domain, sub_problem,s)) ../domains/$(domain)/$(sub_problem)_$(s)`)
+			end
+		end
+	end
+end
+
 
 function _parse_plan(domain, problem_file, plan_file)
 	problem = load_problem(problem_file)
