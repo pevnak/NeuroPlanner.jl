@@ -1,23 +1,30 @@
-struct HGNN{DO,TO,P<:Union{Dict,Nothing},KB<:Union{Nothing, KnowledgeBase},G<:Union{Nothing,Matrix}}
+struct HGNN{DO,TO,MP<:NamedTuple, P<:Union{Dict,Nothing},KB<:Union{Nothing, KnowledgeBase},S<:Union{Nothing,Matrix},G<:Union{Nothing,Matrix}}
 	domain::DO
 	type2obs::TO
-	model_params::NamedTuple{(:message_passes, :residual, :lite), Tuple{Int64, Symbol, Bool}}
+	model_params::MP
 	predicate2id::P
 	kb::KB
+	start::S
 	goal::G
+
+	function HGNN(domain::DO, type2obs::TO, model_params::MP, predicate2id::P, kb::KB, start::S, goal::G) where {DO,TO,MP<:NamedTuple,P,KB,S,G}
+		@assert issubset((:message_passes, :residual, :lite), keys(model_params)) "Parameters of the model are not fully specified"
+		@assert (start === nothing || goal === nothing)  "Fixing start and goal state is bizzaare, as the extractor would always create a constant"
+		new{DO,TO,MP,P,KB,S,G}(domain, type2obs, model_params, predicate2id, kb, start, goal)
+	end
 end
 
 isspecialized(ex::HGNN) = (ex.predicate2id !== nothing) && (ex.kb !== nothing)
-hasgoal(ex::HGNN) = ex.goal !== nothing
+hasgoal(ex::HGNN) = ex.start !== nothing || ex.goal !== nothing
 
 function HGNNLite(domain; message_passes = 2, residual = :linear)
 	model_params = (;message_passes, residual, lite = true)
-	HGNN(domain, nothing, model_params, nothing, nothing, nothing)
+	HGNN(domain, nothing, model_params, nothing, nothing, nothing, nothing)
 end
 
 function HGNN(domain; message_passes = 2, residual = :linear, lite = true)
 	model_params = (;message_passes, residual, lite = false)
-	HGNN(domain, nothing, model_params, nothing, nothing, nothing)
+	HGNN(domain, nothing, model_params, nothing, nothing, nothing, nothing)
 end
 
 function Base.show(io::IO, ex::HGNN)
@@ -38,7 +45,7 @@ function specialize(ex::HGNN, problem)
 		allgrounding(problem, p, type2obs)
 	end
 	predicate2id = Dict(reverse.(enumerate(predicates)))
-	ex = HGNN(ex.domain, type2obs, ex.model_params, predicate2id, nothing, nothing)
+	ex = HGNN(ex.domain, type2obs, ex.model_params, predicate2id, nothing, nothing, nothing)
 
 	# just add fake input for a se to have something, it does not really matter what
 	n = length(predicate2id)
@@ -57,19 +64,29 @@ function specialize(ex::HGNN, problem)
 	s = last(keys(kb))
 	kb = append(kb, :o, BagNode(ArrayNode(KBEntry(s, 1:n)), [1:n]))
 
-	HGNN(ex.domain, type2obs, ex.model_params, predicate2id, kb, nothing)
+	HGNN(ex.domain, type2obs, ex.model_params, predicate2id, kb, nothing, nothing)
 end
 
 function add_goalstate(ex::HGNN, problem, goal = goalstate(ex.domain, problem))
 	ex = isspecialized(ex) ? ex : specialize(ex, problem) 
 	x = encode_input(ex, goal)
-	HGNN(ex.domain, ex.type2obs, ex.model_params, ex.predicate2id, ex.kb, x)
+	HGNN(ex.domain, ex.type2obs, ex.model_params, ex.predicate2id, ex.kb, nothing, x)
+end
+
+function add_startstate(ex::HGNN, problem, start = initstate(ex.domain, problem))
+	ex = isspecialized(ex) ? ex : specialize(ex, problem) 
+	x = encode_input(ex, start)
+	HGNN(ex.domain, ex.type2obs, ex.model_params, ex.predicate2id, ex.kb, x, nothing)
 end
 
 function (ex::HGNN)(state)
 	x = encode_input(ex::HGNN, state)
-	if hasgoal(ex)
+	if ex.goal !== nothing
 		x = vcat(x, ex.goal)
+	end 
+
+	if ex.start !== nothing
+		x = vcat(ex.start, x)
 	end 
 	kb = ex.kb
 	kb = @set kb.kb.pred_1 = x 
