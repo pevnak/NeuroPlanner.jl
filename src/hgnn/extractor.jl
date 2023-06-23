@@ -4,18 +4,18 @@ struct HGNN{DO,TO,MP<:NamedTuple, P<:Union{Dict,Nothing},KB<:Union{Nothing, Know
 	model_params::MP
 	predicate2id::P
 	kb::KB
-	start::S
-	goal::G
+	init_state::S
+	goal_state::G
 
-	function HGNN(domain::DO, type2obs::TO, model_params::MP, predicate2id::P, kb::KB, start::S, goal::G) where {DO,TO,MP<:NamedTuple,P,KB,S,G}
+	function HGNN(domain::DO, type2obs::TO, model_params::MP, predicate2id::P, kb::KB, init::S, goal::G) where {DO,TO,MP<:NamedTuple,P,KB,S,G}
 		@assert issubset((:message_passes, :residual, :lite), keys(model_params)) "Parameters of the model are not fully specified"
-		@assert (start === nothing || goal === nothing)  "Fixing start and goal state is bizzaare, as the extractor would always create a constant"
-		new{DO,TO,MP,P,KB,S,G}(domain, type2obs, model_params, predicate2id, kb, start, goal)
+		@assert (init === nothing || goal === nothing)  "Fixing init and goal state is bizzaare, as the extractor would always create a constant"
+		new{DO,TO,MP,P,KB,S,G}(domain, type2obs, model_params, predicate2id, kb, init, goal)
 	end
 end
 
 isspecialized(ex::HGNN) = (ex.predicate2id !== nothing) && (ex.kb !== nothing)
-hasgoal(ex::HGNN) = ex.start !== nothing || ex.goal !== nothing
+hasgoal(ex::HGNN) = ex.init_state !== nothing || ex.goal_state !== nothing
 
 function HGNNLite(domain; message_passes = 2, residual = :linear)
 	model_params = (;message_passes, residual, lite = true)
@@ -69,31 +69,31 @@ end
 
 function add_goalstate(ex::HGNN, problem, goal = goalstate(ex.domain, problem))
 	ex = isspecialized(ex) ? ex : specialize(ex, problem) 
-	x = encode_input(ex, goal)
+	x = encode_state(ex, goal)
 	HGNN(ex.domain, ex.type2obs, ex.model_params, ex.predicate2id, ex.kb, nothing, x)
 end
 
-function add_startstate(ex::HGNN, problem, start = initstate(ex.domain, problem))
+function add_initstate(ex::HGNN, problem, init = initstate(ex.domain, problem))
 	ex = isspecialized(ex) ? ex : specialize(ex, problem) 
-	x = encode_input(ex, start)
+	x = encode_state(ex, init)
 	HGNN(ex.domain, ex.type2obs, ex.model_params, ex.predicate2id, ex.kb, x, nothing)
 end
 
 function (ex::HGNN)(state)
-	x = encode_input(ex::HGNN, state)
-	if ex.goal !== nothing
-		x = vcat(x, ex.goal)
+	x = encode_state(ex::HGNN, state)
+	if ex.goal_state !== nothing
+		x = vcat(x, ex.goal_state)
 	end 
 
-	if ex.start !== nothing
-		x = vcat(ex.start, x)
+	if ex.init_state !== nothing
+		x = vcat(ex.init_state, x)
 	end 
 	kb = ex.kb
 	kb = @set kb.kb.pred_1 = x 
 	kb
 end
 
-function encode_input(ex::HGNN, state)
+function encode_state(ex::HGNN, state)
 	@assert isspecialized(ex) "Extractor is not specialized for a problem instance"
 	x = zeros(Float32, 1, length(ex.predicate2id))
 	for p in PDDL.get_facts(state)

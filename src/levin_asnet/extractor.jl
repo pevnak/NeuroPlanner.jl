@@ -93,11 +93,11 @@ end
 
 function add_goalstate(ex::LevinASNet, problem, goal = goalstate(ex.domain, problem))
 	ex = isspecialized(ex) ? ex : specialize(ex, problem) 
-	x = encode_input(ex, goal)
+	x = encode_state(ex, goal)
 	LevinASNet(ex.domain, ex.type2obs, ex.model_params, ex.predicate2id, ex.action2id, ex.kb, x)
 end
 
-function encode_input(ex::LevinASNet, state)
+function encode_state(ex::LevinASNet, state)
 	@assert isspecialized(ex) "Extractor is not specialized for a problem instance"
 	x = zeros(Float32, 1, length(ex.predicate2id))
 	for p in PDDL.get_facts(state)
@@ -126,7 +126,7 @@ function MLUtils.batch(xs::Vector{<:LevinState})
 end
 
 function (ex::LevinASNet)(state)
-	x = encode_input(ex, state)
+	x = encode_state(ex, state)
 	if hasgoal(ex)
 		x = vcat(x, ex.goal)
 	end 

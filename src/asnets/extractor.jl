@@ -1,18 +1,26 @@
-struct ASNet{DO,TO,P<:Union{Dict,Nothing},KB<:Union{Nothing, KnowledgeBase},G<:Union{Nothing,Matrix}}
+struct ASNet{DO,TO,MP<:NamedTuple, P<:Union{Dict,Nothing},KB<:Union{Nothing, KnowledgeBase},S<:Union{Nothing,Matrix},G<:Union{Nothing,Matrix}}
 	domain::DO
 	type2obs::TO
-	model_params::NamedTuple{(:message_passes, :residual), Tuple{Int64, Symbol}}
+	model_params::MP
 	predicate2id::P
 	kb::KB
-	goal::G
+	init_state::S
+	goal_state::G
+
+	function ASNet(domain::DO, type2obs::TO, model_params::MP, predicate2id::P, kb::KB, init::S, goal::G) where {DO,TO,MP<:NamedTuple,P,KB,S,G}
+		@assert issubset((:message_passes, :residual), keys(model_params)) "Parameters of the model are not fully specified"
+		@assert (init === nothing || goal === nothing)  "Fixing init and goal state is bizzaare, as the extractor would always create a constant"
+		new{DO,TO,MP,P,KB,S,G}(domain, type2obs, model_params, predicate2id, kb, init, goal)
+	end
 end
 
+
 isspecialized(ex::ASNet) = (ex.predicate2id !== nothing) && (ex.kb !== nothing)
-hasgoal(ex::ASNet) = ex.goal !== nothing
+hasgoal(ex::ASNet) = ex.goal_state !== nothing || ex.init_state !== nothing
 
 function ASNet(domain; message_passes = 2, residual = :linear)
 	model_params = (;message_passes, residual)
-	ASNet(domain, nothing, model_params, nothing, nothing, nothing)
+	ASNet(domain, nothing, model_params, nothing, nothing, nothing, nothing)
 end
 
 function Base.show(io::IO, ex::ASNet)
@@ -33,7 +41,7 @@ function specialize(ex::ASNet, problem)
 		allgrounding(problem, p, type2obs)
 	end
 	predicate2id = Dict(reverse.(enumerate(predicates)))
-	ex = ASNet(ex.domain, type2obs, ex.model_params, predicate2id, nothing, nothing)
+ex = ASNet(ex.domain, type2obs, ex.model_params, predicate2id, nothing, nothing, nothing)
 
 	# just add fake input for a se to have something, it does not really matter what
 	n = length(predicate2id)
@@ -51,7 +59,7 @@ function specialize(ex::ASNet, problem)
 	s = last(keys(kb))
 	kb = append(kb, :o, BagNode(ArrayNode(KBEntry(s, 1:n)), [1:n]))
 
-	ASNet(ex.domain, type2obs, ex.model_params, predicate2id, kb, nothing)
+	ASNet(ex.domain, type2obs, ex.model_params, predicate2id, kb, nothing, nothing)
 end
 
 """
@@ -111,23 +119,33 @@ function type2objects(domain, problem)
 	type2obs
 end
 
-function add_goalstate(ex::ASNet, problem, goal = goalstate(ex.domain, problem))
+function add_goalstate(ex::ASNet, problem, state = goalstate(ex.domain, problem))
 	ex = isspecialized(ex) ? ex : specialize(ex, problem) 
-	x = encode_input(ex, goal)
-	ASNet(ex.domain, ex.type2obs, ex.model_params, ex.predicate2id, ex.kb, x)
+	x = encode_state(ex, state)
+	ASNet(ex.domain, ex.type2obs, ex.model_params, ex.predicate2id, ex.kb, nothing, x)
+end
+
+function add_initstate(ex::ASNet, problem, state = initstate(ex.domain, problem))
+	ex = isspecialized(ex) ? ex : specialize(ex, problem) 
+	x = encode_state(ex, state)
+	ASNet(ex.domain, ex.type2obs, ex.model_params, ex.predicate2id, ex.kb, x, nothing)
 end
 
 function (ex::ASNet)(state)
-	x = encode_input(ex::ASNet, state)
-	if hasgoal(ex)
-		x = vcat(x, ex.goal)
+	x = encode_state(ex::ASNet, state)
+	if ex.goal_state !== nothing
+		x = vcat(x, ex.goal_state)
+	end 
+
+	if ex.init_state !== nothing
+		x = vcat(ex.init_state, x)
 	end 
 	kb = ex.kb
 	kb = @set kb.kb.x1 = x 
 	kb
 end
 
-function encode_input(ex::ASNet, state)
+function encode_state(ex::ASNet, state)
 	@assert isspecialized(ex) "Extractor is not specialized for a problem instance"
 	x = zeros(Float32, 1, length(ex.predicate2id))
 	for p in PDDL.get_facts(state)

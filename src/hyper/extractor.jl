@@ -28,16 +28,26 @@ vertex corresponding to the hyper-edge and its vertices.
 --- `constmap` maps constants to an index in one-hot encoded vertex' properties 
 --- `model_params` some parameters of an algorithm constructing the message passing passes 
 """
-struct HyperExtractor{DO,D,N,G}
+struct HyperExtractor{DO,D,N,MP,S,G}
 	domain::DO
 	multiarg_predicates::NTuple{N,Symbol}
 	nunanary_predicates::Dict{Symbol,Int64}
 	objtype2id::Dict{Symbol,Int64}
 	constmap::Dict{Symbol, Int64}
-	model_params::NamedTuple{(:message_passes, :residual), Tuple{Int64, Symbol}}
+	model_params::MP
 	obj2id::D
-	goal::G
+	init_state::S
+	goal_state::G
+	function HyperExtractor(domain::DO, multiarg_predicates::NTuple{N,Symbol}, nunanary_predicates::Dict{Symbol,Int64}, objtype2id::Dict{Symbol,Int64},constmap::Dict{Symbol,Int64},model_params::MP,obj2id::D, init::S, goal::G) where {DO,D,N,MP<:NamedTuple,S,G}
+		@assert issubset((:message_passes, :residual), keys(model_params)) "Parameters of the model are not fully specified"
+		@assert (init === nothing || goal === nothing)  "Fixing init and goal state is bizzaare, as the extractor would always create a constant"
+		new{DO,D,N,MP,S,G}(domain, multiarg_predicates, nunanary_predicates , objtype2id ,constmap ,model_params,obj2id, init, goal)
+	end
 end
+
+HyperExtractorNoGoal{DO,D,N,MP} = HyperExtractor{DO,D,N,MP,Nothing, Nothing} where {DO,D,N,MP}
+HyperExtractorStart{DO,D,N,MP,S} = HyperExtractor{DO,D,N,MP,S, Nothing} where {DO,D,N,MP,S<:KnowledgeBase}
+HyperExtractorGoal{DO,D,N,MP,S} = HyperExtractor{DO,D,N,MP,Nothing,S} where {DO,D,N,MP,S<:KnowledgeBase}
 
 function HyperExtractor(domain; message_passes = 2, residual = :linear, kwargs...)
 	model_params = (;message_passes, residual)
@@ -47,14 +57,11 @@ function HyperExtractor(domain; message_passes = 2, residual = :linear, kwargs..
 	nunanary_predicates = dictmap([kv[1] for kv in predicates if length(kv[2].args) ≤  1])
 	objtype2id = Dict(s => i + length(nunanary_predicates) for (i, s) in enumerate(collect(keys(domain.typetree))))
 	constmap = Dict{Symbol,Int}(dictmap([x.name for x in domain.constants]))
-	HyperExtractor(domain, multiarg_predicates, nunanary_predicates, objtype2id, constmap, model_params, nothing, nothing)
+	HyperExtractor(domain, multiarg_predicates, nunanary_predicates, objtype2id, constmap, model_params, nothing, nothing, nothing)
 end
 
-NoProblemNoGoalHE{DO,N} = HyperExtractor{DO,Nothing,N,Nothing} where {DO,N}
-ProblemNoGoalHE{DO,N} = HyperExtractor{DO,D,N,Nothing} where {DO,D<:Dict,N}
-
 isspecialized(ex::HyperExtractor) = ex.obj2id !== nothing
-hasgoal(ex::HyperExtractor) = ex.goal !== nothing
+hasgoal(ex::HyperExtractor) = ex.init_state !== nothing || ex.goal_state !== nothing
 
 
 function HyperExtractor(domain, problem; embed_goal = true, kwargs...)
@@ -63,9 +70,14 @@ function HyperExtractor(domain, problem; embed_goal = true, kwargs...)
 	embed_goal ? add_goalstate(ex, problem) : ex
 end
 
-Base.show(io::IO, ex::NoProblemNoGoalHE) = print(io, "Unspecialized extractor for ", ex.domain.name, " (", length(ex.nunanary_predicates), ", ", length(ex.multiarg_predicates),")")
-Base.show(io::IO, ex::ProblemNoGoalHE) = print(io, "Specialized extractor without goal for ",ex.domain.name," (", length(ex.nunanary_predicates),", ",length(ex.multiarg_predicates),", ",length(ex.obj2id),")")
-Base.show(io::IO, ex::HyperExtractor) = print(io, "Specialized extractor with goal for ",ex.domain.name," (", length(ex.nunanary_predicates),", ",length(ex.multiarg_predicates),", ",length(ex.obj2id),")")
+function Base.show(io::IO, ex::HyperExtractor)
+	if !isspecialized(ex)
+		print(io, "Unspecialized extractor for ", ex.domain.name, " (", length(ex.nunanary_predicates), ", ", length(ex.multiarg_predicates),")")
+	else
+		g = hasgoal(ex) ? "with" : "without"
+		print(io, "Specialized extractor ",g," goal for ",ex.domain.name," (", length(ex.nunanary_predicates),", ",length(ex.multiarg_predicates),", ",length(ex.obj2id),")")
+	end
+end
 
 """
 specialize(ex::HyperExtractor{<:Nothing,<:Nothing}, problem)
@@ -79,10 +91,16 @@ function specialize(ex::HyperExtractor, problem)
 	for k in keys(ex.constmap)
 		obj2id[k] = length(obj2id) + 1
 	end
-	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.constmap, ex.model_params, obj2id, nothing)
+	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.constmap, ex.model_params, obj2id, nothing, nothing)
 end
 
 function (ex::HyperExtractor)(state::GenericState)
+	prefix = (ex.goal_state !== nothing) ? :start : ((ex.init_state !== nothing) ? :goal : nothing)
+	kb = encode_state(ex, state, prefix)
+	addgoal(ex, kb)
+end
+
+function encode_state(ex::HyperExtractor, state::GenericState, prefix = nothing)
 	message_passes, residual = ex.model_params
 	x = nunary_predicates(ex, state)
 	kb = KnowledgeBase((;x1 = x))
@@ -91,7 +109,7 @@ function (ex::HyperExtractor)(state::GenericState)
 	if !isempty(ex.multiarg_predicates)
 		for i in 1:message_passes
 			input_to_gnn = last(keys(kb))
-			ds = multi_predicates(ex, input_to_gnn, state)
+			ds = multi_predicates(ex, input_to_gnn, state, prefix)
 			kb = append(kb, layer_name(kb, "gnn"), ds)
 			if residual !== :none #if there is a residual connection, add it 
 				kb = add_residual_layer(kb, keys(kb)[end-1:end], n)
@@ -100,7 +118,6 @@ function (ex::HyperExtractor)(state::GenericState)
 	end
 	s = last(keys(kb))
 	kb = append(kb, :o, BagNode(ArrayNode(KBEntry(s, 1:n)), [1:n]))
-	addgoal(ex, kb)
 end
 
 """
@@ -165,14 +182,15 @@ function nunary_predicates(ex::HyperExtractor, state)
 	x
 end
 
-function multi_predicates(ex::HyperExtractor, kid::Symbol, state)
+function multi_predicates(ex::HyperExtractor, kid::Symbol, state, prefix = nothing)
 	# Then, we specify the predicates the dirty way
 	ks = ex.multiarg_predicates
 	xs = map(ks) do k 
 		preds = filter(f -> f.name == k, get_facts(state))
 		encode_predicates(ex, k, preds,  kid)
 	end
-	ProductNode(NamedTuple{ks}(xs))
+	ns = isnothing(prefix) ? ks : tuple([Symbol(prefix,"_",k) for k in ks]...)
+	ProductNode(NamedTuple{ns}(xs))
 end
 
 function encode_predicates(ex::HyperExtractor, pname::Symbol, preds, kid::Symbol)
@@ -197,31 +215,32 @@ end
 
 function add_goalstate(ex::HyperExtractor, problem, goal = goalstate(ex.domain, problem))
 	ex = isspecialized(ex) ? ex : specialize(ex, problem) 
-	exg = ex(goal)
-	
-	# we need to add goal as a new predicate
-	ks = keys(exg.kb)
-	gp = map(ks) do k
-		eg = exg[k]
-		if eg isa ProductNode{<:NamedTuple{ex.multiarg_predicates}}
-			ns = map(s -> Symbol("goal_$(s)"), keys(eg.data))
-			return(ProductNode(NamedTuple{ns}(values(eg.data))))
-		else 
-			return(eg)
-		end
-	end
-	exg = KnowledgeBase(NamedTuple{ks}(tuple(gp...)))
-
-	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.constmap, ex.model_params, ex.obj2id, exg)
+	exg = encode_state(ex, goal, :goal)
+	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.constmap, ex.model_params, ex.obj2id, nothing, exg)
 end
 
-addgoal(ex::ProblemNoGoalHE, kb::KnowledgeBase) = kb
+function add_initstate(ex::HyperExtractor, problem, start = initstate(ex.domain, problem))
+	ex = isspecialized(ex) ? ex : specialize(ex, problem) 
+	exg = encode_state(ex, start, :start)
+	HyperExtractor(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.constmap, ex.model_params, ex.obj2id, exg, nothing)
+end
 
-function addgoal(ex, kb1::KnowledgeBase{KX,V1}) where {KX, V1}
-	kb2 = ex.goal
+function addgoal(ex::HyperExtractorStart, kb::KnowledgeBase)
+	return(stack_hypergraphs(ex.init_state, kb))
+end
+
+function addgoal(ex::HyperExtractorGoal, kb::KnowledgeBase)
+	return(stack_hypergraphs(kb, ex.goal_state))
+end
+
+function addgoal(ex::HyperExtractorNoGoal, kb::KnowledgeBase)
+	return(kb)
+end
+
+function stack_hypergraphs(kb1::KnowledgeBase{KX,V1}, kb2::KnowledgeBase{KX,V2}) where {KX, V1, V2}
 	x = vcat(kb1[:x1], kb2[:x1])
 	gp = map(KX[2:end-1]) do k
-		if kb1[k] isa ProductNode{<:NamedTuple{ex.multiarg_predicates}}
+		if _isstackable(kb1[k], kb2[k])
 			ProductNode(merge(kb1[k].data, kb2[k].data))
 		else
 			kb1[k]
@@ -229,3 +248,12 @@ function addgoal(ex, kb1::KnowledgeBase{KX,V1}) where {KX, V1}
 	end
 	KnowledgeBase(NamedTuple{KX}(tuple(x, gp..., kb1.kb[end])))
 end
+
+
+"""
+Checks if two ProductNodes should be stacked on top of each other. 
+"""
+function _isstackable(ds1::ProductNode{<:NamedTuple}, ds2::ProductNode{<:NamedTuple})
+	return(true)
+end
+_isstackable(ds1, ds2) = false

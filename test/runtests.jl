@@ -8,7 +8,7 @@ using Random
 using PlanningDomains
 using Setfield
 using ChainRulesCore
-using NeuroPlanner: add_goalstate, add_startstate
+using NeuroPlanner: add_goalstate, add_initstate
 # using Yota
 
 _isapprox(a::NamedTuple,b::NamedTuple; tol = 1e-5) = all(_isapprox(a[k], b[k]; tol) for k in keys(a))
@@ -41,16 +41,28 @@ problem = load_problem("../classical-domains/classical/driverlog/pfile1.pddl")
 	for arch in (HyperExtractor, ASNet, HGNNLite, HGNN)
 		ex = arch(domain)
 		ex = NeuroPlanner.specialize(ex, problem)
+		@test ex.init_state === nothing
+		@test ex.goal_state === nothing
 		state = initstate(domain, problem)
 		ds = ex(state)
 		m = reflectinmodel(ds)
 		@test m(ds) isa Matrix
 
-		for gex in [add_goalstate(ex, problem), add_startstate(ex,problem)]
-			ds = gex(state)
-			m = reflectinmodel(ds)
-			@test m(ds) isa Matrix
-		end
+		#test adding goal state
+		gex = add_goalstate(ex, problem)
+		@test gex.init_state === nothing
+		@test gex.goal_state !== nothing
+		ds = gex(state)
+		m = reflectinmodel(ds)
+		@test m(ds) isa Matrix
+
+		#test adding initial state
+		iex = add_initstate(ex, problem)
+		@test iex.init_state !== nothing
+		@test iex.goal_state === nothing
+		ds = iex(state)
+		m = reflectinmodel(ds)
+		@test m(ds) isa Matrix
 	end
 end
 
