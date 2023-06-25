@@ -176,6 +176,8 @@ julia> model(b)
  -0.0134815  -0.0315447
 ```
 
+
+## A complete example with an integration to the planner
 ```julia
 
 ## Example
