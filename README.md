@@ -1,4 +1,35 @@
 # NeuroPlanner
+
+## Motivation
+
+This library is an experimental library that implements:
+1. neural network based heuristic functions that can accept problem and domains encoded in "unspecified" but sufficiently general subset of PDDL language.
+2. various loss functions used to optimize parameters of the heuristic functions.
+
+The library is in development and therefore things can change.
+
+## Heuristic functions
+At the moment, we implement three different heuristic functions
+* `HyperExtractor` which encodes state as relations coded in hypergraph (more on this later);
+* `HGNN` is an encoding proposed in *Learning Domain-Independent Planning Heuristics with Hypergraph Networks, William Shen, Felipe Trevizan, Sylvie Thiebaux, 2020*
+* `ASNet` is an encoding proposed in *Action Schema Networks: Generalised Policies with Deep Learning, 2018*
+
+The heuristic function itself is implemented as a neural network that expects a sample of some structure. This structure is created by an *extraction function*, which takes a state and converts it to something that the neural network can process (in classical schemes, this would be tensor, here in this library, this is an instance of `KnowledgeBase`.) The extraction function therefore to a large extent controls the computational graph used by the heuristic function. The  extraction function is implemented as a callable struct with a following api. Let's use a `HyperExtractor` as an example
+* `ex = HyperExtractor(domain)` --- initialize the extractor for a given domain
+* `ex = specialize(ex, problem)`  --- specialize the extractor functions for a given domain
+* `ex = add_goalstate(ex, problem, goal = goalstate(domain, problem)` --- fixes a goal state in the extractor
+* `ex = add_initstate(ex, problem, start = initstate(domain, problem)` --- fixes an initial state in the extractor.
+
+With this, `ex(state)` converts the state to a structure for the neural network.
+
+All extraction functions has to be initialized for a given domain and specialed for a given problem. Adding goal or init state is optional. If they are added, the input to the neural network would always contain *goal* or *init* state, in which case the neural network will measure a distance to a state. If they are not used, the neural network can be used to create and embedding of states. 
+
+
+The fixing of *init* and *goal* the state is there, because it is assumed
+
+
+
+## Example
 Is a naive attempt to learn heuristics over PDDL domains. It is restricted only to PDDL2 with predicates with arity at most 2, as it represents the state as a graph, where each object corresponds to one vertex and predicates with arity two are represented as edges. Very naive, but might work.
 
 Below is a commented example which learns heuristic for a single instance of Sokoban. A complete example is located in `example.jl`.
@@ -72,12 +103,3 @@ planner = AStarPlanner(GNNHeuristic(pddld, problem, model))
 sol = planner(domain, state, goal)
 satisfy(domain, sol.trajectory[end], goal)
 ``` 
-
-## Simple and Sparse Graphs
-When PDDL representation is converted to graph, the conversion routine uses on `SimpleGraph` from `Graphs.jl`, since it represents the graph as an adjacency list, which is easy for adding edges. The returned `MultiGraph` then contains tuple of `SimpleGraph`s, where there is one `SimpleGraph` for one type of edges. When graphs in `MultiGraph` are stored in `SimpleGraph`, the resulting type as an alias `SimpleMultiGraph` and crucially they can be concatenated to minibatch. Concatenation for `SimpleMultiGraph`s is easy due to the simplicity in manipulating adjacency list. Contrary, `GeometricFlux` understands `SparseGraphs`, where the adjacency matrix is stored as a `SparseMatrixCSC`, for which we did not implemented concatenation to minibatches. `MultiGNNLayer` automatically converts `SimpleMultiGraph`s to `SparseMultiGraph`s, therefore user does not even notice. you can perform the conversion by itself by method `simplegraph`. The suggested construction of one minibatch containing `minibatch_states` should therefore be
-```julia
-xx = pddle.(minibatch_states)
-batch = reduce(cat, xx);
-sbatch = NeuroPlanner.sparsegraph(batch);
-```
-*We emphasize that resulting `sbatch` cannot be concatenated with other `sbatch`, unlike `batch`.* Thus `sparsegraph` effectively freezes the representation. Using `SparseMultiGraph` put less stress on `Zygote`, but we have not observed huge difference in practice.
