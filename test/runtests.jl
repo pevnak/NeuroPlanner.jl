@@ -8,7 +8,7 @@ using Random
 using PlanningDomains
 using Setfield
 using ChainRulesCore
-using NeuroPlanner: add_goalstate, add_initstate
+using NeuroPlanner: add_goalstate, 
 # using Yota
 
 _isapprox(a::NamedTuple,b::NamedTuple; tol = 1e-5) = all(_isapprox(a[k], b[k]; tol) for k in keys(a))
@@ -86,6 +86,18 @@ end
 			@test reduce(hcat, map(m, xx)) ≈  m(Flux.batch(xx))
 			ii = randperm(length(xx))
 			@test reduce(hcat, map(m, xx[ii])) ≈  m(Flux.batch(xx[ii]))
+		end
+
+		@testset "init-goal invariant"
+			ex = arch(domain)
+			iex = add_initstate(ex, problem)
+			gex = add_goalstate(ex, problem)
+
+			si = initstate(domain, problem)
+			gi = goalstate(domain, problem)
+			model = reflectinmodel(iex(si), d -> Dense(d,10), SegmentedMean;fsm = Dict("" =>  d -> Dense(d,1)))
+
+			@test m(iex(goalstate(domain, problem))) ≈ model(gex(initstate(domain, problem)))
 		end
 
 		@testset "gradient path" begin 

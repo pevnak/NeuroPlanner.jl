@@ -64,7 +64,7 @@ export BackwardSampler
 include("heuristic.jl")
 export NeuroHeuristic
 
-export add_goalstate, add_initstate
+export add_goalstate, add_initstate, specialize
 
 MLUtils.batch(xs::AbstractVector{<:AbstractMillNode}) = reduce(catobs, xs)
 end
