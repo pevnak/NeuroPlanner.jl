@@ -25,7 +25,7 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 SymbolicPlanners = "b6fe5377-9711-4fad-95b0-be4eed71ecbb"
 
 [compat]
-Flux = "0.13"
+Flux = "0.13, 0.14"
 Mill = "2.8.4"
 julia = "1"
 
