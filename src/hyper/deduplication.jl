@@ -39,7 +39,7 @@ struct DeduplicatingNode{D} <: AbstractMillNode
 	ii::Vector{Int}
 end
 
-Mill.nobs(ds::DeduplicatingNode) = length(ds.ii)
+MLUtils.numobs(ds::DeduplicatingNode) = length(ds.ii)
 Base.getindex(x::DeduplicatingNode, ii) = DeduplicatingNode(x.x, x.ii[ii])
 Base.getindex(x::DeduplicatingNode, ii::Vector{Bool}) = DeduplicatingNode(x.x, x.ii[ii])
 Base.getindex(x::DeduplicatingNode, ii::Vector{Int}) = DeduplicatingNode(x.x, x.ii[ii])
@@ -74,10 +74,10 @@ function _deduplicate(kb::KnowledgeBase, ds::ArrayNode{<:KBEntry{K}}) where {K}
 end
 
 function _deduplicate(kb::KnowledgeBase, ds::BagNode)
-	if Mill.nobs(ds.data) == 0 
+	if numobs(ds.data) == 0 
 		@assert all(isempty(b) for b in ds.bags) "All bags should be empty when instances are empty"
 		dedu_bn = BagNode(ds.data, [0:-1])
-		ii = ones(Int, Mill.nobs(ds))
+		ii = ones(Int, numobs(ds))
 		dedu_ds = DeduplicatingNode(dedu_bn, ii)
 		return(dedu_ds, ii)
 	end

@@ -23,7 +23,7 @@ Base.getindex(kb::KnowledgeBase, k::Symbol) = kb.kb[k]
 Base.keys(kb::KnowledgeBase) = keys(kb.kb)
 append(kb::KnowledgeBase, k::Symbol, x) = KnowledgeBase(merge(kb.kb,NamedTuple{(k,)}((x,))))
 function Base.replace(kb::KnowledgeBase, k::Symbol, v)
-    l = Setfield.PropertyLens{:kb}() ∘ Setfield.PropertyLens{k}()
+    l = Accessors.PropertyLens{k}() ∘ Accessors.PropertyLens{:kb}()
     set(kb, l, v)
 end
 
@@ -79,7 +79,7 @@ end
 _getindex(x::KBEntry{E,T}, i) where {E,T} = KBEntry{E,T}(x.ii[i])
 _getindex(x::KBEntry{E,T}) where {E,T} = x
 _getindex(x::KBEntry{E,T}, i::Integer) where {E,T} = KBEntry{E,T}(x.ii[i:i])
-Mill.nobs(a::KBEntry) = length(a.ii)
+MLUtils.numobs(a::KBEntry) = length(a.ii)
 HierarchicalUtils.NodeType(::Type{KBEntry}) = HierarchicalUtils.LeafNode()
 
 ChainRulesCore.ProjectTo(x::KBEntry{E,T}) where {E,T} = ProjectTo{KBEntry}(;E,T,ii = x.ii)
@@ -171,15 +171,12 @@ function _compute_offsets(as::AbstractVector{<:KnowledgeBase{KS,VS}}) where {KS,
         c = zeros(Int, length(as))
         for (i,a) in enumerate(as)
             c[i] = o 
-            o += _numobs(a[k])
+            o += numobs(a[k])
         end
         return(c)
     end    
     NamedTuple{KS}(o)
 end
-
-_numobs(a::AbstractMatrix) = size(a,2)
-_numobs(a::AbstractMillNode) = Mill.nobs(a)
 
 ###########
 #	Plumbing to Mill --- propagation with Knowledge base

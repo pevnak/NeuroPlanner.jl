@@ -13,8 +13,7 @@ using Serialization
 using DataFrames
 using Mill
 using Functors
-using Setfield
-using Comonicon
+using Accessors
 using Logging
 using TensorBoardLogger
 
@@ -51,7 +50,8 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			problem = load_problem(problem_file)
 			ds = fminibatch(pddld, domain, problem, plan)
 			dedu = @set ds.x = deduplicate(ds.x)
-			println("original: ",Base.summarysize(ds), " dedupped: ", Base.summarysize(dedu))
+			size_o, size_d =  Base.summarysize(ds), Base.summarysize(dedu)
+			println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size(d), digits =2),"%)")
 			dedu
 		end
 		log_value(logger, "time_minibatch", t; step=0)
@@ -97,8 +97,8 @@ ArgParse example implemented in Comonicon.
 
 max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
 domain_name = "ferry"
-loss_name = "levinloss"
-arch_name = "levinasnet"
+loss_name = "lstar"
+arch_name = "pddl"
 """
 
 @main function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 

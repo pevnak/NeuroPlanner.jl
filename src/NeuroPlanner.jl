@@ -9,12 +9,11 @@ using Statistics
 using SymbolicPlanners
 using StatsBase
 using Mill
-using Setfield
 using MLUtils
-using NeuralAttentionlib
 using DataStructures
 using HierarchicalUtils
 using ChainRulesCore
+using Accessors
 
 """
 initproblem(ex, problem; add_goal = true)
