@@ -2,6 +2,7 @@ using PDDL
 using SymbolicPlanners
 using Serialization
 using Random
+using DataFrames
 using NeuroPlanner: plan_from_trajectory
 
 include("problems.jl")
@@ -44,24 +45,22 @@ function solveproblem(domain, problem_file)
 
 	state = initstate(domain, problem)
 	spec = MinStepsGoal(problem)
-	planner = AStarPlanner(HAdd(); max_time=3600, save_search = true)
-	# planner = AStarPlanner(HMax(); max_time=3600, save_search = true)
-
+	# planner = AStarPlanner(HAdd(); max_time=3600, save_search = true)
+	planner = ForwardPlanner(;heuristic = NullHeuristic(), max_time=30, save_search = true)
 	goal = PDDL.get_goal(problem)
 	t = @elapsed sol = planner(domain, state, spec)
 	(sol, t)
 end
 
-["rovers", "optical-telegraphs", "philosophers", "airport-adl", "pipesworld-06", pipesworld-notankage "psr-large", "psr-middle", "freecell", "blocks", "elevators-00-full", "elevators-00-strips", "miconic", "miconic-simpleadl", "schedule", "miconic-fulladl", "logistics00"]
-problem_name = "rovers"
-# problem_name = "blocks"
-domain_pddl, problem_files, _ = getproblem(problem_name, false)
+# ["rovers", "optical-telegraphs", "philosophers", "airport-adl", "pipesworld-06", pipesworld-notankage "psr-large", "psr-middle", "freecell", "blocks", "elevators-00-full", "elevators-00-strips", "miconic", "miconic-simpleadl", "schedule", "miconic-fulladl", "logistics00"]
+# problem_name = "rovers"
+problem_name = "blocks"
+domain_pddl, problem_files = getproblem(problem_name, false)
 domain = load_domain(domain_pddl)
 sol, t = solveproblem(domain, first(problem_files))
-
-problem_files = filter(s -> !isfile(plan_file(s)), problem_files)
-problem_files = shuffle(problem_files)
-
+# problem_files = filter(s -> !isfile(plan_file(s)), problem_files)
+# problem_files = shuffle(problem_files)
+df = DataFrame()
 for problem_file in problem_files
 	f = plan_file(problem_file)
 	sol, t = solveproblem(domain, problem_file)
