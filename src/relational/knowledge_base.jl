@@ -100,7 +100,7 @@ function reduce(::typeof(Mill.catobs), As::Vector{<:KBEntry{E,T}}) where {E,T}
 end
 
 ########
-#   THe dangerousness of getindex is questionably and will be removed on first trouble
+#   The dangerousness of getindex is questionably and will be removed on first trouble
 ########
 function Base.getindex(X::KBEntry{E,T}, idcs...) where {E,T}
 	D = length(X.ii)
@@ -122,7 +122,7 @@ end
 # Concatenation of knowledge base is difficult, since KBEntries are essentially
 # views into the knowledgebase and therefore we need to ensure that when
 # we concatenate two knowledge bases for batching purposes, we correctly 
-# indexes into the original arrays. An example of a possible  problem 
+# index into the original arrays. An example of a possible problem 
 # occurs when the knowledge base contains longer array then is the 
 # maximum index in the KBEntry. In this case, problem might happen.
 # The implementation would a very nice user-case for contextual dispatch, 

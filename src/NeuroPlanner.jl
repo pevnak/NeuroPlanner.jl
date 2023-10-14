@@ -66,4 +66,15 @@ export NeuroHeuristic
 export add_goalstate, add_initstate, specialize
 
 MLUtils.batch(xs::AbstractVector{<:AbstractMillNode}) = reduce(catobs, xs)
+
+include("utils/utils.jl")
+export ffnn, tblogger, W15AStarPlanner, W20AStarPlanner, dedup_fmb
+
+include("utils/training.jl")
+export train!, sample_minibatch, prepare_minibatch, isvalid, isinvalid
+
+include("utils/solution_tracking.jl")
+export solve_problem, update_solutions!, update_solution, issolved, show_stats, _show_stats
+include("utils/problems.jl")
+export load_plan, save_plan, plan_file, setup_problem, setup_classic, getproblem, accomodate_leah_plans, merge_ferber_problems, hashfile, _parse_plan, systematize, similarity_of_problems
 end

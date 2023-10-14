@@ -5,10 +5,10 @@ At the moment, we implement three different heuristic functions
 * `HGNN` is an encoding proposed in *Learning Domain-Independent Planning Heuristics with Hypergraph Networks, William Shen, Felipe Trevizan, Sylvie Thiebaux, 2020*
 * `ASNet` is an encoding proposed in *Action Schema Networks: Generalised Policies with Deep Learning, 2018*
 
-The parameters of heuristic function are implemented in a neural network, `nn`, which expects some sample as an input. This same is not directly a state in pddl, but an image if an  *extraction function* `ex`, which prepares the state `s`. This construction is reminiscent of **Mill.jl**, on top of which Lifted Relational NNs are built. The advantage is that the construction contains tedious non-differentiable operations and allows for minibatching. The heuristic function can be seen as a composition `nn ∘ ex.`
+The parameters of the heuristic function are implemented in a neural network, `nn`, which expects some sample as an input. This sample is not directly a state in pddl, but an image of an  *extraction function* `ex`, which prepares the state `s`. This construction is reminiscent of **Mill.jl**, on top of which Lifted Relational NNs are built. The advantage is that the construction contains tedious non-differentiable operations and allows for minibatching. The heuristic function can be seen as a composition `nn ∘ ex`.
 
 
-Let's now focus on extraction function `ex,` which takes a state `s` and converts it to some representation suitable for NN`. While in most cases, this representation would be a tensor, here we preder a relational encoding similar to Lifted Relational Neural Networks (LRNN). In this library, LRNN are instance of `KnowledgeBase`. The extraction function `ex` therefore to  controls the computational graph used by the heuristic function, including things like the number of graph convolutions. The  extraction function is implemented as a callable struct with a following api, where `HyperExtractor` is used as an example:
+Let's now focus on extraction function `ex`, which takes a state `s` and converts it to some representation suitable for NN. While in most cases, this representation would be a tensor, here we preder a relational encoding similar to Lifted Relational Neural Networks (LRNN). In this library, LRNN are instance of `KnowledgeBase`. The extraction function `ex` therefore to  controls the computational graph used by the heuristic function, including things like the number of graph convolutions. The  extraction function is implemented as a callable struct with a following api, where `HyperExtractor` is used as an example:
 * `ex = HyperExtractor(domain)` --- initialize the extractor for a given domain
 * `ex = specialize(ex, problem)`  --- specialize the extractor functions for a given domain
 * `ex = add_goalstate(ex, problem, goal = goalstate(domain, problem)` --- fixes a goal state in the extractor
@@ -77,7 +77,7 @@ julia> model(specex(s))
 1×1 Matrix{Float32}:
  0.003934524
 ```
-The parameters of the model can be optimized using the standard method of **Flux.jl** on top of which they are builded.
+The parameters of the model can be optimized using the standard method of **Flux.jl** on top of which they are built.
 
 A complete example should look like:
 ```julia

@@ -2,7 +2,7 @@
 
 julia_version = "1.9.2"
 manifest_format = "2.0"
-project_hash = "bed8b80b3220be4019391977eac189191c44931a"
+project_hash = "3889a7758cb0eca7e11233ccf1239712a5ff0921"
 
 [[deps.ATK_jll]]
 deps = ["Artifacts", "Glib_jll", "JLLWrappers", "Libdl"]
@@ -981,7 +981,7 @@ uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
 
 [[deps.NeuroPlanner]]
-deps = ["Accessors", "ChainRulesCore", "Compose", "DataStructures", "Flux", "Graphs", "HierarchicalUtils", "Julog", "MLUtils", "Mill", "OneHotArrays", "PDDL", "Parameters", "Statistics", "StatsBase", "SymbolicPlanners"]
+deps = ["Accessors", "ChainRulesCore", "Compose", "DataStructures", "Flux", "Graphs", "HierarchicalUtils", "Julog", "Logging", "MLUtils", "Mill", "OneHotArrays", "PDDL", "Parameters", "SparseArrays", "Statistics", "StatsBase", "SymbolicPlanners", "Term"]
 path = ".."
 uuid = "628e68bf-2596-4972-a53b-69fd3c43dbca"
 version = "0.1.0"

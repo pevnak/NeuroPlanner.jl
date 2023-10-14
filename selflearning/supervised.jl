@@ -42,7 +42,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			reflectinmodel(h₀, d -> Dense(d, dense_dim, relu);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
 		end
 
-		logger=tblogger(filename*"_events.pb")
+		#logger=tblogger(filename*"_events.pb")
 		t = @elapsed minibatches = map(train_files) do problem_file
 			@show problem_file
 			println("creating sample from problem: ",problem_file)
@@ -51,14 +51,14 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			ds = fminibatch(pddld, domain, problem, plan)
 			dedu = @set ds.x = deduplicate(ds.x)
 			size_o, size_d =  Base.summarysize(ds), Base.summarysize(dedu)
-			println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size(d), digits =2),"%)")
+			#println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size(d), digits =2),"%)")
 			dedu
 		end
-		log_value(logger, "time_minibatch", t; step=0)
+		#log_value(logger, "time_minibatch", t; step=0)
 		opt = AdaBelief();
 		ps = Flux.params(model);
-		t = @elapsed train!(NeuroPlanner.loss, model, ps, opt, () -> rand(minibatches), max_steps; logger, trn_data = minibatches)
-		log_value(logger, "time_train", t; step=0)
+		t = @elapsed train!(NeuroPlanner.loss, model, ps, opt, () -> rand(minibatches), max_steps; trn_data = minibatches)
+		#log_value(logger, "time_train", t; step=0)
 		serialize(filename*"_model.jls", model)	
 		model
 	end
@@ -101,7 +101,7 @@ loss_name = "lstar"
 arch_name = "pddl"
 """
 
-@main function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
+function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
 		dense_dim::Int = 32, dense_layers::Int = 2, residual::String = "none", seed::Int = 1)
 	Random.seed!(seed)
 	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, dense_dim, dense_layers, residual, seed)
