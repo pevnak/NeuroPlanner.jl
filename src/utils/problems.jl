@@ -1,3 +1,6 @@
+"""
+File with utility functions related to working with problems
+"""
 function save_plan(ofile, plan)
 	open(ofile,"w") do fio 
 		for a in plan

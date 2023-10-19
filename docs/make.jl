@@ -10,3 +10,6 @@ makedocs(sitename="NeuroPlanner.jl",
             "Extractors" => "extractors.md",
             "Model representation" => "model_representation.md"
         ])
+deploydocs(
+    repo = "github.com/pevnak/NeuroPlanner.jl.git"
+)
