@@ -8,16 +8,16 @@ using Random
 using PlanningDomains
 using Setfield
 using ChainRulesCore
-using NeuroPlanner: add_goalstate, 
+using NeuroPlanner: add_goalstate
 # using Yota
 
+_isapprox(a::Nothing, b::Nothing; tol = 1e-5) = true
+_isapprox(a::ZeroTangent, b::Nothing; tol = 1e-5) = true
+_isapprox(a::Number, b::Number; tol = 1e-5) = abs(a-b)  < tol
 _isapprox(a::NamedTuple,b::NamedTuple; tol = 1e-5) = all(_isapprox(a[k], b[k]; tol) for k in keys(a))
 _isapprox(a::Tangent,b::NamedTuple; tol = 1e-5) = all(_isapprox(a[k], b[k]; tol) for k in keys(b))
 _isapprox(a::Tuple, b::Tuple; tol = 1e-5) = all(_isapprox(a[k], b[k]; tol) for k in keys(a))
 _isapprox(a::AbstractArray, b::AbstractArray; tol = 1e-5) = all(_isapprox.(a,b;tol))
-_isapprox(a::Nothing, b::Nothing; tol = 1e-5) = true
-_isapprox(a::ZeroTangent, b::Nothing; tol = 1e-5) = true
-_isapprox(a::Number, b::Number; tol = 1e-5) = abs(a-b)  < tol
 include("dedu_matrix.jl")
 include("knowledge_base.jl")
 

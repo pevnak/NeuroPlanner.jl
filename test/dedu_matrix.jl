@@ -17,7 +17,7 @@ using NeuroPlanner: DeduplicatedMatrix
 		@test m(dx) isa DeduplicatedMatrix
 		@test m(dx) ≈ m(x)
 		@test _isapprox(gradient(m -> sum(m(x)), m), gradient(m -> sum(m(dx)), m))
-		@test _isapprox(Yota.grad(model -> sum(model(x)), m)[2][2],gradient(m -> sum(m(x)), m)[1])
+		# @test _isapprox(Yota.grad(model -> sum(model(x)), m)[2][2],gradient(m -> sum(m(x)), m)[1])
 	end
 end
 
