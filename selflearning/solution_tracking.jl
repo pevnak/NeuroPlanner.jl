@@ -3,12 +3,23 @@ using SparseArrays
 using OneHotArrays
 verbose::Bool = true
 
-function solve_problem(pddld, problem::GenericProblem, model, init_planner; max_time=30, return_unsolved = false)
-	domain = pddld.domain
-	state₀ = initstate(domain, problem)
+BPlanners = Union{typeof(BackwardAStarPlanner), BackwardPlanner, typeof(BackwardGreedyPlanner),BackwardSearchGoal}
+FPlanners = Union{typeof(AStarPlanner), ForwardPlanner, typeof(GreedyPlanner)}
+
+function solve_problem(pddld, problem::GenericProblem, model, init_planner::FPlanners; kwargs...)
 	hfun = NeuroHeuristic(pddld, problem, model)
+	solve_problem(pddld, problem, model, init_planner, hfun; kwargs...)
+end
+
+function solve_problem(pddld, problem::GenericProblem, model, init_planner::BPlanners; kwargs...)
+	hfun = NeuroHeuristic(NeuroPlanner.add_initstate(pddld, problem), model, Ref(0.0))
+	solve_problem(pddld, problem, model, init_planner, hfun; kwargs...)
+end
+
+function solve_problem(pddld, problem::GenericProblem, model, init_planner, hfun; max_time=30, return_unsolved = false)
+	domain = pddld.domain
 	planner = init_planner(hfun; max_time, save_search = true)
-	solution_time = @elapsed sol = planner(domain, state₀, PDDL.get_goal(problem))
+	solution_time = @elapsed sol = planner(domain, problem)
 	return_unsolved || sol.status == :success || return(nothing)
 	stats = (;solution_time, 
 		sol_length = length(sol.trajectory),

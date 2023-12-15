@@ -374,12 +374,16 @@ loss(model, xy::Tuple,surrogate=softplus) = sum(map(x -> lossfun(model, x), xy),
 
 
 function minibatchconstructor(name)
-	name == "l2" && return(L₂MiniBatch)
-	name == "l₂" && return(L₂MiniBatch)
-	name == "lstar" && return(LₛMiniBatch)
-	name == "lₛ" && return(LₛMiniBatch)
+	name ∈ ("l2","l₂")  && return(L₂MiniBatch)
+	name == "backl2"  && return(BackwardL2)
+	name ∈  ("lstar", "lₛ") && return(LₛMiniBatch)
+	name == "backlstar" && return(BackwardLₛMiniBatch)
 	name == "lgbfs" && return(LgbfsMiniBatch)
+	name == "backlgbfs" && return(BackwardLgbfsMiniBatch)
 	name == "lrt" && return(LRTMiniBatch)
+	name == "backlrt" && return(BackwardLRTMiniBatch)
+
+	# some prior art that had to be checked
 	name == "bellman" && return(BellmanMiniBatch)
 	name == "levinloss" && return(LevinMiniBatch)
 	error("unknown loss $(name)")

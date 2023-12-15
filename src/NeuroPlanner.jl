@@ -53,8 +53,11 @@ include("potential/extractor.jl")
 export LinearExtractor
 
 include("rsearch_tree.jl")
-include("losses.jl")
+
+include("forward_losses.jl")
 export L₂MiniBatch, LₛMiniBatch, LRTMiniBatch, LgbfsMiniBatch
+include("backward_losses.jl")
+export BackwardLₛMiniBatch
 
 include("artificial_goals.jl")
 include("sample_trace.jl")
