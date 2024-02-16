@@ -12,7 +12,7 @@ function _previous_states(domain, problem, sᵢ)
 	end
 end
 
-function reverse_simulate(domain, problem, plan)
+function backward_simulate(domain, problem, plan)
 	s₀ = goalstate(domain, problem)
 	trajectory = accumulate(reverse(plan), init = s₀) do s,a
 		PDDL.regress(domain, s, a)
@@ -20,9 +20,9 @@ function reverse_simulate(domain, problem, plan)
 	vcat([s₀], trajectory)
 end
 
-function BackwardL2(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Compound}; goal_aware = true, max_branch = typemax(Int))
+function BackwardL₂MiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Compound}; goal_aware = true, max_branch = typemax(Int))
 	pddle = goal_aware ? NeuroPlanner.add_initstate(pddld, problem) : pddld
-	trajectory = reverse_simulate(domain, problem, plan)
+	trajectory = backward_simulate(domain, problem, plan)
 	L₂MiniBatch(batch(map(pddle, trajectory)),
      collect(length(trajectory):-1:1),
      )
@@ -30,7 +30,7 @@ end
 
 function BackwardLₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Compound}; goal_aware = true, max_branch = typemax(Int))
 	pddle = goal_aware ? NeuroPlanner.add_initstate(pddld, problem) : pddld
-	trajectory = reverse_simulate(domain, problem, plan)
+	trajectory = backward_simulate(domain, problem, plan)
 	plan = reverse(plan)
 	spec = Specification(problem)
 	state = trajectory[1]
@@ -79,14 +79,14 @@ function BackwardLₛMiniBatch(pddld, domain::GenericDomain, problem::GenericPro
 end
 
 
-function BackwardLgbfsMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan; kwargs...)
+function BackwardLgbfsMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Compound}; kwargs...)
 	l = BackwardLₛMiniBatch(pddld, domain, problem, plan; kwargs...)
 	LgbfsMiniBatch(l.x, l.H₊, l.H₋, l.path_cost, l.sol_length)	
 end
 
-function BackwardLRTMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan; goal_aware = true, kwargs...)
+function BackwardLRTMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Compound}; goal_aware = true, kwargs...)
 	pddle = goal_aware ? NeuroPlanner.add_initstate(pddld, problem) : pddld
-	trajectory = reverse_simulate(domain, problem, plan)
+	trajectory = backward_simulate(domain, problem, plan)
 	n = length(trajectory)
 	if n < 2
 		H₊ = onehotbatch([], 1:n)

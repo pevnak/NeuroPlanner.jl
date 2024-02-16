@@ -57,7 +57,8 @@ include("rsearch_tree.jl")
 include("forward_losses.jl")
 export L₂MiniBatch, LₛMiniBatch, LRTMiniBatch, LgbfsMiniBatch
 include("backward_losses.jl")
-export BackwardLₛMiniBatch
+export BackwardL₂MiniBatch, BackwardLₛMiniBatch, BackwardLRTMiniBatch, BackwardLgbfsMiniBatch
+include("bidirectional_losses.jl")
 
 include("artificial_goals.jl")
 include("sample_trace.jl")

@@ -375,7 +375,7 @@ loss(model, xy::Tuple,surrogate=softplus) = sum(map(x -> lossfun(model, x), xy),
 
 function minibatchconstructor(name)
 	name ∈ ("l2","l₂")  && return(L₂MiniBatch)
-	name == "backl2"  && return(BackwardL2)
+	name == "backl2"  && return(BackwardL₂MiniBatch)
 	name ∈  ("lstar", "lₛ") && return(LₛMiniBatch)
 	name == "backlstar" && return(BackwardLₛMiniBatch)
 	name == "lgbfs" && return(LgbfsMiniBatch)

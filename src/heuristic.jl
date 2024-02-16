@@ -7,9 +7,17 @@ struct NeuroHeuristic{P,M} <: Heuristic
 	t::Base.RefValue{Float64}
 end
 
-NeuroHeuristic(pddld, problem, model) = NeuroHeuristic(NeuroPlanner.add_goalstate(pddld, problem), model, Ref(0.0))
+function NeuroHeuristic(pddld, problem, model; backward = true) 
+	pddle = backward ? add_initstate(pddld, problem) : add_goalstate(pddld, problem)
+	NeuroHeuristic(pddle, model, Ref(0.0))
+end
+
 Base.hash(g::NeuroHeuristic, h::UInt) = hash(g.model, hash(g.pddle, h))
 function SymbolicPlanners.compute(h::NeuroHeuristic, domain::Domain, state::State, spec::Specification) 
+	h(state)
+end
+
+function (h::NeuroHeuristic)(state::State)
 	h.t[] += @elapsed r = only(h.model(h.pddle(state)))
 	r
 end

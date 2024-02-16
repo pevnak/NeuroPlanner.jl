@@ -3,16 +3,17 @@ using SparseArrays
 using OneHotArrays
 verbose::Bool = true
 
-BPlanners = Union{typeof(BackwardAStarPlanner), BackwardPlanner, typeof(BackwardGreedyPlanner),BackwardSearchGoal}
-FPlanners = Union{typeof(AStarPlanner), ForwardPlanner, typeof(GreedyPlanner)}
+BPlanners = Union{BackwardPlanner, typeof(BackwardAStarPlanner), typeof(BackwardGreedyPlanner),BackwardSearchGoal}
+FPlanners = Union{ForwardPlanner, typeof(AStarPlanner), typeof(GreedyPlanner)}
+BiPlanners = Union{BidirectionalPlanner, typeof(BiAStarPlanner), typeof(BiGreedyPlanner)}
 
 function solve_problem(pddld, problem::GenericProblem, model, init_planner::FPlanners; kwargs...)
-	hfun = NeuroHeuristic(pddld, problem, model)
+	hfun = NeuroHeuristic(pddld, problem, model; backward = false)
 	solve_problem(pddld, problem, model, init_planner, hfun; kwargs...)
 end
 
 function solve_problem(pddld, problem::GenericProblem, model, init_planner::BPlanners; kwargs...)
-	hfun = NeuroHeuristic(NeuroPlanner.add_initstate(pddld, problem), model, Ref(0.0))
+	hfun = NeuroHeuristic(pddld, problem, model; backward = true)
 	solve_problem(pddld, problem, model, init_planner, hfun; kwargs...)
 end
 
@@ -26,6 +27,39 @@ function solve_problem(pddld, problem::GenericProblem, model, init_planner, hfun
 		expanded = sol.expanded,
 		solved = sol.status == :success,
 		time_in_heuristic = hfun.t[]
+		)
+	(;sol, stats)
+end
+
+function solve_problem(pddld, problem::GenericProblem, model, init_planner::BiPlanners; max_time=30, return_unsolved = false)
+	f_heuristic = NeuroHeuristic(pddld, problem, model; backward = false)
+	b_heuristic = NeuroHeuristic(pddld, problem, model; backward = true)
+	domain = pddld.domain
+	planner = init_planner(f_heuristic, b_heuristic; max_time, save_search = true)
+	solution_time = @elapsed sol = planner(domain, problem)
+	return_unsolved || sol.status == :success || return(nothing)
+
+	# I want to save, how many states from trajectory are in forward search tree
+	# and in backward search tree. This will tell me, how beneficial is 
+	# bidirectional planner
+	bst = sol.b_search_tree
+	fst = sol.f_search_tree
+	plan = sol.plan
+
+	bt = NeuroPlanner.backward_simulate(domain, problem, plan)
+	ft = SymbolicPlanners.simulate(StateRecorder(), domain, initstate(domain, problem), plan)
+
+	# Let's now check how many of states on the optimal reverse path are in the search tree
+	trajectory_in_bst = isempty(plan) ? 0 : sum(haskey(bst, hash(s)) for s in bt)
+	trajectory_in_fst = isempty(plan) ? 0 : sum(haskey(fst, hash(s)) for s in ft)
+
+	stats = (;solution_time, 
+		sol_length = sol.trajectory === nothing ? 0 : length(sol.trajectory),
+		expanded = sol.expanded,
+		solved = sol.status == :success,
+		time_in_heuristic = f_heuristic.t[] + b_heuristic.t[],
+		trajectory_in_bst,
+		trajectory_in_fst,
 		)
 	(;sol, stats)
 end

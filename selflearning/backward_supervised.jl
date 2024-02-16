@@ -42,27 +42,37 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			reflectinmodel(h₀, d -> Dense(d, dense_dim, relu);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
 		end
 
-		logger=tblogger(filename*"_events.pb")
+		# logger=tblogger(filename*"_events.pb")
+		logger=nothing
 		t = @elapsed minibatches = map(train_files) do problem_file
 			@show problem_file
 			println("creating sample from problem: ",problem_file)
 			plan = load_plan(problem_file)
 			problem = load_problem(problem_file)
 			ds = fminibatch(pddld, domain, problem, plan)
-			dedu = @set ds.x = deduplicate(ds.x)
+			if fminibatch == NeuroPlanner.BidirecationalLₛMiniBatch
+				dedu = [(@set s.x = deduplicate(s.x)) for s in ds]
+			else
+				dedu = @set ds.x = deduplicate(ds.x)
+			end
 			size_o, size_d =  Base.summarysize(ds), Base.summarysize(dedu)
 			println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size_o, digits =2),"%)")
 			dedu
 		end
-		log_value(logger, "time_minibatch", t; step=0)
+		if fminibatch == NeuroPlanner.BidirecationalLₛMiniBatch
+			minibatches = reduce(vcat, minibatches)
+		end
+		# log_value(logger, "time_minibatch", t; step=0)
 		opt = AdaBelief();
 		ps = Flux.params(model);
 		t = @elapsed train!(NeuroPlanner.loss, model, ps, opt, () -> rand(minibatches), max_steps; logger, trn_data = minibatches)
-		log_value(logger, "time_train", t; step=0)
+		# log_value(logger, "time_train", t; step=0)
 		serialize(filename*"_model.jls", model)	
 		model
 	end
-	planners = model isa NeuroPlanner.LevinModel ? [BFSPlanner] : [AStarPlanner, GreedyPlanner, BackwardPlannerAStarPlanner, BackwardGreedyPlanner]
+
+	# BiGreedyPlanner is not yet working because of some small bug
+	planners = model isa NeuroPlanner.LevinModel ? [BFSPlanner] : [AStarPlanner, GreedyPlanner, BackwardAStarPlanner, BackwardGreedyPlanner, BiAStarPlanner]
 
 	stats = map(Iterators.product(planners, problem_files)) do (planner, problem_file)
 		used_in_train = problem_file ∈ train_files
@@ -97,7 +107,7 @@ ArgParse example implemented in Comonicon.
 
 max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
 domain_name = "ferry"
-loss_name = "lstar"
+loss_name = "backlstar"
 arch_name = "pddl"
 """
 
@@ -115,14 +125,110 @@ arch_name = "pddl"
 	fminibatch = NeuroPlanner.minibatchconstructor(loss_name)
 	hnet = archs[arch_name]
 
-	filename = joinpath("super", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+	filename = joinpath("bidirectional", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
 	experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch; max_steps, max_time, graph_layers, residual, dense_layers, dense_dim, settings)
 end
 
+function debug()
+	# assuming we have a trained model, let's take a look on loss function
+	df = map(zip(minibatches, train_files)) do (mb, tf )
+		(;tf = basename(tf), loss = NeuroPlanner.loss(model, mb, x -> x > 0))
+	end |> DataFrame
+	# This tells us that we are making few errors, not sure, if this is important
 
-function check_optimality()
+	#Let's try to solve the problem
 	plan = load_plan(problem_file)
 	problem = load_problem(problem_file)
+	back_sol = solve_problem(pddld, problem_file, model, BackwardAStarPlanner; return_unsolved = false)
+	# even if we have a small error, the problem seems to be unresolved. 
+
+
+	hfun = NeuroHeuristic(pddld, problem, model; backward = true)
+	planner = BackwardAStarPlanner(hfun; max_time, save_search = true)
+	sol = planner(domain, problem)
+
+	# Let's see, how many states from the plan are in the search-tree
+	bt = NeuroPlanner.backward_simulate(domain, problem, plan)
+	ft = SymbolicPlanners.simulate(StateRecorder(), domain, initstate(domain, problem), plan)
+	st = sol.search_tree
+	map(s -> any(issubset(b.state,s) for b in values(st)), bt)
+
+	s = goalstate(domain, problem)
+	for sol_a in reverse(plan)
+		hs = map(relevant(domain, s)) do a
+			s₋₁ = PDDL.regress(domain, s, a)
+			h = hfun(s₋₁)
+			(h, a == sol_a)
+		end
+
+		if argmin(first, hs)[2]
+			for (h, a) in hs
+				a ? print(@yellow "$(h) ") : print(h, " ")
+			end
+		else
+			for (h, a) in hs
+				a ? print(@red "$(h) ") : print(h, " ")
+			end
+		end
+		println()
+		s = PDDL.regress(domain, s, sol_a)
+	end
+
+	# what is the average branching factor of the backward search?
+	g = goalstate(domain, problem)
+	i = initstate(domain, problem)
+	plan = load_plan(problem_file)
+	consts = Symbol.(("not-eq", "car","location",))
+	additional = filter(s -> s.name ∈ consts, i.facts)
+	foreach(s -> push!(g.facts, s), additional)
+
+	let s = goalstate(domain, problem)
+		map(reverse(plan)) do a 
+			n = length(relevant(domain, s))
+			s = PDDL.regress(domain, s, a)
+			n
+		end
+	end
+
+	let s = initstate(domain, problem)
+		map(plan) do a 
+			n = length(available(domain, s))
+			s = PDDL.transition(domain, s, a)
+			n
+		end
+	end
+
+end
+
+
+function understanding_bidirectional_search()
+	plan = load_plan(problem_file)
+	problem = load_problem(problem_file)
+
+	back_sol = solve_problem(pddld, problem_file, model, BackwardAStarPlanner; return_unsolved = false)
+	forw_sol = solve_problem(pddld, problem_file, model, AStarPlanner; return_unsolved = false)
+
+	bi_sol = solve_problem(pddld, problem_file, model, BiAStarPlanner; return_unsolved = false)
+
+	bst = bi_sol.sol.b_search_tree
+	fst = bi_sol.sol.f_search_tree
+	plan = bi_sol.sol.plan
+
+	# I want to verify, if both have followed the same route
+	bt = NeuroPlanner.backward_simulate(domain, problem, plan)
+	ft = SymbolicPlanners.simulate(StateRecorder(), domain, initstate(domain, problem), plan)
+
+	# Let's check that states from backward replay are subset of states on the forward path.
+	# This should hold, but I want to to double check
+	map(zip(ft, reverse(bt))) do (f, b )
+		issubset(b, f)
+	end
+
+	# Let's now check how many of states on the optimal reverse path are in the search tree
+	[haskey(bst, hash(s)) for s in bt]
+	[haskey(fst, hash(s)) for s in ft]
+
+
 
 	s = goalstate(domain, problem)
 	for sol_a in reverse(plan)
