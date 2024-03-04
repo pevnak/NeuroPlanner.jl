@@ -4,24 +4,24 @@ import Base.==
 
 """
 struct KnowledgeBase{KB<:NamedTuple}
-	kb::KB
+    kb::KB
 end
 
 a thin wrapper around NamedTuple, such that we have a control over dispatch
 """
-struct KnowledgeBase{KS, VS}
-	kb::NamedTuple{KS, VS}
+struct KnowledgeBase{KS,VS}
+    kb::NamedTuple{KS,VS}
 end
 
-function Base.show(io::IO, kb::KnowledgeBase{KS, VS}) where {KS, VS}
-	print(io, "KnowledgeBase: (",join(KS, ","),")");
+function Base.show(io::IO, kb::KnowledgeBase{KS,VS}) where {KS,VS}
+    print(io, "KnowledgeBase: (", join(KS, ","), ")")
 end
 
 KnowledgeBase() = KnowledgeBase(NamedTuple())
 
 Base.getindex(kb::KnowledgeBase, k::Symbol) = kb.kb[k]
 Base.keys(kb::KnowledgeBase) = keys(kb.kb)
-append(kb::KnowledgeBase, k::Symbol, x) = KnowledgeBase(merge(kb.kb,NamedTuple{(k,)}((x,))))
+append(kb::KnowledgeBase, k::Symbol, x) = KnowledgeBase(merge(kb.kb, NamedTuple{(k,)}((x,))))
 function Base.replace(kb::KnowledgeBase, k::Symbol, v)
     l = Accessors.PropertyLens{k}() ∘ Accessors.PropertyLens{:kb}()
     set(kb, l, v)
@@ -57,7 +57,7 @@ struct KBEntry{E,T} <: AbstractMatrix{T}
 end
 
 function KBEntry(T::DataType, e, ii)
-	KBEntry{Symbol(e), T}(ii)
+    KBEntry{Symbol(e),T}(ii)
 end
 
 KBEntry(e, ii) = KBEntry(Float32, e, ii)
@@ -65,16 +65,16 @@ KBEntry(e, ii) = KBEntry(Float32, e, ii)
 
 Base.show(io::IO, A::KBEntry{E,T}) where {E,T} = print(io, "KBEntry{$(E)} with $(length(A.ii)) items")
 Base.show(io::IO, ::MIME"text/plain", A::KBEntry{E,T}) where {E,T} = print(io, "KBEntry{$(E)} with $(length(A.ii)) items")
-Base.show(io::IO, ::MIME"text/plain", @nospecialize(n::ArrayNode{<:KBEntry})) = print(io, "(: × ", length(n.data.ii),")")
+Base.show(io::IO, ::MIME"text/plain", @nospecialize(n::ArrayNode{<:KBEntry})) = print(io, "(: × ", length(n.data.ii), ")")
 Base.size(A::KBEntry{E,T}) where {E,T} = ((:), length(A.ii))
 Base.size(A::KBEntry{E,T}, d) where {E,T} = (d == 1) ? (:) : length(A.ii)
-Base.Matrix(kb::KnowledgeBase, X::KBEntry{E,T}) where {E,T}  = kb[E][:,X.ii]
+Base.Matrix(kb::KnowledgeBase, X::KBEntry{E,T}) where {E,T} = kb[E][:, X.ii]
 Base.Matrix(X::KBEntry) = error("cannot instantiate Matrix from KBEntry without a KnowledgeBase, use Matrix(kb::KnowledgeBase, A::KBEntry)")
-Base.getindex(X::KBEntry, idcs)  = _getindex(X, idcs)
+Base.getindex(X::KBEntry, idcs) = _getindex(X, idcs)
 Base.axes(X::KBEntry, d) = d == 1 ? (:) : (1:length(X.ii))
-function ==(a::KBEntry{A,<:Any},b::KBEntry{B,<:Any}) where {A,B}
-    A != B && return(false)
-    return(a.ii == b.ii)
+function ==(a::KBEntry{A,<:Any}, b::KBEntry{B,<:Any}) where {A,B}
+    A != B && return (false)
+    return (a.ii == b.ii)
 end
 _getindex(x::KBEntry{E,T}, i) where {E,T} = KBEntry{E,T}(x.ii[i])
 _getindex(x::KBEntry{E,T}) where {E,T} = x
@@ -82,13 +82,13 @@ _getindex(x::KBEntry{E,T}, i::Integer) where {E,T} = KBEntry{E,T}(x.ii[i:i])
 MLUtils.numobs(a::KBEntry) = length(a.ii)
 HierarchicalUtils.NodeType(::Type{KBEntry}) = HierarchicalUtils.LeafNode()
 
-ChainRulesCore.ProjectTo(x::KBEntry{E,T}) where {E,T} = ProjectTo{KBEntry}(;E,T,ii = x.ii)
+ChainRulesCore.ProjectTo(x::KBEntry{E,T}) where {E,T} = ProjectTo{KBEntry}(; E, T, ii=x.ii)
 
 ########
 #   We do not do reduce, as it is potentially very dangerous as it might be dissinchronized with the knowledge base
 ########
 function Mill.catobs(A::KBEntry{E,T}, B::KBEntry{E,T}) where {E,T}
-	error("The catobs is not implemented for \"KBEntry\", as it might not be safe without KnowledgeBase")
+    error("The catobs is not implemented for \"KBEntry\", as it might not be safe without KnowledgeBase")
 end
 
 function reduce(::typeof(Mill.catobs), As::Tuple{Vararg{KBEntry{E,T}}}) where {E,T}
@@ -103,15 +103,15 @@ end
 #   THe dangerousness of getindex is questionably and will be removed on first trouble
 ########
 function Base.getindex(X::KBEntry{E,T}, idcs...) where {E,T}
-	D = length(X.ii)
-	if first(idcs) isa Colon
-		idcs = idcs[2:end]
-	end
-	if first(idcs) == Base.Slice(Base.OneTo(D))
-		idcs = idcs[2:end]
-	end
-	length(idcs) > 1 && error("cannot subsample rows of embedding vectors")
-	_getindex(X, idcs...)
+    D = length(X.ii)
+    if first(idcs) isa Colon
+        idcs = idcs[2:end]
+    end
+    if first(idcs) == Base.Slice(Base.OneTo(D))
+        idcs = idcs[2:end]
+    end
+    length(idcs) > 1 && error("cannot subsample rows of embedding vectors")
+    _getindex(X, idcs...)
 end
 
 
@@ -133,7 +133,7 @@ reduce(::typeof(Mill.catobs), as::AbstractVector{<:KnowledgeBase}) = _catobs_kbs
 
 function _catobs_kbs(as::AbstractVector{<:KnowledgeBase{KS,VS}}) where {KS,VS}
     offsets = _compute_offsets(as)
-    vs = map(KS) do k 
+    vs = map(KS) do k
         _catobs_kbs(offsets, [a[k] for a in as])
     end
     KnowledgeBase(NamedTuple{KS}(vs))
@@ -149,7 +149,7 @@ end
 
 function _catobs_kbs(offsets, as::AbstractVector{<:KBEntry{E,T}}) where {E,T}
     i = [a.ii for a in as]
-    ii = reduce(vcat,[a.ii .+ o for (a, o) in zip(as,offsets[E])])
+    ii = reduce(vcat, [a.ii .+ o for (a, o) in zip(as, offsets[E])])
     KBEntry{E,T}(ii)
 end
 
@@ -158,36 +158,44 @@ function _catobs_kbs(offsets, as::AbstractVector{<:ProductNode{T,<:Nothing}}) wh
     xs = T(_catobs_kbs(offsets, [a[i] for a in as]) for i in keys(as[1]))
     ProductNode(xs)
 end
- 
+
 function _catobs_kbs(offsets, as::AbstractVector{<:BagNode})
     d = [a.data for a in as]
     bags = reduce(vcat, [n.bags for n in as])
     BagNode(_catobs_kbs(offsets, d), bags, nothing)
 end
- 
+
+function _catobs_kbs(offset, as::AbstractVector{<:MaskedNode})
+    xs = _catobs_kbs(offset, [a.data for a in as])
+    MaskedNode(xs, reduce(vcat, [x.mask for x in as]))
+end
+
 function _compute_offsets(as::AbstractVector{<:KnowledgeBase{KS,VS}}) where {KS,VS}
-    o = map(KS) do k 
+    o = map(KS) do k
         o = 0
         c = zeros(Int, length(as))
-        for (i,a) in enumerate(as)
-            c[i] = o 
+        for (i, a) in enumerate(as)
+            c[i] = o
             o += numobs(a[k])
         end
-        return(c)
-    end    
+        return (c)
+    end
     NamedTuple{KS}(o)
 end
 
 ###########
-#	Plumbing to Mill --- propagation with Knowledge base
+#   Plumbing to Mill --- propagation with Knowledge base
 ###########
 function (m::Mill.ArrayModel)(kb::KnowledgeBase, x::ArrayNode{<:KBEntry})
-	xx = Matrix(kb, x.data)
-	m.m(xx)
+    xx = Matrix(kb, x.data)
+    m.m(xx)
 end
 
 (m::BagModel)(kb::KnowledgeBase, x::BagNode{<:AbstractMillNode}) = m.bm(m.a(m.im(kb, x.data), x.bags))
 (m::BagModel)(kb::KnowledgeBase, x::BagNode{Missing}) = m.bm(m.a(x.data, x.bags))
+
+(m::MaskedModel)(kb::KnowledgeBase, x::MaskedNode{<:AbstractMillNode}) = m.m(kb, x.data) .* x.mask'
+
 @generated function (m::ProductModel{<:NamedTuple{KM}})(kb::KnowledgeBase, x::ProductNode{<:NamedTuple{KD}}) where {KM,KD}
     @assert issubset(KM, KD)
     chs = map(KM) do k
@@ -216,7 +224,7 @@ end
 ###########
 import Mill: reflectinmodel, _reflectinmodel
 
-function _reflectinmodel(kb::KnowledgeBase,x::AbstractBagNode, fm, fa, fsm, fsa, s, args...)
+function _reflectinmodel(kb::KnowledgeBase, x::AbstractBagNode, fm, fa, fsm, fsa, s, args...)
     c = Mill.stringify(s)
     im, d = _reflectinmodel(kb, x.data, fm, fa, fsm, fsa, s * Mill.encode(1, 1), args...)
     agg = haskey(fsa, c) ? fsa[c](d) : fa(d)
@@ -245,7 +253,7 @@ function _reflectinmodel(kb::KnowledgeBase, x::AbstractProductNode, fm, fa, fsm,
 end
 
 function _reflectinmodel(kb::KnowledgeBase, x::ArrayNode, fm, fa, fsm, fsa, s, ski, ssi, ai)
-	xx = Matrix(kb, x.data)
+    xx = Matrix(kb, x.data)
     c = Mill.stringify(s)
     r = size(xx, 1)
     m = if haskey(fsm, c)
@@ -260,17 +268,24 @@ function _reflectinmodel(kb::KnowledgeBase, x::ArrayNode, fm, fa, fsm, fsa, s, s
 end
 
 
+function _reflectinmodel(kb::KnowledgeBase, x::AbstractMaskedNode, fm, fa, fsm, fsa, s, ski, args...)
+    m, s = _reflectinmodel(kb, x.data, fm, fa, fsm, fsa, s, ski, args...)
+    MaskedModel(m), s
+end
+
+
 ###########
 #  replacement in mill structures.
 ###########
 
 function Base.replace(x::KBEntry{E,T}, ps::Pair{Symbol,Symbol}...) where {E,T}
-    for (a, b) in ps 
-        E == a && return(KBEntry{b,T}(x.ii))
+    for (a, b) in ps
+        E == a && return (KBEntry{b,T}(x.ii))
     end
-    return(x)
+    return (x)
 end
 
-Base.replace(x::ArrayNode, ps::Pair{Symbol,Symbol}...) = ArrayNode(replace(x.data, ps...), x.metadata) 
+Base.replace(x::ArrayNode, ps::Pair{Symbol,Symbol}...) = ArrayNode(replace(x.data, ps...), x.metadata)
 Base.replace(x::BagNode, ps::Pair{Symbol,Symbol}...) = BagNode(replace(x.data, ps...), x.bags, x.metadata)
-Base.replace(x::ProductNode, ps::Pair{Symbol,Symbol}...) = ProductNode(map(k -> replace(k,ps...), x.data), x.metadata)
+Base.replace(x::ProductNode, ps::Pair{Symbol,Symbol}...) = ProductNode(map(k -> replace(k, ps...), x.data), x.metadata)
+Base.replace(x::MaskedNode, ps::Pair{Symbol,Symbol}...) = MaskedNode(map(k -> replace(k, ps...), x.data), x.mask)

@@ -128,7 +128,7 @@ function encode_action(ex::HGNN, kb::KnowledgeBase, action::GenericAction, kid::
 	previous_edges = filter(s -> startswith(String(s), "$(action.name)_"), keys(kb))
 	if !ex.model_params.lite && !isempty(previous_edges)
 		previous_edge = last(previous_edges)
-		x_edge = ProductNode((x_edge, ArrayNode(KBEntry(previous_edge, 1:nobs(x_edge)))))
+		x_edge = ProductNode((x_edge, ArrayNode(KBEntry(previous_edge, 1:numobs(x_edge)))))
 	end
 	ln = layer_name(kb, "$(action.name)")
 	kb = append(kb, ln, x_edge)
@@ -141,7 +141,7 @@ function encode_action(ex::HGNN, kb::KnowledgeBase, action::GenericAction, kid::
 			push!(bags[ex.predicate2id[a]], j)
 		end
 	end
-	xa = BagNode(ArrayNode(KBEntry(ln, 1:nobs(x_edge))), ScatteredBags(bags))
+	xa = BagNode(ArrayNode(KBEntry(ln, 1:numobs(x_edge))), ScatteredBags(bags))
 	xa, kb
 end
 

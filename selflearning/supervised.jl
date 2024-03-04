@@ -2,6 +2,7 @@ using NeuroPlanner
 using PDDL
 using Flux
 using JSON
+using CSV
 using SymbolicPlanners
 using PDDL: GenericProblem
 using SymbolicPlanners: PathSearchSolution
@@ -16,6 +17,7 @@ using Functors
 using Accessors
 using Logging
 using TensorBoardLogger
+using Comonicon
 
 include("solution_tracking.jl")
 include("problems.jl")
@@ -42,7 +44,6 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			reflectinmodel(h₀, d -> Dense(d, dense_dim, relu);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
 		end
 
-		logger=tblogger(filename*"_events.pb")
 		t = @elapsed minibatches = map(train_files) do problem_file
 			@show problem_file
 			println("creating sample from problem: ",problem_file)
@@ -51,9 +52,10 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			ds = fminibatch(pddld, domain, problem, plan)
 			dedu = @set ds.x = deduplicate(ds.x)
 			size_o, size_d =  Base.summarysize(ds), Base.summarysize(dedu)
-			println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size(d), digits =2),"%)")
+			println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size_o, digits =2),"%)")
 			dedu
 		end
+		logger=TBLogger(filename*"_events")
 		log_value(logger, "time_minibatch", t; step=0)
 		opt = AdaBelief();
 		ps = Flux.params(model);
@@ -62,18 +64,19 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 		serialize(filename*"_model.jls", model)	
 		model
 	end
-	planners = model isa NeuroPlanner.LevinModel ? [BFSPlanner] : [AStarPlanner, GreedyPlanner, W15AStarPlanner, W20AStarPlanner]
+	planners = model isa NeuroPlanner.LevinModel ? [BFSPlanner] : [AStarPlanner, GreedyPlanner]
 
 	stats = map(Iterators.product(planners, problem_files)) do (planner, problem_file)
 		used_in_train = problem_file ∈ train_files
 		@show problem_file
-		sol = solve_problem(pddld, problem_file, model, planner; return_unsolved = true)
+		sol = solve_problem(pddld, problem_file, model, planner; return_unsolved = true, max_time)
 		trajectory = sol.sol.status == :max_time ? nothing : sol.sol.trajectory
 		merge(sol.stats, (;used_in_train, planner = "$(planner)", trajectory, problem_file))
 	end
 	df = DataFrame(vec(stats))
 	mean(df.solved[.!df.used_in_train])
-	serialize(filename*"_stats.jls", stats)
+	serialize(filename*"_stats.jls", vec(stats))
+	# CSV.write(filename*"_stats.csv", df)
 	settings !== nothing && serialize(filename*"_settings.jls",settings)
 end
 
@@ -96,9 +99,9 @@ ArgParse example implemented in Comonicon.
 - `--residual <String>`:  residual connections between graph convolutions (none / dense / linear)
 
 max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
-domain_name = "ferry"
+domain_name = "ipc23_satellite"
 loss_name = "lstar"
-arch_name = "pddl"
+arch_name = "lrnn"
 """
 
 @main function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
@@ -106,16 +109,16 @@ arch_name = "pddl"
 	Random.seed!(seed)
 	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, dense_dim, dense_layers, residual, seed)
 	@show settings
-	archs = Dict("asnet" => ASNet, "pddl" => HyperExtractor, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
+	archs = Dict("asnet" => ASNet, "lrnn" => LRNN, "mixedlrnn" => MixedLRNN, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
 	residual = Symbol(residual)
 	domain_pddl, problem_files = getproblem(domain_name, false)
 	# problem_files = filter(s -> isfile(plan_file(domain_name, s)), problem_files)
 	train_files = filter(s -> isfile(plan_file(s)), problem_files)
-	train_files = sample(train_files, min(div(length(problem_files), 2), length(train_files)), replace = false)
+	train_files = domain_name ∉ IPC_PROBLEMS ? sample(train_files, min(div(length(problem_files), 2), length(train_files)), replace = false) : train_files
 	fminibatch = NeuroPlanner.minibatchconstructor(loss_name)
 	hnet = archs[arch_name]
 
-	filename = joinpath("super", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+	filename = joinpath("super_amd", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
 	experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch; max_steps, max_time, graph_layers, residual, dense_layers, dense_dim, settings)
 end
 

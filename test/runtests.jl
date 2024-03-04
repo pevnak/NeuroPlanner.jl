@@ -20,6 +20,9 @@ _isapprox(a::Tuple, b::Tuple; tol = 1e-5) = all(_isapprox(a[k], b[k]; tol) for k
 _isapprox(a::AbstractArray, b::AbstractArray; tol = 1e-5) = all(_isapprox.(a,b;tol))
 include("dedu_matrix.jl")
 include("knowledge_base.jl")
+include("datanode.jl")
+include("modelnode.jl")
+
 
 # domain = load_domain("sokoban.pddl")
 # problem = load_problem("s1.pddl")
@@ -38,7 +41,7 @@ problem = load_problem("../classical-domains/classical/driverlog/pfile1.pddl")
 # problem = load_problem("../classical-domains/classical/briefcaseworld/pfile1.pddl")
 
 @testset "extraction of hypergraph" begin
-	for arch in (HyperExtractor, ASNet, HGNNLite, HGNN)
+	for arch in (MixedLRNN, LRNN, ASNet, HGNNLite, HGNN)
 		ex = arch(domain)
 		ex = NeuroPlanner.specialize(ex, problem)
 		@test ex.init_state === nothing
@@ -75,7 +78,7 @@ end
 	trajectory = sol.trajectory
 	satisfy(domain, sol.trajectory[end], goal)
 
-	for arch in (HyperExtractor, ASNet, HGNNLite, HGNN)
+	for arch in (MixedLRNN, LRNN, ASNet, HGNNLite, HGNN)
 		# get training example by running A* planner with h_add heuristic
 		pddle = NeuroPlanner.specialize(arch(domain), problem)
 		m = reflectinmodel(pddle(state), d -> Dense(d,10), SegmentedMean;fsm = Dict("" =>  d -> Dense(d,1)))
@@ -128,7 +131,7 @@ end
 	domain = load_domain(IPCInstancesRepo,ipcyear, domain_name)
 	problems = list_problems(IPCInstancesRepo, ipcyear, domain_name)
 
-	for arch in (HyperExtractor, ASNet, HGNNLite, HGNN)
+	for arch in (MixedLRNN, LRNN, ASNet, HGNNLite, HGNN)
 		#create model from some problem instance
 		pddld = arch(domain)
 		model = let 

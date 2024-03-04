@@ -13,7 +13,7 @@ BFSPathNode(id, state::S, path_cost, log_path_prob, log_action_probs, parent_id,
 BFSPathNode(id, state::S, path_cost, log_path_prob, log_action_probs) where {S} =
     BFSPathNode{S}(id, state, Float32(path_cost), Float32(log_path_prob), Float32.(log_action_probs), nothing, nothing)
 
-function reconstruct(node_id::UInt, search_tree::Dict{UInt,BFSPathNode{S}}) where S
+function SymbolicPlanners.reconstruct(node_id::UInt, search_tree::Dict{UInt,BFSPathNode{S}}) where S
     plan, traj = Term[], S[]
     while node_id in keys(search_tree)
         node = search_tree[node_id]

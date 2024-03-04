@@ -72,6 +72,27 @@ using Flux
 			@test Matrix(kbb, kbb[:c].data.data) ≈ hcat(Matrix(kb1, kb1[:c].data.data), Matrix(kb2, kb2[:c].data.data))
 		end
 
+		@testset "MaskedNode" begin
+			kb1 = KnowledgeBase((;a = randn(Float32, 3,7), b = randn(Float32, 2,4)))
+			c1 = ArrayNode(KBEntry(:a, [4,1,3,2]))
+			d1 = ArrayNode(KBEntry(:b, [1,3,3,2]))
+			kb1 = append(kb1, :c, MaskedNode(ProductNode((c1, d1)), BitVector([1,1,0,1])))
+			kb1 = append(kb1, :d, MaskedNode(ProductNode((a = c1, b = d1))))
+
+			kb2 = KnowledgeBase((;a = randn(Float32, 3,4), b = randn(Float32, 2,4)))
+			c2 = ArrayNode(KBEntry(:a, [1,4,2,3]))
+			d2 = ArrayNode(KBEntry(:b, [4,1,3,4]))
+			kb2 = append(kb2, :c, MaskedNode(ProductNode((c2, d2))))
+			kb2 = append(kb2, :d, MaskedNode(ProductNode((a = c2, b = d2)), BitVector([1,0,0,1])))
+
+
+			kbb = _catobs_kbs([kb1,kb2])
+			@test Matrix(kbb, kbb[:c].data.data[1].data) ≈ hcat(Matrix(kb1, kb1[:c].data.data[1].data), Matrix(kb2, kb2[:c].data.data[1].data))
+			@test Matrix(kbb, kbb[:c].data.data[2].data) ≈ hcat(Matrix(kb1, kb1[:c].data.data[2].data), Matrix(kb2, kb2[:c].data.data[2].data))
+			@test Matrix(kbb, kbb[:d].data[:a].data) ≈ hcat(Matrix(kb1, kb1[:d].data[:a].data), Matrix(kb2, kb2[:d].data[:a].data))
+			@test Matrix(kbb, kbb[:d].data[:b].data) ≈ hcat(Matrix(kb1, kb1[:d].data[:b].data), Matrix(kb2, kb2[:d].data[:b].data))
+		end
+
 		@testset "Replace" begin
 			@test KBEntry(:a, [4,1,3,2]) == KBEntry(:a, [4,1,3,2]) 
 			@test KBEntry(:a, [4,1,3,2]) != KBEntry(:b, [4,1,3,2]) 
@@ -109,7 +130,6 @@ using Flux
 			@test m(kb, ds) ≈ m.m(Matrix(kb, a))
 			@test gradient(kb -> sum(sin.(Matrix(kb, a))), kb)[1][:kb][:a] ≈ gradient(x -> sum(sin.(x)), kb[:a])[1]
 			@test gradient(kb -> sum(sin.(m(kb, ds))), kb)[1][:kb][:a] ≈  gradient(x -> sum(sin.(m.m(x))), kb[:a])[1]
-			@test gradient(x -> sum(sin.(m.m(x))), kb[:a])[1]
 		end
 
 		@testset "Full stack " begin
@@ -117,6 +137,7 @@ using Flux
 			a = KBEntry(:a, [4,1,3,2])
 			b = KBEntry(:b, [3,1,3,2])
 			kb = NeuroPlanner.append(kb, :c, ProductNode((;a = ArrayNode(a), b = ArrayNode(b))))
+			kb = NeuroPlanner.append(kb, :d, MaskedNode(ProductNode((;a = ArrayNode(a), b = ArrayNode(b)), BitVector([0, 1, 1, 0]))))
 			m = reflectinmodel(kb)
 
 			@test gradient(kb -> sum(sin.(m(kb))), kb) !== nothing
@@ -145,6 +166,7 @@ using Flux
 				n = rand(0:4)
 				bags = Mill.length2bags([n, 4 - n])
 				append(kb, :d, BagNode(ProductNode((a = c, b = d)), bags))
+				append(kb, :e, MaskedNode(ProductNode((a = c, b = d))))
 			end
 			m = reflectinmodel(kbs[1])
 			@test reduce(hcat, map(m, kbs)) ≈ m(reduce(catobs, kbs))
@@ -189,12 +211,25 @@ using Flux
 			@test _isapprox(gradient(model -> sum(sin.(model(kb))), m)[1], gradient(model -> sum(sin.(model(dekb))), m)[1])
 		end
 
+		@testset "MaskedNode" begin 
+			a = Float32[1 1 2 2 3 3]
+			b = Float32[1 2 2 2 2 3]
+			kb = KnowledgeBase((;a, b, c = MaskedNode(ProductNode((KBEntry(:a, 1:6), KBEntry(:b, 1:6),)), BitVector([1, 0, 1, 1, 0, 0]))))
+			m = reflectinmodel(kb, d -> Dense(d,10), SegmentedMean)
+			dekb = NeuroPlanner.deduplicate(kb)
+			@test m(dekb) ≈ m(kb)
+			@test dekb[:c] isa NeuroPlanner.DeduplicatingNode
+			@test dekb[:c].ii == [1,2,3,3,4,5]
+			@test _isapprox(gradient(model -> sum(sin.(model(kb))), m)[1], gradient(model -> sum(sin.(model(dekb))), m)[1])
+		end
+
 		@testset "More complicated problem" begin 
 			a = Float32[1 1 2 2 3 3]
 			b = Float32[1 1 2 2 3 3]
 			kb = KnowledgeBase((;a, b, 
 				c = ProductNode((KBEntry(:a, 1:6), KBEntry(:b, 1:6),)),
 				d = BagNode(KBEntry(:c, [1,1,2,2,3,3]), [1:2,1:2,3:4,4:5,4:5]),
+				e = MaskedNode(ProductNode((KBEntry(:a, 1:6), KBEntry(:b, 1:6),)), BitVector([1, 0, 1, 1, 0, 0]))
 			))
 			m = reflectinmodel(kb, d -> Dense(d,10), SegmentedMean)
 			dekb = deduplicate(kb)

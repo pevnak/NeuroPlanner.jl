@@ -107,7 +107,7 @@ ArgParse example implemented in Comonicon.
 max_steps = 10_000; max_time = 30; graph_layers = 1; dense_dim = 32; dense_layers = 2; residual = "none"; seed = 1;  opt_type = "mean"; epsilon = 0.0; max_loss = 0.0; sort_by_complexity = false; artificial_goals = false; double_maxtime = false; solve_solved = false; stop_after = 32; max_epochs = 100; max_sim_time = Int(23.5*3600)
 domain_name = "ferry"
 loss_name = "l2"
-arch_name = "hgnn"
+arch_name = "mixedlrnn"
 planner_name = "astar"
 """
 

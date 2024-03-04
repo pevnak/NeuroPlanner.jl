@@ -8,7 +8,10 @@ using DataFrames
 using HypothesisTests
 using Statistics
 using PrettyTables
+using Term
 using Printf
+IPC_PROBLEM_NAMES = ["ferry", "rovers","blocksworld","floortile","satellite","spanner","childsnack","miconic","sokoban","transport"]
+IPC_PROBLEMS = ["ipc23_"*s for s in IPC_PROBLEM_NAMES]
 
 function lexargmax(a, b)
 	@assert length(a) == length(b)
@@ -41,7 +44,9 @@ function compute_stats(df; max_time = 30)
 		i2 = filter(i -> !sub_df.used_in_train[i], ii[2:2:end])
 		solved = sub_df.solution_time .≤ max_time
 		(;	trn_solved = mean(solved[sub_df.used_in_train]),
+			trn_solved_sum = sum(solved[sub_df.used_in_train]),
 	     	tst_solved = mean(solved[.!sub_df.used_in_train]),
+	     	tst_solved_sum = sum(solved[.!sub_df.used_in_train]),
 	     	tst_solved_fold1 = mean(solved[i1]),
 	     	tst_solved_fold2 = mean(solved[i2]),
 	     	expanded_fold1 = mean(sub_df.expanded[i1]),
@@ -115,7 +120,6 @@ function show_length(df; backend = Val(:text), max_time = 30)
 	d = Matrix(t[:,2:end])
 	for i in 2:3
 		d += Matrix(extract_length(df, i; max_time)[:,2:end])
-
 	end
 	data = hcat(t.domain_name, round.(d ./ 3, digits = 1))
 
@@ -128,18 +132,21 @@ function show_length(df; backend = Val(:text), max_time = 30)
 	pretty_table(data ; backend, header = [split(s," ")[end] for s in header])
 end
 
-function submit_missing(;dry_run = true, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
-	filename = joinpath("super", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+function submit_missing(;dry_run = true, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super")
+	filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
 	filename = filename*"_stats.jls"
-	isfile(filename) && return(false)
-	@show filename
+	if isfile(filename)
+		println(@yellow "finished "*filename)
+	 	return(false)
+	end
+	println(@red "submit "*filename)
 	dry_run || run(`sbatch -D /home/pevnytom/julia/Pkg/NeuroPlanner.jl/selflearning slurm.sh $domain_name $dense_dim $graph_layers $residual $loss_name $arch_name $seed`)
 	return(true)
 end
 
-function read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
+function read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir="super")
 	# filename = joinpath("super", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
-	filename = joinpath("super", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+	filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
 	filename = filename*"_stats.jls"
 	!isfile(filename) && return(DataFrame())
 	df = DataFrame(vec(deserialize(filename)))
@@ -167,13 +174,68 @@ function make_table(df, k, high; max_time = 30, backend = Val(:text), agg = mean
 	db = joindomains(_make_table("GreedyPlanner"), _make_table("BFSPlanner"))
 	db = db[:,[:domain_name, :lstar, :lgbfs, :lrt, :l2, :bellman, :levinloss]]
 
-
 	header = [names(da)..., " ", names(db)[2:end]...]
 	data = hcat(Matrix(da), fill(" ", size(da,1)), Matrix(db)[:,2:end])
 	ha = [high(Matrix(da), i, j) for i in 1:size(da,1), j in 1:size(da,2)]
 	hb = [high(Matrix(db), i, j) for i in 1:size(db,1), j in 1:size(db,2)]
 	h = hcat(ha, falses(size(da,1)), hb[:,2:end])
 
+	highlighters = backend == Val(:latex) ? LatexHighlighter((data, i, j) -> h[i, j], "textbf") :  Highlighter((data, i, j) -> h[i, j], crayon"yellow")
+	pretty_table(data ; header, backend , highlighters)
+end
+
+function vitek_table(df, k, high; max_time = 30, backend = Val(:text), agg = mean)
+	function _make_table(planner) 
+		ddf = filter(r -> r.planner == planner, df)
+		show_loss(compute_stats(ddf;max_time), k; agg)
+	end
+	da = _make_table("AStarPlanner")
+	da = da[:,[:domain_name, :lstar, :l2]]
+
+	header = [names(da)...]
+	data = Matrix(da)
+	h = [high(Matrix(da), i, j) for i in 1:size(da,1), j in 1:size(da,2)]
+	h[h .=== missing] .= false
+	highlighters = backend == Val(:latex) ? LatexHighlighter((data, i, j) -> h[i, j], "textbf") :  Highlighter((data, i, j) -> h[i, j], crayon"yellow")
+	pretty_table(data ; header, backend , highlighters)
+end
+
+function show_top_k(df, column, high; max_time = 30, backend = Val(:text), agg = mean, arch_name = "mixedlrnn", loss_name = "lstar")
+	ddf = filter(r -> r.planner == "AStarPlanner" && r.arch_name == arch_name && r.loss_name == loss_name, df)
+	ddf = compute_stats(ddf;max_time)
+	gdf = DataFrames.groupby(ddf, [:domain_name, :arch_name, :loss_name])
+	rdf = combined_stats = combine(gdf) do sub_df
+		domain_name = sub_df.domain_name[1]
+		n = size(sub_df,1)
+		println(domain_name, "  ", n)
+		sort(sub_df, :tst_solved, rev = true)[1:min(n,3),:]
+	end
+
+	rdf[:,["domain_name","graph_layers", "residual", "dense_layers", "dense_dim", "seed"]]
+	key ∉ (:tst_solved, :expanded, :solution_time, :sol_length) && error("works only for tst_solved and :expanded are supported")
+	k1 = Symbol("$(key)_fold1")
+	k2 = Symbol("$(key)_fold2")
+	dfs = mapreduce(joindomains, unique(combined_stats.loss_name)) do ln 
+		df1 = filter(r -> r.loss_name == ln, combined_stats)
+		gdf = DataFrames.groupby(df1, :domain_name)
+		dfs = combine(gdf) do sub_df
+			# (;average = mean(sub_df.tst_solved), maximum = maximum(sub_df.tst_solved))
+			v = map(unique(sub_df.seed)) do s
+				subsub_df = filter(r -> r.seed == s, sub_df)
+				i = subsub_df[lexargmax(subsub_df.tst_solved_fold1, -subsub_df.sol_length_fold1),k2]
+				j = subsub_df[lexargmax(subsub_df.tst_solved_fold2, -subsub_df.sol_length_fold2),k1]
+				(i+j) / 2
+			end |> agg
+			DataFrame("$ln" => [v])
+		end
+		dfs
+	end;
+
+
+	header = [names(da)...]
+	data = Matrix(da)
+	h = [high(Matrix(da), i, j) for i in 1:size(da,1), j in 1:size(da,2)]
+	h[h .=== missing] .= false
 	highlighters = backend == Val(:latex) ? LatexHighlighter((data, i, j) -> h[i, j], "textbf") :  Highlighter((data, i, j) -> h[i, j], crayon"yellow")
 	pretty_table(data ; header, backend , highlighters)
 end
@@ -202,9 +264,13 @@ function collect_stats()
 	seed = 1
 	dry_run = true
 	problems = ["blocks","ferry","npuzzle","spanner","elevators_00"]
-	stats = map(Iterators.product(("hgnn",), ("bellman", "lstar", "l2", "lrt", "lgbfs",), problems, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+	stats = map(Iterators.product(("hgnn","hgnnlite","pddl","asnet"), ("bellman", "lstar", "l2", "lrt", "lgbfs",), problems, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
 		# submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
 		read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
+	end |> vec
+
+	amd_stats = map(Iterators.product(("mixedlrnn",), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+		submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
 	end |> vec
 
 	lstats = map(Iterators.product(("levinasnet",), ("levinloss",), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
@@ -215,6 +281,58 @@ function collect_stats()
 	df = reduce(vcat, filter(!isempty, vec(vcat(stats, lstats))))
 	df = CSV.read("super/results.csv", DataFrame)
 	df
+end
+
+function show_vitek()
+	max_steps = 10_000
+	max_time = 30
+	dense_layers = 2
+	seed = 1
+	dry_run = true
+	domain_name = "ferry"
+	arch_name = "mixedlrnn"
+	loss_name = "lstar"
+	graph_layers = 2
+	residual = "none"
+	dense_layers = 2
+	dense_dim = 8
+	seed = 2
+	problems = ["blocks","ferry","npuzzle","spanner","elevators_00"]
+
+	amd_stats = map(Iterators.product(("mixedlrnn","asnet"), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+		submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
+	end |> vec |> mean
+
+	amd_stats = map(Iterators.product(("mixedlrnn","asnet"), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+		read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir="super_amd")
+	end |> vec
+	df = reduce(vcat, filter(!isempty, amd_stats))
+	vitek_table(filter(r -> r.arch_name .== "mixedlrnn", df), :tst_solved, highlight_max)
+	vitek_table(filter(r -> r.arch_name .== "asnet", df), :tst_solved, highlight_max)
+
+	# CSV.write("super_amd/results.csv", df)
+	# vitek_table(filter(r -> r.arch_name .== "lrnn", df), :tst_solved, highlight_max)
+end
+
+function tabulate_gusta()
+	df  = CSV.read("super_amd/results.csv", DataFrame)
+	dff = CSV.read("super/results.csv", DataFrame)
+	df = vcat(df, dff)
+	archs = 
+
+	function _make_table(planner, df;max_time = 30) 
+		ddf = filter(r -> r.planner == planner, df)
+		show_loss(compute_stats(ddf;max_time), :tst_solved; agg = mean)
+	end
+
+	dff = map(unique(df.arch_name)) do arch
+		dff = filter(r -> r.arch_name == arch && r.loss_name == "lstar", df)
+		isempty(dff) && return(missing)
+		da = _make_table("AStarPlanner", dff)
+		rename(da, :lstar => arch)
+	end;
+	reduce((a,b) -> leftjoin(a,b,on=:domain_name), skipmissing(dff))
+
 end
 
 df = CSV.read("super/results.csv", DataFrame)

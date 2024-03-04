@@ -55,8 +55,16 @@ end
 # (m::AbstractMillModel)(kb::KnowledgeBase, dedu::DeduplicatingNode{<:AbstractMillNode}) = m(kb, dedu.x)[:,dedu.ii]
 
 function deduplicate(kb::KnowledgeBase)
+	ii = Int[]
 	for k in keys(kb)
-		kb = replace(kb, k, _deduplicate(kb, kb[k])[1])
+		new_entry, ii = _deduplicate(kb, kb[k])
+		kb = replace(kb, k, new_entry)
+	end
+	if length(ii) == length(unique(ii))
+		println("all entries are unique")
+	else 
+		p = round(100*(1 - length(unique(ii)) / length(ii)), digits = 2)
+		println("$(p) entries are duplicate")
 	end
 	kb
 end
@@ -95,6 +103,15 @@ function _deduplicate(kb::KnowledgeBase, ds::ProductNode)
 	dedu_ds = ProductNode(map(x -> x[1][mask], xs))
 	dedu_ds = DeduplicatingNode(dedu_ds, ii)
 	dedu_ds, ii
+end
+
+
+function _deduplicate(kb::KnowledgeBase, ds::MaskedNode)
+    x, ii = _deduplicate(kb, ds.data)
+    mask, ii = find_duplicates(vcat(ii', ds.mask'))
+    dedu_ds = MaskedNode(x[mask], ds.mask[mask])
+    dedu_ds = DeduplicatingNode(dedu_ds, ii)
+    dedu_ds, ii
 end
 
 
