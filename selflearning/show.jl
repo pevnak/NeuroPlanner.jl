@@ -292,7 +292,7 @@ function show_vitek()
 	domain_name = "ferry"
 	arch_name = "mixedlrnn"
 	loss_name = "lstar"
-	graph_layers = 2
+	graph_layers = 3
 	residual = "none"
 	dense_layers = 2
 	dense_dim = 8

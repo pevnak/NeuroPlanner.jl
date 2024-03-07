@@ -40,12 +40,14 @@ include("relational/deduplication.jl")
 export deduplicate
 include("relational/dedu_matrix.jl")
 include("relational/mha.jl")
+include("relational/renamer.jl")
 export MultiheadAttention
 
 # a basic architecture based on hyper-graph representatation of predicates
 include("lrnn/pure_extractor.jl")
 include("lrnn/mixed_extractor.jl")
-export MixedLRNN, LRNN 
+include("lrnn/mixed_extractor2.jl")
+export MixedLRNN, MixedLRNN2, LRNN 
 
 # ASNet and HGNN by Silvia
 include("asnets/extractor.jl")

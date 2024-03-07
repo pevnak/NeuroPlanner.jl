@@ -76,7 +76,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 	df = DataFrame(vec(stats))
 	mean(df.solved[.!df.used_in_train])
 	serialize(filename*"_stats.jls", vec(stats))
-	# CSV.write(filename*"_stats.csv", df)
+	CSV.write(filename*"_stats.csv", df)
 	settings !== nothing && serialize(filename*"_settings.jls",settings)
 end
 

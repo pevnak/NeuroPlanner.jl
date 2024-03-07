@@ -103,7 +103,7 @@ function _next_states(domain, problem, sᵢ, st::Nothing)
 	isempty(acts) && return([])
 	hsᵢ = hash(sᵢ)
 	map(acts) do act
-		state = execute(domain, sᵢ, act; check=false)
+		state = PDDL.execute(domain, sᵢ, act; check=false)
 		(;state,
 		  id = hash(state),
 		  parent_action = act,
