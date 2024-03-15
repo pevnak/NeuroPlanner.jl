@@ -134,9 +134,12 @@ end
 
 function submit_missing(;dry_run = true, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super")
 	filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
-	filename = filename*"_stats.jls"
-	if isfile(filename)
-		println(@yellow "finished "*filename)
+	if isfile(filename*"_stats.jls")
+		println(@green "finished stats "*filename)
+	 	return(false)
+	end
+	if isfile(filename*"_model.jls")
+		println(@yellow "finished model "*filename)
 	 	return(false)
 	end
 	println(@red "submit "*filename)
@@ -314,42 +317,21 @@ function show_vitek()
 	# vitek_table(filter(r -> r.arch_name .== "lrnn", df), :tst_solved, highlight_max)
 end
 
-function tabulate_gusta()
-	df  = CSV.read("super_amd/results.csv", DataFrame)
-	dff = CSV.read("super/results.csv", DataFrame)
-	df = vcat(df, dff)
-	archs = 
+# df = CSV.read("super/results.csv", DataFrame)
+# df = filter(r -> r.arch_name ∈ ("hgnn", "levinasnet"), df);
 
-	function _make_table(planner, df;max_time = 30) 
-		ddf = filter(r -> r.planner == planner, df)
-		show_loss(compute_stats(ddf;max_time), :tst_solved; agg = mean)
-	end
+# # Table 1 in the main paper
+# # backend = Val(:text)
+# backend = Val(:latex)
+# make_table(df, :tst_solved, highlight_max; max_time =  5, backend,  agg = x -> round(Int, mean(100*x)))
 
-	dff = map(unique(df.arch_name)) do arch
-		dff = filter(r -> r.arch_name == arch && r.loss_name == "lstar", df)
-		isempty(dff) && return(missing)
-		da = _make_table("AStarPlanner", dff)
-		rename(da, :lstar => arch)
-	end;
-	reduce((a,b) -> leftjoin(a,b,on=:domain_name), skipmissing(dff))
+# # Table 1 in supplementary (mean and standard deviation)
+# meanstd_text(x) = "$(round(Int, mean(100*x))) ± $(round(Int, std(100*x)))"
+# meanstd_latex(x) = "\$ $(round(Int, mean(100*x))) \\pm $(round(Int, std(100*x))) \$"
+# make_table(df, :tst_solved, nohighlight; backend, max_time =  5, agg = backend == Val(:latex) ? meanstd_latex : meanstd_text)
 
-end
+# # Table 2 in supplementary (average number of expanded states)
+# make_table(df, :expanded, highlight_min; max_time =  30, backend,  agg = x -> round(Int, mean(x)))
 
-df = CSV.read("super/results.csv", DataFrame)
-df = filter(r -> r.arch_name ∈ ("hgnn", "levinasnet"), df);
-
-# Table 1 in the main paper
-# backend = Val(:text)
-backend = Val(:latex)
-make_table(df, :tst_solved, highlight_max; max_time =  5, backend,  agg = x -> round(Int, mean(100*x)))
-
-# Table 1 in supplementary (mean and standard deviation)
-meanstd_text(x) = "$(round(Int, mean(100*x))) ± $(round(Int, std(100*x)))"
-meanstd_latex(x) = "\$ $(round(Int, mean(100*x))) \\pm $(round(Int, std(100*x))) \$"
-make_table(df, :tst_solved, nohighlight; backend, max_time =  5, agg = backend == Val(:latex) ? meanstd_latex : meanstd_text)
-
-# Table 2 in supplementary (average number of expanded states)
-make_table(df, :expanded, highlight_min; max_time =  30, backend,  agg = x -> round(Int, mean(x)))
-
-# Table 3 in supplementary (average length of the solutions)
-show_length(df; backend, max_time = 5)
+# # Table 3 in supplementary (average length of the solutions)
+# show_length(df; backend, max_time = 5)
