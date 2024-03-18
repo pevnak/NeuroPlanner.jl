@@ -33,6 +33,7 @@ export initproblem
 #	A general support for architectures
 #####
 include("mill_extension/mill_extension.jl")
+using .MillExtension: MaskedNode, AbstractMaskedNode, MaskedModel
 include("relational/knowledge_base.jl")
 include("relational/knowledge_model.jl")
 export KBEntry, KnowledgeBase, append
@@ -48,6 +49,10 @@ include("lrnn/pure_extractor.jl")
 include("lrnn/mixed_extractor.jl")
 include("lrnn/mixed_extractor2.jl")
 export MixedLRNN, MixedLRNN2, LRNN 
+
+# Object Binary structure by Sira and Horcik
+include("object_binary/normal/extractor.jl")
+export ObjectBinary
 
 # ASNet and HGNN by Silvia
 include("asnets/extractor.jl")
