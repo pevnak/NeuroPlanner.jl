@@ -77,7 +77,7 @@ end
 	plan = collect(sol)
 	trajectory = sol.trajectory
 	satisfy(domain, sol.trajectory[end], goal)
-	
+
 	for arch in (MixedLRNN, LRNN, ObjectBinary, ASNet, HGNNLite, HGNN)
 		# get training example by running A* planner with h_add heuristic
 		pddle = NeuroPlanner.specialize(arch(domain), problem)
@@ -131,7 +131,7 @@ end
 	domain = load_domain(IPCInstancesRepo,ipcyear, domain_name)
 	problems = list_problems(IPCInstancesRepo, ipcyear, domain_name)
 
-	for arch in (MixedLRNN, LRNN, ObjectBinary, ASNet, HGNNLite, HGNN)		
+	for arch in (MixedLRNN, LRNN, ObjectBinary, ASNet, HGNNLite, HGNN)
 		#create model from some problem instance
 		pddld = arch(domain)
 		model = let 
