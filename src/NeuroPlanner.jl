@@ -33,7 +33,6 @@ export initproblem
 #	A general support for architectures
 #####
 include("mill_extension/mill_extension.jl")
-using .MillExtension: MaskedNode, AbstractMaskedNode, MaskedModel
 include("relational/knowledge_base.jl")
 include("relational/knowledge_model.jl")
 export KBEntry, KnowledgeBase, append
