@@ -1,12 +1,4 @@
-module MillExtension
-
-using Mill
 import Mill: catobs
-
-using Flux
-using HierarchicalUtils
-using MLUtils
-using HierarchicalUtils
 
 import Base: *, ==
 
@@ -17,19 +9,21 @@ const VecOrTupOrNTup{T} = Union{Vector{<:T},Tuple{Vararg{T}},NamedTuple{K,<:Tupl
 const Maybe{T} = Union{T,Missing}
 const Optional{T} = Union{T,Nothing}
 
-const DOCTEST_FILTER = r"\s*-?[0-9]+\.[0-9]+[\.]*\s*"
-
-const AbstractMillStruct = Union{AbstractMillModel,AbstractMillNode}
-
-include("datanodes/datanode.jl")
+include("maskednode.jl")
 export AbstractMaskedNode
 export MaskedNode
 
-include("modelnodes/modelnode.jl")
+include("maskedmodel.jl")
 export MaskedModel
 
-include("show.jl")
 
-include("hierarchical_utils.jl")
+import Mill: _levelparams, _show_submodels
+_levelparams(m::MaskedModel) = Flux.params(m.m)
 
-end
+
+import HierarchicalUtils: NodeType, LeafNode, children
+@nospecialize
+NodeType(::Type{<:BitVector}) = LeafNode()
+children(n::MaskedNode) = (n.data, n.mask)
+children(n::MaskedModel) = (n.m,)
+@specialize
