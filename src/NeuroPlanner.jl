@@ -49,6 +49,10 @@ include("lrnn/mixed_extractor.jl")
 include("lrnn/mixed_extractor2.jl")
 export MixedLRNN, MixedLRNN2, LRNN 
 
+# Object Binary structure by Sira and Horcik
+include("object_binary/normal/extractor.jl")
+export ObjectBinary
+
 # ASNet and HGNN by Silvia
 include("asnets/extractor.jl")
 export ASNet

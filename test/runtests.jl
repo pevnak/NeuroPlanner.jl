@@ -41,7 +41,7 @@ problem = load_problem("../classical-domains/classical/driverlog/pfile1.pddl")
 # problem = load_problem("../classical-domains/classical/briefcaseworld/pfile1.pddl")
 
 @testset "extraction of hypergraph" begin
-	for arch in (MixedLRNN, LRNN, ASNet, HGNNLite, HGNN)
+	for arch in (MixedLRNN, LRNN, ObjectBinary, ASNet, HGNNLite, HGNN)
 		ex = arch(domain)
 		ex = NeuroPlanner.specialize(ex, problem)
 		@test ex.init_state === nothing
@@ -78,7 +78,7 @@ end
 	trajectory = sol.trajectory
 	satisfy(domain, sol.trajectory[end], goal)
 
-	for arch in (MixedLRNN, LRNN, ASNet, HGNNLite, HGNN)
+	for arch in (MixedLRNN, LRNN, ObjectBinary, ASNet, HGNNLite, HGNN)
 		# get training example by running A* planner with h_add heuristic
 		pddle = NeuroPlanner.specialize(arch(domain), problem)
 		m = reflectinmodel(pddle(state), d -> Dense(d,10), SegmentedMean;fsm = Dict("" =>  d -> Dense(d,1)))
@@ -91,7 +91,7 @@ end
 			@test reduce(hcat, map(m, xx[ii])) ≈  m(Flux.batch(xx[ii]))
 		end
 
-		@testset "init-goal invariant"
+		@testset "init-goal invariant" begin
 			ex = arch(domain)
 			iex = add_initstate(ex, problem)
 			gex = add_goalstate(ex, problem)
@@ -100,7 +100,7 @@ end
 			gi = goalstate(domain, problem)
 			model = reflectinmodel(iex(si), d -> Dense(d,10), SegmentedMean;fsm = Dict("" =>  d -> Dense(d,1)))
 
-			@test m(iex(goalstate(domain, problem))) ≈ model(gex(initstate(domain, problem)))
+			@test model(iex(goalstate(domain, problem))) ≈ model(gex(initstate(domain, problem)))
 		end
 
 		@testset "gradient path" begin 
@@ -131,7 +131,7 @@ end
 	domain = load_domain(IPCInstancesRepo,ipcyear, domain_name)
 	problems = list_problems(IPCInstancesRepo, ipcyear, domain_name)
 
-	for arch in (MixedLRNN, LRNN, ASNet, HGNNLite, HGNN)
+	for arch in (MixedLRNN, LRNN, ObjectBinary, ASNet, HGNNLite, HGNN)
 		#create model from some problem instance
 		pddld = arch(domain)
 		model = let 
