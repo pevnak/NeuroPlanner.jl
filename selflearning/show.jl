@@ -24,15 +24,26 @@ end
 
 function highlight_max(data, i, j)
 	j == 1 && return(false)
-	maximum(data[i,2:end]) == data[i,j]
+	maximum(skipmissing(data[i,2:end])) == data[i,j]
 end
 
 function highlight_min(data, i, j)
 	j == 1 && return(false)
-	minimum(data[i,2:end]) == data[i,j]
+	minimum(skipmissing(data[i,2:end])) == data[i,j]
 end
 
 nohighlight(args...) = false
+
+
+function highlight_table(df; backend = Val(:text), high = highlight_max)
+	header = [names(df)...]
+	data = Matrix(df)
+	h = [highlight_max(Matrix(df), i, j) for i in 1:size(df,1), j in 1:size(df,2)]
+	h[h .=== missing] .= false
+	highlighters = Highlighter((data, i, j) -> h[i, j], crayon"yellow")
+	pretty_table(data ; header, backend = Val(:text) , highlighters)
+end
+
 
 joindomains(a,b) = outerjoin(a, b, on = :domain_name)
 
@@ -194,13 +205,8 @@ function vitek_table(df, k, high; max_time = 30, backend = Val(:text), agg = mea
 	end
 	da = _make_table("AStarPlanner")
 	da = da[:,[:domain_name, :lstar, :l2]]
-
-	header = [names(da)...]
-	data = Matrix(da)
-	h = [high(Matrix(da), i, j) for i in 1:size(da,1), j in 1:size(da,2)]
-	h[h .=== missing] .= false
-	highlighters = backend == Val(:latex) ? LatexHighlighter((data, i, j) -> h[i, j], "textbf") :  Highlighter((data, i, j) -> h[i, j], crayon"yellow")
-	pretty_table(data ; header, backend , highlighters)
+	display(highlight_table(da; backend, high))
+	da
 end
 
 function show_top_k(df, column, high; max_time = 30, backend = Val(:text), agg = mean, arch_name = "mixedlrnn", loss_name = "lstar")
@@ -293,7 +299,7 @@ function show_vitek()
 	seed = 1
 	dry_run = true
 	domain_name = "ferry"
-	arch_name = "mixedlrnn"
+	arch_name = "mixedlrnn2"
 	loss_name = "lstar"
 	graph_layers = 3
 	residual = "none"
@@ -302,18 +308,51 @@ function show_vitek()
 	seed = 2
 	problems = ["blocks","ferry","npuzzle","spanner","elevators_00"]
 
-	amd_stats = map(Iterators.product(("mixedlrnn","asnet"), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
-		submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
-	end |> vec |> mean
+	# amd_stats = map(Iterators.product(("mixedlrnn","asnet"), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+	# 	submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
+	# end |> vec |> mean
 
-	amd_stats = map(Iterators.product(("mixedlrnn","asnet"), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+	# amd_stats = map(Iterators.product(("mixedlrnn",), ("lstar", "l2"), ("ipc23_rovers","ipc23_childsnack"), (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+	# 	submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
+	# end |> vec |> mean
+
+	# amd_stats = map(Iterators.product(("mixedlrnn2",), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+	# 	submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
+	# end |> vec |> mean
+
+	
+	df = isfile("super_amd/results.csv") ? CSV.read("super_amd/results.csv", DataFrame) :  DataFrame()
+
+	cases = Iterators.product(("lrnn", "mixedlrnn", "mixedlrnn2","asnet"), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))
+	if !isempty(df)
+		done = Set([(r.arch_name, r.loss_name, r.domain_name, r.dense_dim, r.graph_layers, Symbol(r.residual), r.seed,) for r in eachrow(df)])
+		cases = filter(e -> e ∉ done, collect(cases))
+	end
+
+	amd_stats = map(cases) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
 		read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir="super_amd")
 	end |> vec
-	df = reduce(vcat, filter(!isempty, amd_stats))
-	vitek_table(filter(r -> r.arch_name .== "mixedlrnn", df), :tst_solved, highlight_max)
-	vitek_table(filter(r -> r.arch_name .== "asnet", df), :tst_solved, highlight_max)
+	dff = reduce(vcat, filter(!isempty, amd_stats))
 
-	# CSV.write("super_amd/results.csv", df)
+	df = isempty(df) ? dff : vcat(df, dff)
+	CSV.write("super_amd/results.csv", df)
+
+	df1 = vitek_table(filter(r -> r.arch_name .== "mixedlrnn", df), :tst_solved, highlight_max);
+	df2 = vitek_table(filter(r -> r.arch_name .== "mixedlrnn2", df), :tst_solved, highlight_max);
+	df3 = vitek_table(filter(r -> r.arch_name .== "asnet", df), :tst_solved, highlight_max);
+	rdf = joindomains(rename(df1[:,[:domain_name, :lstar]], :lstar => "MixedLRNN"),
+		rename(df2[:,[:domain_name, :lstar]], :lstar => "MixedLRNN2"))
+	rdf = joindomains(rdf,rename(df3[:,[:domain_name, :lstar]], :lstar => "ASNets"))
+	highlight_table(rdf)
+
+	df1 = filter(r -> r.arch_name == "mixedlrnn" && r.planner == "AStarPlanner", df)
+	df2 = filter(r -> r.arch_name == "mixedlrnn2" && r.planner == "AStarPlanner", df)
+	jdf = innerjoin(df1,df2, on=[:domain_name, :loss_name, :problem_file, :graph_layers, :residual, :dense_layers, :dense_dim, :seed], makeunique=true)
+	jdf[!,:de] = jdf.expanded - jdf.expanded_1
+	sort!(jdf, :de)
+	jdf[:,[:expanded, :expanded_1]]	
+
+
 	# vitek_table(filter(r -> r.arch_name .== "lrnn", df), :tst_solved, highlight_max)
 end
 

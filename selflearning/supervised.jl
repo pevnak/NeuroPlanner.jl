@@ -32,9 +32,10 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 	#create model from some problem instance
 
 	# we can check that the model can learn the training data if the dedup_model can differentiate all input states, which is interesting by no means
-
-	model = if isfile(filename*"_model.jls")
-		deserialize(filename*"_model.jls")
+	# A special hook to rerun the faster mixed lrnn2
+	modelfile = contains(filename, "mixedlrnn2_") ? replace(filename, "mixedlrnn2_" => "mixedlrnn_")*"_model.jls" : filename*"_model.jls"
+	model = if isfile(modelfile)
+		deserialize(modelfile)
 	else
 		model = let 
 			problem = load_problem(first(train_files))
@@ -61,7 +62,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 		ps = Flux.params(model);
 		t = @elapsed train!(NeuroPlanner.loss, model, ps, opt, () -> rand(minibatches), max_steps; logger, trn_data = minibatches)
 		log_value(logger, "time_train", t; step=0)
-		serialize(filename*"_model.jls", model)	
+		serialize(modelfile, model)	
 		model
 	end
 	planners = model isa NeuroPlanner.LevinModel ? [BFSPlanner] : [AStarPlanner, GreedyPlanner]
@@ -76,7 +77,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 	df = DataFrame(vec(stats))
 	mean(df.solved[.!df.used_in_train])
 	serialize(filename*"_stats.jls", vec(stats))
-	CSV.write(filename*"_stats.csv", df)
+	CSV.write(filename*"_stats.csv", df; transform = (col, val) -> something(val, missing))
 	settings !== nothing && serialize(filename*"_settings.jls",settings)
 end
 
@@ -99,9 +100,9 @@ ArgParse example implemented in Comonicon.
 - `--residual <String>`:  residual connections between graph convolutions (none / dense / linear)
 
 max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
-domain_name = "ipc23_satellite"
+domain_name = "ipc23_ferry"
 loss_name = "lstar"
-arch_name = "lrnn"
+arch_name = "mixedlrnn2"
 """
 
 @main function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
@@ -109,7 +110,7 @@ arch_name = "lrnn"
 	Random.seed!(seed)
 	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, dense_dim, dense_layers, residual, seed)
 	@show settings
-	archs = Dict("asnet" => ASNet, "lrnn" => LRNN, "mixedlrnn" => MixedLRNN, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
+	archs = Dict("asnet" => ASNet, "lrnn" => LRNN, "mixedlrnn2" => MixedLRNN2, "mixedlrnn" => MixedLRNN, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
 	residual = Symbol(residual)
 	domain_pddl, problem_files = getproblem(domain_name, false)
 	# problem_files = filter(s -> isfile(plan_file(domain_name, s)), problem_files)
