@@ -102,7 +102,7 @@ ArgParse example implemented in Comonicon.
 max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
 domain_name = "ipc23_ferry"
 loss_name = "lstar"
-arch_name = "mixedlrnn2"
+arch_name = "objectbinary"
 """
 
 @main function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
@@ -110,7 +110,7 @@ arch_name = "mixedlrnn2"
 	Random.seed!(seed)
 	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, dense_dim, dense_layers, residual, seed)
 	@show settings
-	archs = Dict("asnet" => ASNet, "lrnn" => LRNN, "mixedlrnn2" => MixedLRNN2, "mixedlrnn" => MixedLRNN, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
+	archs = Dict("objectbinary" => ObjectBinary, "asnet" => ASNet, "lrnn" => LRNN, "mixedlrnn2" => MixedLRNN2, "mixedlrnn" => MixedLRNN, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
 	residual = Symbol(residual)
 	domain_pddl, problem_files = getproblem(domain_name, false)
 	# problem_files = filter(s -> isfile(plan_file(domain_name, s)), problem_files)
