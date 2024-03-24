@@ -308,11 +308,11 @@ function show_vitek()
 	seed = 2
 	problems = ["blocks","ferry","npuzzle","spanner","elevators_00"]
 
-	# amd_stats = map(Iterators.product(("mixedlrnn","asnet"), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
-	# 	submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
-	# end |> vec |> mean
+	map(Iterators.product(("objectbinary",), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+		submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
+	end |> vec |> mean
 
-	# amd_stats = map(Iterators.product(("mixedlrnn",), ("lstar", "l2"), ("ipc23_rovers","ipc23_childsnack"), (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+	# amd_stats = map(Iterators.product(("objectbinary",), ("lstar", "l2"), ("ipc23_rovers","ipc23_childsnack"), (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
 	# 	submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
 	# end |> vec |> mean
 
@@ -323,7 +323,7 @@ function show_vitek()
 	
 	df = isfile("super_amd/results.csv") ? CSV.read("super_amd/results.csv", DataFrame) :  DataFrame()
 
-	cases = Iterators.product(("lrnn", "mixedlrnn", "mixedlrnn2","asnet"), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))
+	cases = Iterators.product(("objectbinary","lrnn", "mixedlrnn", "mixedlrnn2","asnet"), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))
 	if !isempty(df)
 		done = Set([(r.arch_name, r.loss_name, r.domain_name, r.dense_dim, r.graph_layers, Symbol(r.residual), r.seed,) for r in eachrow(df)])
 		cases = filter(e -> e ∉ done, collect(cases))
@@ -340,9 +340,11 @@ function show_vitek()
 	df1 = vitek_table(filter(r -> r.arch_name .== "mixedlrnn", df), :tst_solved, highlight_max);
 	df2 = vitek_table(filter(r -> r.arch_name .== "mixedlrnn2", df), :tst_solved, highlight_max);
 	df3 = vitek_table(filter(r -> r.arch_name .== "asnet", df), :tst_solved, highlight_max);
+	df4 = vitek_table(filter(r -> r.arch_name .== "objectbinary", df), :tst_solved, highlight_max);
 	rdf = joindomains(rename(df1[:,[:domain_name, :lstar]], :lstar => "MixedLRNN"),
 		rename(df2[:,[:domain_name, :lstar]], :lstar => "MixedLRNN2"))
 	rdf = joindomains(rdf,rename(df3[:,[:domain_name, :lstar]], :lstar => "ASNets"))
+	# rdf = joindomains(rdf,rename(df4[:,[:domain_name, :lstar]], :lstar => "ObjectBinary"))
 	highlight_table(rdf)
 
 	df1 = filter(r -> r.arch_name == "mixedlrnn" && r.planner == "AStarPlanner", df)
