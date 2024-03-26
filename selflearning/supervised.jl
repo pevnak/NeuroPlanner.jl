@@ -41,7 +41,6 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			problem = load_problem(first(train_files))
 			pddle, state = initproblem(pddld, problem)
 			h₀ = pddle(state)
-			# model = reflectinmodel(h₀, d -> ffnn(d, dense_dim, dense_dim, dense_layers);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
 			reflectinmodel(h₀, d -> Dense(d, dense_dim, relu);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
 		end
 
@@ -67,17 +66,25 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 	end
 	planners = model isa NeuroPlanner.LevinModel ? [BFSPlanner] : [AStarPlanner, GreedyPlanner]
 
-	stats = map(Iterators.product(planners, problem_files)) do (planner, problem_file)
+	stats = DataFrame()
+	#precompilation
+	solve_problem(pddld, first(problem_files), model, first(planners); return_unsolved = true, max_time)
+	t₀ = time()
+	for (planner, problem_file) in Iterators.product(planners, problem_files)
 		used_in_train = problem_file ∈ train_files
 		@show problem_file
-		sol = solve_problem(pddld, problem_file, model, planner; return_unsolved = true, max_time)
+		t = @elapsed sol = solve_problem(pddld, problem_file, model, planner; return_unsolved = true, max_time)
+		println("time in the solver: ", t)
 		trajectory = sol.sol.status == :max_time ? nothing : sol.sol.trajectory
-		merge(sol.stats, (;used_in_train, planner = "$(planner)", trajectory, problem_file))
+		s = merge(sol.stats, (;used_in_train, planner = "$(planner)", trajectory, problem_file))
+		push!(stats, s, cols=:union, promote=true)
+		if time()-t₀ > 3600	# serialize stats evert hour
+			serialize(filename*"_stats_tmp.jls", stats)
+			t₀ = time()
+		end
 	end
-	df = DataFrame(vec(stats))
-	mean(df.solved[.!df.used_in_train])
-	serialize(filename*"_stats.jls", vec(stats))
-	CSV.write(filename*"_stats.csv", df; transform = (col, val) -> something(val, missing))
+	serialize(filename*"_stats.jls", stats)
+	CSV.write(filename*"_stats.csv", stats; transform = (col, val) -> something(val, missing))
 	settings !== nothing && serialize(filename*"_settings.jls",settings)
 end
 
@@ -99,6 +106,7 @@ ArgParse example implemented in Comonicon.
 - `--dense_layers <Int>`:  number of layers of dense network after pooling vertices (default 32)
 - `--residual <String>`:  residual connections between graph convolutions (none / dense / linear)
 
+max_steps = 10_000; max_time = 30; graph_layers = 3; dense_dim = 16; dense_layers = 3; residual = "none"; seed = 1
 max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
 domain_name = "ipc23_ferry"
 loss_name = "lstar"

@@ -1,7 +1,7 @@
 function ffnn(idim, hdim, odim, nlayers)
 	nlayers == 1 && return(Dense(idim,odim))
 	nlayers == 2 && return(Chain(Dense(idim, hdim, relu), Dense(hdim,odim)))
-	nlayers == 3 && return(Chain(Dense(idim, hdim, relu), Dense(hdim, hdim, relu), Dense(odim,odim)))
+	nlayers == 3 && return(Chain(Dense(idim, hdim, relu), Dense(hdim, hdim, relu), Dense(hdim,odim)))
 	error("nlayers should be only in [1,3]")
 end
 
