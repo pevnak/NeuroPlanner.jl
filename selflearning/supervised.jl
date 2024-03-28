@@ -73,6 +73,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 	for (planner, problem_file) in Iterators.product(planners, problem_files)
 		used_in_train = problem_file ∈ train_files
 		@show problem_file
+		GC.gc();GC.gc();GC.gc();GC.gc();GC.gc();GC.gc();
 		t = @elapsed sol = solve_problem(pddld, problem_file, model, planner; return_unsolved = true, max_time)
 		println("time in the solver: ", t)
 		trajectory = sol.sol.status == :max_time ? nothing : sol.sol.trajectory
@@ -83,6 +84,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			t₀ = time()
 		end
 	end
+	rm(filename*"_stats_tmp.jls")
 	serialize(filename*"_stats.jls", stats)
 	CSV.write(filename*"_stats.csv", stats; transform = (col, val) -> something(val, missing))
 	settings !== nothing && serialize(filename*"_settings.jls",settings)

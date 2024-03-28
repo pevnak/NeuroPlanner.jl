@@ -169,7 +169,8 @@ function nunary_predicates(ex::MixedLRNN2, state)
 end
 
 function group_facts(ex::MixedLRNN2, facts::Vector{<:Term})
-    occurences = Dict([k => Int[] for k in ex.multiarg_predicates])
+    ps = [k => Int[] for k in ex.multiarg_predicates]
+    occurences = Dict(ps)
     for (i,f) in enumerate(facts)
         f.name ∉ keys(occurences) && continue
         push!(occurences[f.name], i)
@@ -177,13 +178,43 @@ function group_facts(ex::MixedLRNN2, facts::Vector{<:Term})
     occurences
 end
 
+"""
+    _mapenumerate_tuple(f::Function, xs::Tuple)
+
+    output `map(f, enumerate(xs))`, but preserves the output to be `tuple`
+"""
+function _mapenumerate_tuple(f::Function, xs::Tuple)
+    isempty(xs) && return(xs)
+    tuple(f(1, first(xs)), _mapenumerate_tuple(f, 2, Base.tail(xs))...)
+end
+
+function _mapenumerate_tuple(f::Function, i::Int,  xs::Tuple)
+    isempty(xs) && return(xs)
+    tuple(f(i, first(xs)), _mapenumerate_tuple(f, i+1, Base.tail(xs))...)
+end
+
+
+function group_facts_fast(ex::MixedLRNN2, facts::Vector{<:Term})
+    occurences = falses(length(facts), length(ex.multiarg_predicates))
+    for (i,f) in enumerate(facts)
+        # f.name ∉ keys(occurences) && continue
+        f.name ∉ ex.multiarg_predicates && continue
+        col = findfirst(==(f.name), ex.multiarg_predicates)
+        occurences[i, col] = true
+    end
+    # [k => (@view occurences[:,col]) for (col, k) in enumerate(ex.multiarg_predicates)]
+    _mapenumerate_tuple((col,k) -> k => (@view occurences[:,col]), ex.multiarg_predicates)
+end
+
 # # this is better
 function multi_predicates(ex::MixedLRNN2, kid::Symbol, state, prefix=nothing)
     # Then, we specify the predicates the dirty way
     ks = ex.multiarg_predicates
     facts = collect(get_facts(state))
-    gr = group_facts(ex, facts)
-    xs = map(k -> encode_predicates(ex, k, facts[gr[k]], kid), ks)
+    # gr = group_facts(ex, facts)
+    # xs = map(k -> encode_predicates(ex, k, facts[gr[k]], kid), ks)
+    gr = group_facts_fast(ex, facts)
+    xs = map(kii -> encode_predicates(ex, kii[1], facts[kii[2]], kid), gr)
     ns = isnothing(prefix) ? ks : tuple([Symbol(prefix, "_", k) for k in ks]...)
     ProductNode(NamedTuple{ns}(xs))
 end
@@ -192,10 +223,37 @@ function encode_predicates(ex::MixedLRNN2, pname::Symbol, preds, kid::Symbol)
     p = ex.domain.predicates[pname]
     obj2id = ex.obj2id
     bags = [Int[] for _ in 1:length(obj2id)]
+    n = length(preds)
     xs = map(1:length(p.args)) do i
-        ii = [obj2id[f.args[i].name] for f in preds]
-        for (j, oi) in enumerate(ii)
+        # ii = [obj2id[f.args[i].name] for f in preds]
+        # for (j, oi) in enumerate(ii)
+        #     push!(bags[oi], j)
+        # end
+        ii = Vector{Int}(undef,n)
+        for j in 1:n
+            oi = obj2id[preds[j].args[i].name]
+            ii[j] = oi
             push!(bags[oi], j)
+        end
+        ArrayNode(KBEntry(kid, ii))
+    end
+    BagNode(ProductNode(tuple(xs...)), ScatteredBags(bags))
+end
+
+function encode_predicates_lowalloc(ex::MixedLRNN2, pname::Symbol, preds, kid::Symbol)
+    n = length(preds)
+    p = ex.domain.predicates[pname]
+    m = length(p.args)
+    obj2id = ex.obj2id
+    bag_id = Vector{Int}(undef, n, m) 
+    bag_sizes = zeros(Int, n)
+    xs = map(1:m) do i
+        ii = Vector{Int}(undef,n)
+        for j in 1:n
+            oi = obj2id[preds[j].args[i].name]
+            ii[j] = oi
+            push!(bags[oi], j)
+            bag_sizes[oi] +=1
         end
         ArrayNode(KBEntry(kid, ii))
     end

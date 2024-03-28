@@ -163,7 +163,8 @@ function read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, gra
 	filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
 	filename = filename*"_stats.jls"
 	!isfile(filename) && return(DataFrame())
-	df = DataFrame(vec(deserialize(filename)))
+	stats = deserialize(filename)
+	df = stats isa DataFrame ? stats : DataFrame(vec(stats))
 	select!(df, Not(:trajectory))
 	df[:,:domain_name] .= domain_name
 	df[:,:arch_name] .= arch_name
@@ -292,7 +293,7 @@ function collect_stats()
 	df
 end
 
-function show_vitek()
+# function show_vitek()
 	max_steps = 10_000
 	max_time = 30
 	dense_layers = 2
@@ -335,7 +336,7 @@ function show_vitek()
 	dff = reduce(vcat, filter(!isempty, amd_stats))
 
 	df = isempty(df) ? dff : vcat(df, dff)
-	CSV.write("super_amd/results.csv", df)
+	# CSV.write("super_amd/results.csv", df)
 
 	df1 = vitek_table(filter(r -> r.arch_name .== "mixedlrnn", df), :tst_solved, highlight_max);
 	df2 = vitek_table(filter(r -> r.arch_name .== "mixedlrnn2", df), :tst_solved, highlight_max);
@@ -344,19 +345,19 @@ function show_vitek()
 	rdf = joindomains(rename(df1[:,[:domain_name, :lstar]], :lstar => "MixedLRNN"),
 		rename(df2[:,[:domain_name, :lstar]], :lstar => "MixedLRNN2"))
 	rdf = joindomains(rdf,rename(df3[:,[:domain_name, :lstar]], :lstar => "ASNets"))
-	# rdf = joindomains(rdf,rename(df4[:,[:domain_name, :lstar]], :lstar => "ObjectBinary"))
+	rdf = joindomains(rdf,rename(df4[:,[:domain_name, :lstar]], :lstar => "ObjectBinary"))
 	highlight_table(rdf)
 
-	df1 = filter(r -> r.arch_name == "mixedlrnn" && r.planner == "AStarPlanner", df)
-	df2 = filter(r -> r.arch_name == "mixedlrnn2" && r.planner == "AStarPlanner", df)
-	jdf = innerjoin(df1,df2, on=[:domain_name, :loss_name, :problem_file, :graph_layers, :residual, :dense_layers, :dense_dim, :seed], makeunique=true)
-	jdf[!,:de] = jdf.expanded - jdf.expanded_1
-	sort!(jdf, :de)
-	jdf[:,[:expanded, :expanded_1]]	
+	# df1 = filter(r -> r.arch_name == "mixedlrnn" && r.planner == "AStarPlanner", df)
+	# df2 = filter(r -> r.arch_name == "mixedlrnn2" && r.planner == "AStarPlanner", df)
+	# jdf = innerjoin(df1,df2, on=[:domain_name, :loss_name, :problem_file, :graph_layers, :residual, :dense_layers, :dense_dim, :seed], makeunique=true)
+	# jdf[!,:de] = jdf.expanded - jdf.expanded_1
+	# sort!(jdf, :de)
+	# jdf[:,[:expanded, :expanded_1]]	
 
 
 	# vitek_table(filter(r -> r.arch_name .== "lrnn", df), :tst_solved, highlight_max)
-end
+# end
 
 # df = CSV.read("super/results.csv", DataFrame)
 # df = filter(r -> r.arch_name ∈ ("hgnn", "levinasnet"), df);
