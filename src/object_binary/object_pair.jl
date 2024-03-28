@@ -126,7 +126,8 @@ function specialize(ex::ObjectPair, problem)
             pair2id[(name, obj2idv[i][1])] = offset + i
         end
         p
-    end |> (arrays -> vcat(arrays...))
+    end 
+    pairs = reduce(vcat, pairs)
 
     ObjectPair(ex.domain, ex.multiarg_predicates, ex.unary_predicates, ex.nullary_predicates, ex.objtype2id,
         ex.constmap, ex.model_params, obj2id, obj2pid, pair2id, pairs, nothing, nothing)
@@ -314,11 +315,13 @@ function encode_predicates(ex::ObjectPair, pname::Symbol, preds, kid::Symbol)
         ys = unique(x[1] for x in ex.obj2pid[f.args[2].name])
 
         [(x, y) for x in xs for y in ys if x != y]
-    end |> (arrays -> vcat(arrays...))
+    end 
+    xs = reduce(vcat, xs)
 
     x = map(1:2) do i
         ArrayNode(KBEntry(kid, map(p -> p[i], xs)))
-    end |> (an -> ProductNode(tuple(an...)))
+    end
+    x = ProductNode(tuple(x...))
 
 
     bags = [Int64[] for _ in 1:length(ex.pairs)]

@@ -1,6 +1,6 @@
 using NeuroPlanner
 using Test 
-using Flux 
+using NeuroPlanner.Flux 
 using NeuroPlanner: DeduplicatedMatrix
 
 @testset "DeduplicatedMatrix" begin 

@@ -1,9 +1,9 @@
 # use only activations without "kinks" for numerical gradient checking
 # see e.g. https://stackoverflow.com/questions/40623512/how-to-check-relu-gradient
 
-const ACTIVATIONS = [identity, σ, swish, softplus, logcosh, mish, tanhshrink, lisht]
-const LAYERBUILDER = k -> f64(Flux.Dense(k, 2, rand(ACTIVATIONS)))
-const ABUILDER = d -> BagCount(all_aggregations(Float64, d))
+ACTIVATIONS = [identity, σ, swish, softplus, logcosh, mish, tanhshrink, lisht]
+LAYERBUILDER = k -> f64(Flux.Dense(k, 2, rand(ACTIVATIONS)))
+ABUILDER = d -> BagCount(all_aggregations(Float64, d))
 
 
 @testset "masked models" begin

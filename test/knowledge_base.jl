@@ -1,9 +1,8 @@
 using Test
 using NeuroPlanner
 using NeuroPlanner:  _catobs_kbs
-using Zygote
-using Mill
-using Flux
+using NeuroPlanner.Mill
+using NeuroPlanner.Flux.Zygote
 
 
 @testset "KnowledgeBase" begin 
