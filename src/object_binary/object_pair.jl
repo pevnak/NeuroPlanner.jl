@@ -1,6 +1,6 @@
 using PDDL: get_facts, get_args
 """
-struct ObjPairBin{DO,D,N,MP,S,G}
+struct ObjectPair{DO,D,N,MP,S,G}
 	domain::DO
 	multiarg_predicates::NTuple{N,Symbol}
 	nunanary_predicates::Dict{Symbol,Int64}
@@ -29,7 +29,7 @@ vertex corresponding to the hyper-edge and its vertices.
 --- `model_params` some parameters of an algorithm constructing the message passing passes 
 """
 
-struct ObjPairBin{DO,D,MP,DV,DT,V,S,G}
+struct ObjectPair{DO,D,MP,DV,DT,V,S,G}
     domain::DO
     multiarg_predicates::Dict{Symbol,Int64}
     unary_predicates::Dict{Symbol,Int64}
@@ -43,7 +43,7 @@ struct ObjPairBin{DO,D,MP,DV,DT,V,S,G}
     pairs::V
     init_state::S
     goal_state::G
-    function ObjPairBin(domain::DO, multiarg_predicates::Dict{Symbol,Int64}, unary_predicates::Dict{Symbol,Int64}, nullary_predicates::Dict{Symbol,Int64},
+    function ObjectPair(domain::DO, multiarg_predicates::Dict{Symbol,Int64}, unary_predicates::Dict{Symbol,Int64}, nullary_predicates::Dict{Symbol,Int64},
         objtype2id::Dict{Symbol,Int64}, constmap::Dict{Symbol,Int64}, model_params::MP, obj2id::D, obj2pid::DV, pair2id::DT,
         pairs::V, init::S, goal::G) where {DO,D,MP<:NamedTuple,DV,DT,V,S,G}
 
@@ -55,11 +55,11 @@ struct ObjPairBin{DO,D,MP,DV,DT,V,S,G}
 end
 
 
-ObjPairBinNoGoal{DO,D,MP,DV,DT,V} = ObjPairBin{DO,D,MP,DV,DT,V,Nothing,Nothing} where {DO,D,MP,DV,DT,V,}
-ObjPairBinStart{DO,D,MP,DV,DT,V,S} = ObjPairBin{DO,D,MP,DV,DT,V,Nothing} where {DO,D,MP,DV,DT,V,S<:KnowledgeBase}
-ObjPairBinGoal{DO,D,MP,DV,DT,V,S} = ObjPairBin{DO,D,MP,DV,DT,V,Nothing,S} where {DO,D,MP,DV,DT,V,S<:KnowledgeBase}
+ObjectPairNoGoal{DO,D,MP,DV,DT,V} = ObjectPair{DO,D,MP,DV,DT,V,Nothing,Nothing} where {DO,D,MP,DV,DT,V}
+ObjectPairStart{DO,D,MP,DV,DT,V,S} = ObjectPair{DO,D,MP,DV,DT,V,S,Nothing} where {DO,D,MP,DV,DT,V,S<:KnowledgeBase}
+ObjectPairGoal{DO,D,MP,DV,DT,V,S} = ObjectPair{DO,D,MP,DV,DT,V,Nothing,S} where {DO,D,MP,DV,DT,V,S<:KnowledgeBase}
 
-function ObjPairBin(domain; message_passes=2, residual=:linear, kwargs...)
+function ObjectPair(domain; message_passes=2, residual=:linear, kwargs...)
     model_params = (; message_passes, residual)
     dictmap(x) = Dict(reverse.(enumerate(sort(x))))
     predicates = collect(domain.predicates)
@@ -68,20 +68,20 @@ function ObjPairBin(domain; message_passes=2, residual=:linear, kwargs...)
     nullary_predicates = dictmap([kv[1] for kv in predicates if length(kv[2].args) < 1])
     objtype2id = Dict(s => i + length(unary_predicates) for (i, s) in enumerate(collect(keys(domain.typetree))))
     constmap = Dict{Symbol,Int}(dictmap([x.name for x in domain.constants]))
-    ObjPairBin(domain, multiarg_predicates, unary_predicates, nullary_predicates, objtype2id, constmap, model_params,
+    ObjectPair(domain, multiarg_predicates, unary_predicates, nullary_predicates, objtype2id, constmap, model_params,
         nothing, nothing, nothing, nothing, nothing, nothing)
 end
 
-isspecialized(ex::ObjPairBin) = ex.obj2id !== nothing
-hasgoal(ex::ObjPairBin) = ex.init_state !== nothing || ex.goal_state !== nothing
+isspecialized(ex::ObjectPair) = ex.obj2id !== nothing
+hasgoal(ex::ObjectPair) = ex.goal_state !== nothing
 
-function ObjPairBin(domain, problem; embed_goal=true, kwargs...)
-    ex = ObjPairBin(domain; kwargs...)
+function ObjectPair(domain, problem; embed_goal=true, kwargs...)
+    ex = ObjectPair(domain; kwargs...)
     ex = specialize(ex, problem)
     embed_goal ? add_goalstate(ex, problem) : ex
 end
 
-function Base.show(io::IO, ex::ObjPairBin)
+function Base.show(io::IO, ex::ObjectPair)
     if !isspecialized(ex)
         print(io, "Unspecialized extractor for ", ex.domain.name,
             " (", length(ex.nullary_predicates), ", ", length(ex.unary_predicates), ", ", length(ex.multiarg_predicates), ")")
@@ -95,13 +95,13 @@ end
 
 
 """
-specialize(ex::ObjPairBin{<:Nothing,<:Nothing}, problem)
+specialize(ex::ObjectPair{<:Nothing,<:Nothing}, problem)
 
 initializes extractor for a given `problem` by initializing mapping 
 from objects to id of vertices. Goals are not changed added to the 
 extractor.
 """
-function specialize(ex::ObjPairBin, problem)
+function specialize(ex::ObjectPair, problem)
     obj2id = Dict(v.name => i for (i, v) in enumerate(problem.objects))
     obj2idv = [(v.name, i) for (i, v) in enumerate(problem.objects)]
 
@@ -129,17 +129,17 @@ function specialize(ex::ObjPairBin, problem)
         # [(name, obj2idv[i][1]) for i in id:length(obj2idv)]
     end |> (arrays -> vcat(arrays...))
 
-    ObjPairBin(ex.domain, ex.multiarg_predicates, ex.unary_predicates, ex.nullary_predicates, ex.objtype2id,
+    ObjectPair(ex.domain, ex.multiarg_predicates, ex.unary_predicates, ex.nullary_predicates, ex.objtype2id,
         ex.constmap, ex.model_params, obj2id, obj2pid, pair2id, pairs, nothing, nothing)
 end
 
-function (ex::ObjPairBin)(state::GenericState)
+function (ex::ObjectPair)(state::GenericState)
     prefix = (ex.goal_state !== nothing) ? :start : ((ex.init_state !== nothing) ? :goal : nothing)
     kb = encode_state(ex, state, prefix)
     addgoal(ex, kb)
 end
 
-function encode_state(ex::ObjPairBin, state::GenericState, prefix=nothing)
+function encode_state(ex::ObjectPair, state::GenericState, prefix=nothing)
     message_passes, residual = ex.model_params
     # rename to feature vectors
     x = feature_vectors(ex, state)
@@ -161,11 +161,11 @@ function encode_state(ex::ObjPairBin, state::GenericState, prefix=nothing)
 end
 
 """
-feature_vectors(ex::ObjPairBin, state) 
+feature_vectors(ex::ObjectPair, state) 
 
 Creates a matrix with one column per pairs of objects and encode features by one-hot-encoding
 """
-function feature_vectors(ex::ObjPairBin, state)
+function feature_vectors(ex::ObjectPair, state)
     idim = length(ex.nullary_predicates) + 2 * (length(ex.unary_predicates) + length(ex.objtype2id) + length(ex.constmap)) + length(ex.multiarg_predicates)
     x = zeros(Float32, idim, length(ex.pairs))
 
@@ -234,11 +234,11 @@ function feature_vectors(ex::ObjPairBin, state)
 end
 
 """
-function encode_edges(ex::ObjPairBin, kid::Symbol, state, prefix=nothing)
+function encode_edges(ex::ObjectPair, kid::Symbol, state, prefix=nothing)
 
 Creates ProductNode of named BagNodes each representing one labeled edge in multigraph.
 """
-function encode_edges(ex::ObjPairBin, kid::Symbol, state, prefix=nothing)
+function encode_edges(ex::ObjectPair, kid::Symbol, state, prefix=nothing)
     name, edges = encode_E_edges(ex, kid; prefix=prefix)
     ns, xs = multi_predicates(ex, kid, state, prefix)
 
@@ -246,11 +246,11 @@ function encode_edges(ex::ObjPairBin, kid::Symbol, state, prefix=nothing)
 end
 
 """
-function encode_E_edges(ex::ObjPairBin, kid::Symbol; sym=:edge, prefix=nothing)
+function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
 
 Encodes `E` Edges, which connect two pairs of object if and only if size of conjunction of their objects is equal to 1.
 """
-function encode_E_edges(ex::ObjPairBin, kid::Symbol; sym=:edge, prefix=nothing)
+function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
     xs = map(collect(keys(ex.obj2id))) do obj
         pairs = ex.obj2pid[obj]
         edges = Tuple{Int64,Int64}[]
@@ -284,11 +284,11 @@ function encode_E_edges(ex::ObjPairBin, kid::Symbol; sym=:edge, prefix=nothing)
 end
 
 """
-function multi_predicates(ex::ObjPairBin, kid::Symbol, state, prefix=nothing)
+function multi_predicates(ex::ObjectPair, kid::Symbol, state, prefix=nothing)
 
 Encodes predicates with arity greater than 1 to edges that connect pairs of objects whose objects are related by given predicate.
 """
-function multi_predicates(ex::ObjPairBin, kid::Symbol, state, prefix=nothing)
+function multi_predicates(ex::ObjectPair, kid::Symbol, state, prefix=nothing)
     # Then, we specify the predicates the dirty way
     ks = tuple(collect(keys(ex.multiarg_predicates))...)
     xs = map(ks) do k
@@ -301,13 +301,13 @@ end
 
 
 """
-function encode_predicates(ex::ObjPairBin, pname::Symbol, preds, kid::Symbol)
+function encode_predicates(ex::ObjectPair, pname::Symbol, preds, kid::Symbol)
 Encode predicates for binary relations.
 
 This function encodes predicates for binary relations.
 
 # Arguments
-- `ex::ObjPairBin`: An extractor representing pddl architecture.
+- `ex::ObjectPair`: An extractor representing pddl architecture.
 - `pname::Symbol`: The symbol representing the predicate name.
 - `preds`: The predicates.
 - `kid::Symbol`: The symbol representing the previous entry in KB.
@@ -315,7 +315,7 @@ This function encodes predicates for binary relations.
 # Returns
 - `BagNode`: A bag node containing the encoded predicates.
 """
-function encode_predicates(ex::ObjPairBin, pname::Symbol, preds, kid::Symbol)
+function encode_predicates(ex::ObjectPair, pname::Symbol, preds, kid::Symbol)
     xs = map(collect(preds)) do f
         xs = unique(x[1] for x in ex.obj2pid[f.args[1].name])
         ys = unique(x[1] for x in ex.obj2pid[f.args[2].name])
@@ -340,28 +340,28 @@ function encode_predicates(ex::ObjPairBin, pname::Symbol, preds, kid::Symbol)
 end
 
 
-function add_goalstate(ex::ObjPairBin, problem, goal=goalstate(ex.domain, problem))
+function add_goalstate(ex::ObjectPair, problem, goal=goalstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
     exg = encode_state(ex, goal, :goal)
-    ObjPairBin(ex.domain, ex.multiarg_predicates, ex.unary_predicates, ex.nullary_predicates, ex.objtype2id, ex.constmap,
+    ObjectPair(ex.domain, ex.multiarg_predicates, ex.unary_predicates, ex.nullary_predicates, ex.objtype2id, ex.constmap,
         ex.model_params, ex.obj2id, ex.obj2pid, ex.pair2id, ex.pairs, nothing, exg)
 end
 
-function add_initstate(ex::ObjPairBin, problem, start=initstate(ex.domain, problem))
+function add_initstate(ex::ObjectPair, problem, start=initstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
     exg = encode_state(ex, start, :start)
-    ObjPairBin(ex.domain, ex.multiarg_predicates, ex.unary_predicates, ex.nullary_predicates, ex.objtype2id, ex.constmap,
+    ObjectPair(ex.domain, ex.multiarg_predicates, ex.unary_predicates, ex.nullary_predicates, ex.objtype2id, ex.constmap,
         ex.model_params, ex.obj2id, ex.obj2pid, ex.pair2id, ex.pairs, exg, nothing)
 end
 
-function addgoal(ex::ObjPairBinStart, kb::KnowledgeBase)
+function addgoal(ex::ObjectPairStart, kb::KnowledgeBase)
     return (stack_hypergraphs(ex.init_state, kb))
 end
 
-function addgoal(ex::ObjPairBinGoal, kb::KnowledgeBase)
+function addgoal(ex::ObjectPairGoal, kb::KnowledgeBase)
     return (stack_hypergraphs(kb, ex.goal_state))
 end
 
-function addgoal(ex::ObjPairBinNoGoal, kb::KnowledgeBase)
+function addgoal(ex::ObjectPairNoGoal, kb::KnowledgeBase)
     return (kb)
 end
