@@ -23,9 +23,9 @@ initproblem(ex, problem; add_goal = true)
 Specialize extractor for the given problem instance and return init state 
 """
 function initproblem(ex, problem; add_goal = true)
-    ex = specialize(ex, problem)
-    pddle = add_goal ? add_goalstate(ex, problem) : ex
-    pddle, initstate(ex.domain, problem)
+	ex = specialize(ex, problem)
+	pddle = add_goal ? add_goalstate(ex, problem) : ex
+	pddle, initstate(ex.domain, problem)
 end
 export initproblem
 
@@ -47,7 +47,7 @@ export MultiheadAttention
 include("lrnn/pure_extractor.jl")
 include("lrnn/mixed_extractor.jl")
 include("lrnn/mixed_extractor2.jl")
-export MixedLRNN, MixedLRNN2, LRNN
+export MixedLRNN, MixedLRNN2, LRNN 
 
 # Object Binary structures by Sira and Horcik
 include("object_binary/object_binary.jl")

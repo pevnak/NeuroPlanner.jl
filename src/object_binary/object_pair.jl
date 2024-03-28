@@ -126,7 +126,6 @@ function specialize(ex::ObjectPair, problem)
             pair2id[(name, obj2idv[i][1])] = offset + i
         end
         p
-        # [(name, obj2idv[i][1]) for i in id:length(obj2idv)]
     end |> (arrays -> vcat(arrays...))
 
     ObjectPair(ex.domain, ex.multiarg_predicates, ex.unary_predicates, ex.nullary_predicates, ex.objtype2id,
@@ -141,7 +140,6 @@ end
 
 function encode_state(ex::ObjectPair, state::GenericState, prefix=nothing)
     message_passes, residual = ex.model_params
-    # rename to feature vectors
     x = feature_vectors(ex, state)
     kb = KnowledgeBase((; x1=x))
     n = size(x, 2)
@@ -256,14 +254,9 @@ function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
         edges = Tuple{Int64,Int64}[]
         for i in eachindex(pairs)
             pairs[i][2] != 1 && continue
-
             pid = pairs[i][1]
-            # es1 = [pid for j in 1+i:length(pairs) if pid != pairs[j][1]]
-            # es2 = [pairs[j][1] for j in i+1:length(pairs) if pid != pairs[j][1]]
             es = [(pid, pairs[j][1]) for j in i+1:length(pairs) if pid != pairs[j][1]]
             push!(edges, es...)
-            # push!(edges1, es1...)
-            # push!(edges2, es2...)
         end
         edges
     end |> (arrays -> vcat(arrays...))
