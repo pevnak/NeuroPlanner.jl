@@ -200,20 +200,32 @@ This function encodes predicates for an ObjectBinary instance using the given pr
 """
 
 function encode_predicates(ex::ObjectBinary, pname::Symbol, preds, kid::Symbol)
+    if length(preds) == 0
+        bags = fill(Int[], length(ex.obj2id))
+
+        xs = Tuple{Int,Int}[]
+        x = map(1:2) do i
+            ArrayNode(KBEntry(kid, map(p -> p[i], xs)))
+        end
+        x = ProductNode(tuple(x...))
+        return BagNode(x, ScatteredBags(bags))
+    end
+
     p = ex.domain.predicates[pname]
     obj2id = ex.obj2id
-    constmap = ex.constmap
 
-    xs = map(collect(preds)) do f
-        [[obj2id[f.args[i].name], obj2id[f.args[j].name]] for i in 1:length(f.args)-1 for j in i+1:length(f.args)]
-    end |> (arrays -> vcat(arrays...))
+    xs = Tuple{Int,Int}[]
+    for f in collect(preds)
+        es = [(obj2id[f.args[i].name], obj2id[f.args[j].name]) for i in 1:length(f.args)-1 for j in i+1:length(f.args)]
+        push!(xs, es...)
+    end
 
     x = map(1:2) do i
         ArrayNode(KBEntry(kid, map(p -> p[i], xs)))
-    end |> (an -> ProductNode(tuple(an...)))
+    end
+    x = ProductNode(tuple(x...))
 
     bags = [Int[] for _ in 1:length(obj2id)]
-
     for (i, f) in enumerate(xs)
         for j in 1:2
             push!(bags[f[j]], i)
