@@ -149,6 +149,11 @@ function submit_missing(;dry_run = true, domain_name, arch_name, loss_name, max_
 		println(@green "finished stats "*filename)
 	 	return(false)
 	end
+	if isfile(filename*"_model.jls") && isfile(filename*"_stats_tmp.jls")
+		println(@cyan "finished model with temporary stats "*filename)
+	 	return(false)
+	end
+
 	if isfile(filename*"_model.jls")
 		println(@yellow "finished model "*filename)
 	 	return(false)
@@ -309,7 +314,7 @@ end
 	seed = 2
 	problems = ["blocks","ferry","npuzzle","spanner","elevators_00"]
 
-	map(Iterators.product(("objectbinary",), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+	map(Iterators.product(("mixedlrnn2",), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
 		submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
 	end |> vec |> mean
 
