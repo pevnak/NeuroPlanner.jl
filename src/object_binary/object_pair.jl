@@ -113,21 +113,21 @@ function specialize(ex::ObjectPair, problem)
     obj2pid = Dict(v[1] => Tuple{Int64,Int64}[] for v in obj2idv)
     pair2id = Dict{Tuple{Symbol,Symbol},Int32}()
 
+    pairs_count = Int((1 + length(obj2idv)) * length(obj2idv) / 2)
+
+    pairs = [(Symbol("a_$i"), Symbol("b_$i")) for i in 1:pairs_count]
     offset = -length(obj2idv)
 
-    pairs = map(obj2idv) do (name, id)
+    for (name, id) in obj2idv
         # global offset
         offset += length(obj2idv) + 1 - id
-        p = Tuple{Symbol,Symbol}[]
         for i in id:length(obj2idv)
             push!(obj2pid[name], (offset + i, 1))
             push!(obj2pid[obj2idv[i][1]], (offset + i, 2))
-            push!(p, (name, obj2idv[i][1]))
+            pairs[offset+i] = (name, obj2idv[i][1])
             pair2id[(name, obj2idv[i][1])] = offset + i
         end
-        p
-    end 
-    pairs = reduce(vcat, pairs)
+    end
 
     ObjectPair(ex.domain, ex.multiarg_predicates, ex.unary_predicates, ex.nullary_predicates, ex.objtype2id,
         ex.constmap, ex.model_params, obj2id, obj2pid, pair2id, pairs, nothing, nothing)
@@ -250,21 +250,21 @@ function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
 Encodes `E` Edges, which connect two pairs of object if and only if size of conjunction of their objects is equal to 1.
 """
 function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
-    xs = map(collect(keys(ex.obj2id))) do obj
+    xs = Tuple{Int64,Int64}[]
+    for obj in collect(keys(ex.obj2id))
         pairs = ex.obj2pid[obj]
-        edges = Tuple{Int64,Int64}[]
         for i in eachindex(pairs)
             pairs[i][2] != 1 && continue
             pid = pairs[i][1]
             es = [(pid, pairs[j][1]) for j in i+1:length(pairs) if pid != pairs[j][1]]
-            push!(edges, es...)
+            push!(xs, es...)
         end
-        edges
-    end |> (arrays -> vcat(arrays...))
+    end
 
     x = map(1:2) do i
         ArrayNode(KBEntry(kid, map(p -> p[i], xs)))
-    end |> (an -> ProductNode(tuple(an...)))
+    end
+    x = ProductNode(tuple(x...))
 
     bags = [Int64[] for _ in 1:length(ex.pairs)]
     for (i, f) in enumerate(xs)
@@ -310,13 +310,25 @@ This function encodes predicates for binary relations.
 - `BagNode`: A bag node containing the encoded predicates.
 """
 function encode_predicates(ex::ObjectPair, pname::Symbol, preds, kid::Symbol)
-    xs = map(collect(preds)) do f
-        xs = unique(x[1] for x in ex.obj2pid[f.args[1].name])
-        ys = unique(x[1] for x in ex.obj2pid[f.args[2].name])
+    if length(preds) == 0
+        bags = fill(Int[], length(ex.pairs))
 
-        [(x, y) for x in xs for y in ys if x != y]
-    end 
-    xs = reduce(vcat, xs)
+        xs = Tuple{Int,Int}[]
+        x = map(1:2) do i
+            ArrayNode(KBEntry(kid, map(p -> p[i], xs)))
+        end
+        x = ProductNode(tuple(x...))
+        return BagNode(x, ScatteredBags(bags))
+    end
+
+
+    xs = Tuple{Int,Int}[]
+    for f in collect(preds)
+        xss = unique(x[1] for x in ex.obj2pid[f.args[1].name])
+        yss = unique(x[1] for x in ex.obj2pid[f.args[2].name])
+        es = [(x, y) for x in xss for y in yss if x != y]
+        push!(xs, es...)
+    end
 
     x = map(1:2) do i
         ArrayNode(KBEntry(kid, map(p -> p[i], xs)))
