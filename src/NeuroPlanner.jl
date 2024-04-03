@@ -15,6 +15,7 @@ using DataStructures
 using HierarchicalUtils
 using ChainRulesCore
 using Accessors
+using LinearAlgebra
 
 
 """

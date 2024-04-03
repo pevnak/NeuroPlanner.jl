@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --time=3-00:00:00
+#SBATCH --time=42-00:00:00
 #SBATCH --nodes=1 --ntasks-per-node=1 --cpus-per-task=1
 #SBATCH --mem=64G
-#SBATCH -p amdlong
+#SBATCH -p amdextralong
 #SBATCH --error=/home/pevnytom/logs/pddl.%j.err
 #SBATCH --out=/home/pevnytom/logs/pddl.%j.out
 

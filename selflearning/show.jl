@@ -314,7 +314,7 @@ end
 	seed = 2
 	problems = ["blocks","ferry","npuzzle","spanner","elevators_00"]
 
-	map(Iterators.product(("mixedlrnn2",), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+	map(Iterators.product(("objectpair",), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
 		submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
 	end |> vec |> mean
 
@@ -329,18 +329,19 @@ end
 	
 	df = isfile("super_amd/results.csv") ? CSV.read("super_amd/results.csv", DataFrame) :  DataFrame()
 
-	cases = Iterators.product(("objectbinary","lrnn", "mixedlrnn", "mixedlrnn2","asnet"), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))
+	cases = Iterators.product(("objectpair","objectbinary","lrnn", "mixedlrnn", "mixedlrnn2","asnet"), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3));
 	if !isempty(df)
 		done = Set([(r.arch_name, r.loss_name, r.domain_name, r.dense_dim, r.graph_layers, Symbol(r.residual), r.seed,) for r in eachrow(df)])
 		cases = filter(e -> e ∉ done, collect(cases))
-	end
+	end;
 
 	amd_stats = map(cases) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
 		read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir="super_amd")
-	end |> vec
-	dff = reduce(vcat, filter(!isempty, amd_stats))
+	end |> vec;
+	dff = reduce(vcat, filter(!isempty, amd_stats));
+	@show unique(dff.arch_name)
 
-	df = isempty(df) ? dff : vcat(df, dff)
+	df = isempty(df) ? dff : vcat(df, dff);
 	# CSV.write("super_amd/results.csv", df)
 
 	df1 = vitek_table(filter(r -> r.arch_name .== "mixedlrnn", df), :tst_solved, highlight_max);

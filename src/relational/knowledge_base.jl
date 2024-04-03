@@ -196,13 +196,37 @@ end
 
 (m::MaskedModel)(kb::KnowledgeBase, x::MaskedNode{<:AbstractMillNode}) = m.m(kb, x.data) .* x.mask'
 
+# @generated function (m::ProductModel{<:NamedTuple{KM}})(kb::KnowledgeBase, x::ProductNode{<:NamedTuple{KD}}) where {KM,KD}
+#     @assert issubset(KM, KD)
+#     chs = map(KM) do k
+#         :(m.ms.$k(kb, x.data.$k))
+#     end
+#     quote
+#         m.m(vcat($(chs...)))
+#     end
+# end
+
+# @generated function (m::ProductModel{T})(kb::KnowledgeBase, x::ProductNode{U}) where {T<:Tuple,U<:Tuple}
+#     l1 = T.parameters |> length
+#     l2 = U.parameters |> length
+#     @assert l1 ≤ l2 "Applied ProductModel{<:Tuple} has more children than ProductNode"
+#     chs = map(1:l1) do i
+#         :(m.ms[$i](kb, x.data[$i]))
+#     end
+#     quote
+#         m.m(vcat($(chs...)))
+#     end
+# end
+
+
+
 @generated function (m::ProductModel{<:NamedTuple{KM}})(kb::KnowledgeBase, x::ProductNode{<:NamedTuple{KD}}) where {KM,KD}
     @assert issubset(KM, KD)
     chs = map(KM) do k
         :(m.ms.$k(kb, x.data.$k))
     end
     quote
-        m.m(vcat($(chs...)))
+        m.m(LazyVCatMatrix($(chs...)))
     end
 end
 
@@ -214,7 +238,7 @@ end
         :(m.ms[$i](kb, x.data[$i]))
     end
     quote
-        m.m(vcat($(chs...)))
+        m.m(LazyVCatMatrix($(chs...)))
     end
 end
 

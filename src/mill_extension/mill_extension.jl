@@ -16,6 +16,9 @@ export MaskedNode
 include("maskedmodel.jl")
 export MaskedModel
 
+include("lazyvcat.jl")
+export MaskedModel
+
 
 import Mill: _levelparams, _show_submodels
 _levelparams(m::MaskedModel) = Flux.params(m.m)

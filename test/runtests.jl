@@ -1,3 +1,4 @@
+
 using NeuroPlanner
 using NeuroPlanner.PDDL
 using NeuroPlanner.Flux
@@ -19,6 +20,7 @@ _isapprox(a::Tangent,b::NamedTuple; tol = 1e-5) = all(_isapprox(a[k], b[k]; tol)
 _isapprox(a::Tuple, b::Tuple; tol = 1e-5) = all(_isapprox(a[k], b[k]; tol) for k in keys(a))
 _isapprox(a::AbstractArray, b::AbstractArray; tol = 1e-5) = all(_isapprox.(a,b;tol))
 include("dedu_matrix.jl")
+include("lazyvcat.jl")
 include("knowledge_base.jl")
 include("datanode.jl")
 include("modelnode.jl")

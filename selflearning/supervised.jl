@@ -59,7 +59,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 		log_value(logger, "time_minibatch", t; step=0)
 		opt = AdaBelief();
 		ps = Flux.params(model);
-		t = @elapsed train!(NeuroPlanner.loss, model, ps, opt, () -> rand(minibatches), max_steps; logger, trn_data = minibatches)
+		t = @elapsed train!(NeuroPlanner.loss, model, ps, opt, () -> rand(minibatches), max_steps; logger, trn_data = minibatches, reset_fval=100)
 		log_value(logger, "time_train", t; step=0)
 		serialize(modelfile, model)	
 		model
@@ -112,7 +112,7 @@ max_steps = 10_000; max_time = 30; graph_layers = 3; dense_dim = 16; dense_layer
 max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
 domain_name = "ipc23_ferry"
 loss_name = "lstar"
-arch_name = "objectbinary"
+arch_name = "objectpair"
 """
 
 @main function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 

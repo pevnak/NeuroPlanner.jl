@@ -27,3 +27,29 @@ function ChainRulesCore.rrule(::Type{DeduplicatedMatrix}, a, ii)
     end
     return DeduplicatedMatrix(a, ii), dedu_pullback
 end
+
+
+function muladd!(c::Matrix, a::Matrix, ii, α, β)
+	size(a,1) == size(c,1) || error("c and a should have the same number of rows")
+	@inbounds for (i, j) in enumerate(ii)
+		for k in 1:size(a,1)
+			c[k,i] = β*c[k,i] + α*a[k, j]
+		end
+	end
+end
+
+function *(A::Matrix{T}, B::LazyVCatMatrix{T, N, DeduplicatedMatrix{T}}) where {T,N}
+	x = first(B.xs)
+	v = view(A, :, 1:size(x,1))
+	z = v * x.x
+	o = similar(A, size(A,1), size(x,2))
+	muladd!(o, z, x.ii, true, false)
+	offset = size(x,1)
+	for x in Base.tail(B.xs)
+		v = view(A, :, offset+1:offset+size(x,1))
+		z = v * x.x
+		muladd!(o, z, x.ii, true, true)
+		offset += size(x,1)
+	end
+	o
+end
