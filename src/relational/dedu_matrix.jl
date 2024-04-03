@@ -17,18 +17,6 @@ Base.Matrix(x::DeduplicatedMatrix) = x.x[:,x.ii]
 (m::Flux.Chain)(x::DeduplicatedMatrix) = DeduplicatedMatrix(m(x.x), x.ii)
 (m::Flux.Dense)(x::DeduplicatedMatrix) = DeduplicatedMatrix(m(x.x), x.ii)
 
-function ChainRulesCore.rrule(::Type{DeduplicatedMatrix}, a, ii)
-    function dedu_pullback(Δbar)
-    	δx = zeros(eltype(a), size(a))
-    	for (i,j) in enumerate(ii)
-    		δx[:,j] += Δbar[:,i]
-    	end
-    	NoTangent(), δx, NoTangent()
-    end
-    return DeduplicatedMatrix(a, ii), dedu_pullback
-end
-
-
 function muladd!(c::Matrix, a::Matrix, ii, α, β)
 	size(a,1) == size(c,1) || error("c and a should have the same number of rows")
 	@inbounds for (i, j) in enumerate(ii)
@@ -37,6 +25,16 @@ function muladd!(c::Matrix, a::Matrix, ii, α, β)
 		end
 	end
 end
+
+function ChainRulesCore.rrule(::Type{DeduplicatedMatrix}, a, ii)
+    function dedu_pullback(ȳ)
+    	δx = similar(a)
+    	muladd!(δc, ȳ, ii, true,false)
+    	NoTangent(), δx, NoTangent()
+    end
+    return DeduplicatedMatrix(a, ii), dedu_pullback
+end
+
 
 function *(A::Matrix{T}, B::LazyVCatMatrix{T, N, DeduplicatedMatrix{T}}) where {T,N}
 	x = first(B.xs)
@@ -53,3 +51,34 @@ function *(A::Matrix{T}, B::LazyVCatMatrix{T, N, DeduplicatedMatrix{T}}) where {
 	end
 	o
 end
+
+function ChainRulesCore.rrule(::typeof(*), A::Matrix{T}, B::LazyVCatMatrix{T, N, DeduplicatedMatrix{T}}) where {T,N}
+    function lazymull_pullback(ȳ)
+    	Ȳ = unthunk(ȳ)
+    	dA = @thunk(Ȳ * B')
+    	dB = @thunk(project_B(A' * Ȳ))
+    	for (i,j) in enumerate(ii)
+    		δx[:,j] += ȳ[:,i]
+    	end
+    	NoTangent(), δx, NoTangent()
+    end
+    return A*B, lazymull_pullback
+end
+
+# function rrule(
+#     ::typeof(*),
+#     A::AbstractVecOrMat{<:CommutativeMulNumber},
+#     B::AbstractVecOrMat{<:CommutativeMulNumber},
+# )
+#     project_A = ProjectTo(A)
+#     project_B = ProjectTo(B)
+#     function times_pullback(ȳ)
+#         Ȳ = unthunk(ȳ)
+#         dA = @thunk(project_A(Ȳ * B'))
+#         dB = @thunk(project_B(A' * Ȳ))
+#         return NoTangent(), dA, dB
+#     end
+#     return A * B, times_pullback
+# end
+
+
