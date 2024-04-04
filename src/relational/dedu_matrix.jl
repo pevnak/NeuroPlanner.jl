@@ -17,7 +17,7 @@ Base.Matrix(x::DeduplicatedMatrix) = x.x[:,x.ii]
 (m::Flux.Chain)(x::DeduplicatedMatrix) = DeduplicatedMatrix(m(x.x), x.ii)
 (m::Flux.Dense)(x::DeduplicatedMatrix) = DeduplicatedMatrix(m(x.x), x.ii)
 
-function muladd!(c::Matrix, a::Matrix, ii, α, β)
+function scatter_cols!(c::Matrix, a::AbstractMatrix, ii, α, β)
 	size(a,1) == size(c,1) || error("c and a should have the same number of rows")
 	@inbounds for (i, j) in enumerate(ii)
 		for k in 1:size(a,1)
@@ -26,10 +26,20 @@ function muladd!(c::Matrix, a::Matrix, ii, α, β)
 	end
 end
 
+function gather_cols!(c::Matrix, a::AbstractMatrix, ii, α, β)
+	size(a,1) == size(c,1) || error("c and a should have the same number of rows")
+	size(c,2) ≤ maximum(ii) || error("c has to has to have at least $(maximum(ii)) columns")
+	@inbounds for (i, j) in enumerate(ii)
+		for k in 1:size(a,1)
+			c[k,j] = β*c[k,j] + α*a[k, i]
+		end
+	end
+end
+
 function ChainRulesCore.rrule(::Type{DeduplicatedMatrix}, a, ii)
     function dedu_pullback(ȳ)
     	δx = similar(a)
-    	muladd!(δc, ȳ, ii, true,false)
+    	scatter_cols!(δc, ȳ, ii, true,false)
     	NoTangent(), δx, NoTangent()
     end
     return DeduplicatedMatrix(a, ii), dedu_pullback
@@ -41,44 +51,40 @@ function *(A::Matrix{T}, B::LazyVCatMatrix{T, N, DeduplicatedMatrix{T}}) where {
 	v = view(A, :, 1:size(x,1))
 	z = v * x.x
 	o = similar(A, size(A,1), size(x,2))
-	muladd!(o, z, x.ii, true, false)
+	scatter_cols!(o, z, x.ii, true, false)
 	offset = size(x,1)
 	for x in Base.tail(B.xs)
 		v = view(A, :, offset+1:offset+size(x,1))
 		z = v * x.x
-		muladd!(o, z, x.ii, true, true)
+		scatter_cols!(o, z, x.ii, true, true)
 		offset += size(x,1)
 	end
 	o
 end
 
-function ChainRulesCore.rrule(::typeof(*), A::Matrix{T}, B::LazyVCatMatrix{T, N, DeduplicatedMatrix{T}}) where {T,N}
-    function lazymull_pullback(ȳ)
-    	Ȳ = unthunk(ȳ)
-    	dA = @thunk(Ȳ * B')
-    	dB = @thunk(project_B(A' * Ȳ))
-    	for (i,j) in enumerate(ii)
-    		δx[:,j] += ȳ[:,i]
-    	end
-    	NoTangent(), δx, NoTangent()
-    end
-    return A*B, lazymull_pullback
+# This is lame but may-be sufficient for now
+function *(A::Matrix{T}, B::LinearAlgebra.Adjoint{T,LazyVCatMatrix{T, N, DeduplicatedMatrix{T}}}) where {T,N}
+	A * LazyVCatMatrix(Matrix.(B.parent.xs))'
 end
 
-# function rrule(
-#     ::typeof(*),
-#     A::AbstractVecOrMat{<:CommutativeMulNumber},
-#     B::AbstractVecOrMat{<:CommutativeMulNumber},
-# )
-#     project_A = ProjectTo(A)
-#     project_B = ProjectTo(B)
-#     function times_pullback(ȳ)
-#         Ȳ = unthunk(ȳ)
-#         dA = @thunk(project_A(Ȳ * B'))
-#         dB = @thunk(project_B(A' * Ȳ))
-#         return NoTangent(), dA, dB
-#     end
-#     return A * B, times_pullback
-# end
+function ChainRulesCore.ProjectTo(B::LazyVCatMatrix{T,N,DeduplicatedMatrix{T}}) where {T,N}
+	sizes = map(x -> size(x.x), B.xs)
+	indices = map(x -> x.ii, B.xs)
+	element = eltype(B)
+	return(ProjectTo{LazyVCatMatrix{T,N,DeduplicatedMatrix{T}}}(;sizes, indices, element))
+end
 
-
+function (a::ChainRulesCore.ProjectTo{LazyVCatMatrix{T,N,DeduplicatedMatrix{T}}})(x::Matrix) where {T,N}
+	offset = 0 
+	xs = map(1:length(a.sizes)) do i
+		rows, cols = a.sizes[i]
+		start = offset + 1
+		stop = offset + rows
+		offset += rows
+		sub_δ = x[start:stop, :]
+		δ = zeros(T, rows, cols)
+		gather_cols!(δ, sub_δ, a.indices[i], true, true)
+		Tangent{DeduplicatedMatrix{T}}(;x = δ)
+	end
+	return(Tangent{LazyVCatMatrix{T,N,DeduplicatedMatrix{T}}}(;xs))
+end

@@ -68,34 +68,22 @@ function *(A::Matrix{T}, B::LinearAlgebra.Adjoint{T, LazyVCatMatrix{T, N, Matrix
 	offset = size(x,1)
 	for x in Base.tail(xs)
 		v = view(o, :, offset+1:offset+size(x,1))
-		LinearAlgebra.mul!(v, A, x', true, true)
+		LinearAlgebra.mul!(v, A, x')
 		offset += size(x,1)
 	end
 	o
 end
 
-function ChainRulesCore.ProjectTo(B::T) where {T<:LazyVCatMatrix}
+function ChainRulesCore.ProjectTo(B::LazyVCatMatrix{T,N,Matrix{T}}) where {T,N}
 	sizes = map(size, B.xs)
 	element = eltype(B)
-	return(ProjectTo{T}(;sizes, element))
+	return(ProjectTo{LazyVCatMatrix{T,N,Matrix{T}}}(;sizes, element))
 end
 
-function (a::ChainRulesCore.ProjectTo{T})(x::Matrix) where {T<:LazyVCatMatrix}
+function (a::ChainRulesCore.ProjectTo{LazyVCatMatrix{T,N,Matrix{T}}})(x::Matrix) where {T,N}
 	offsets = cumsum((0, map(first, a.sizes)...))
 	xs = map((i, j) -> x[i+1:j,:],offsets[1:end-1], offsets[2:end])
-	return(Tangent{T}(;xs))
-end
-
-
-function ChainRulesCore.rrule(::typeof(*), A::Matrix{T}, B::LazyVCatMatrix{T, N, Matrix{T}}) where {T,N}
-	project_B = ProjectTo(B)
-    function lazymull_pullback(ȳ)
-    	Ȳ = Matrix(unthunk(ȳ))
-    	dA = Ȳ * B'
-    	dB = @thunk(project_B(A' * Ȳ))
-    	NoTangent(), dA, dB
-    end
-    return A*B, lazymull_pullback
+	return(Tangent{LazyVCatMatrix{T,N,Matrix{T}}}(;xs))
 end
 
 

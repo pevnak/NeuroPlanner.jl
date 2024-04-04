@@ -1,3 +1,4 @@
 [deps]
+FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
 NeuroPlanner = "628e68bf-2596-4972-a53b-69fd3c43dbca"
 PlanningDomains = "34fa33c8-33e3-4e77-bac8-de592315aba2"
