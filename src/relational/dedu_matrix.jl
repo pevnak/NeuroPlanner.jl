@@ -19,6 +19,8 @@ Base.Matrix(x::DeduplicatedMatrix) = x.x[:,x.ii]
 
 function scatter_cols!(c::Matrix, a::AbstractMatrix, ii, α, β)
 	size(a,1) == size(c,1) || error("c and a should have the same number of rows")
+	size(a,2) ≤ maximum(ii) || error("a has to has to have at least $(maximum(ii)) columns")
+	size(c,2) ≤ length(ii) || error("c has to has to have at least $(length(ii)) columns")
 	@inbounds for (i, j) in enumerate(ii)
 		for k in 1:size(a,1)
 			c[k,i] = β*c[k,i] + α*a[k, j]
@@ -29,6 +31,7 @@ end
 function gather_cols!(c::Matrix, a::AbstractMatrix, ii, α, β)
 	size(a,1) == size(c,1) || error("c and a should have the same number of rows")
 	size(c,2) ≤ maximum(ii) || error("c has to has to have at least $(maximum(ii)) columns")
+	size(a,2) ≤ length(ii) || error("a has to has to have at least $(length(ii)) columns")
 	@inbounds for (i, j) in enumerate(ii)
 		for k in 1:size(a,1)
 			c[k,j] = β*c[k,j] + α*a[k, i]
@@ -38,8 +41,16 @@ end
 
 function ChainRulesCore.rrule(::Type{DeduplicatedMatrix}, a, ii)
     function dedu_pullback(ȳ)
-    	δx = similar(a)
-    	scatter_cols!(δc, ȳ, ii, true,false)
+    	Ȳ = unthunk(ȳ)
+    	δx = zeros(eltype(a), size(a))
+    	gather_cols!(δx, ȳ, ii, true,true)
+    	NoTangent(), δx, NoTangent()
+    end
+
+    function dedu_pullback(ȳ::Tangent{Any, @NamedTuple{x::Matrix{Float32}, ii::ZeroTangent}})
+    	Ȳ = unthunk(ȳ)
+    	# @show typeof(Ȳ)
+    	δx = Ȳ.x
     	NoTangent(), δx, NoTangent()
     end
     return DeduplicatedMatrix(a, ii), dedu_pullback
