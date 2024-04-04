@@ -73,9 +73,18 @@ function *(A::Matrix{T}, B::LazyVCatMatrix{T, N, DeduplicatedMatrix{T}}) where {
 	o
 end
 
-# This is lame but may-be sufficient for now
+
 function *(A::Matrix{T}, B::LinearAlgebra.Adjoint{T,LazyVCatMatrix{T, N, DeduplicatedMatrix{T}}}) where {T,N}
-	A * LazyVCatMatrix(Matrix.(B.parent.xs))'
+	o = similar(A, size(A,1), size(B,2))
+	offset = 0
+	for x in B.parent.xs
+		v = view(o, :, offset+1:offset+size(x,1))
+		subA = zeros(T, size(A,1), size(x.x,2))
+		gather_cols!(subA, A, x.ii, true, true)
+		LinearAlgebra.mul!(v, subA, x.x')
+		offset += size(x,1)
+	end
+	o
 end
 
 function ChainRulesCore.ProjectTo(B::LazyVCatMatrix{T,N,DeduplicatedMatrix{T}}) where {T,N}

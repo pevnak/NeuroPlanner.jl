@@ -961,7 +961,7 @@ version = "0.1.4"
 
 [[deps.Mill]]
 deps = ["Accessors", "ChainRulesCore", "Combinatorics", "DataFrames", "DataStructures", "FiniteDifferences", "Flux", "HierarchicalUtils", "LinearAlgebra", "MLUtils", "MacroTools", "OneHotArrays", "PooledArrays", "Preferences", "SparseArrays", "Statistics", "Test"]
-git-tree-sha1 = "4714a60121050de76aa7b95098878e60d3963b98"
+path = "/Users/tomas.pevny/Work/Julia/Pkg/Mill.jl/"
 uuid = "1d0525e4-8992-11e8-313c-e310e1f6ddea"
 version = "2.10.2"
 

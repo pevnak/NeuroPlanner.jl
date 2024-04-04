@@ -61,12 +61,9 @@ end
 
 
 function *(A::Matrix{T}, B::LinearAlgebra.Adjoint{T, LazyVCatMatrix{T, N, Matrix{T}}}) where {T,N}
-	xs = B.parent.xs
 	o = similar(A, size(A,1), size(B,2))
-	x = first(xs)
-	LinearAlgebra.mul!(view(o, :, 1:size(x,1)), A, x')
-	offset = size(x,1)
-	for x in Base.tail(xs)
+	offset = 0
+	for x in B.parent.xs
 		v = view(o, :, offset+1:offset+size(x,1))
 		LinearAlgebra.mul!(v, A, x')
 		offset += size(x,1)

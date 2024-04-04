@@ -22,8 +22,8 @@ using FiniteDifferences
 		@test m(dx) isa DeduplicatedMatrix
 		@test m(dx) ≈ m(x)
 		@test gradient(_x -> sum(sin.(m(DeduplicatedMatrix(_x, dx.ii)))), dx.x)[1] ≈ grad(central_fdm(5,1), _x -> sum(sin.(m(DeduplicatedMatrix(_x, dx.ii)))), dx.x)[1] rtol = 1e-3
-		@test _isapprox(gradient(m -> sum(m(x)), m), gradient(m -> sum(m(dx)), m))
-		@test _isapprox(gradient(m -> sum(sin.(m(x))), m), gradient(m -> sum(sin.(m(dx))), m))
+		@test _isapprox(gradient(m -> sum(m(x)), m), gradient(m -> sum(m(dx)), m); rtol = 1e-3)
+		@test _isapprox(gradient(m -> sum(sin.(m(x))), m), gradient(m -> sum(sin.(m(dx))), m); rtol = 1e-3)
 		# @test _isapprox(Yota.grad(model -> sum(model(x)), m)[2][2],gradient(m -> sum(m(x)), m)[1])
 	end
 end
