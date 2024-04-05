@@ -250,16 +250,16 @@ function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
 Encodes `E` Edges, which connect two pairs of object if and only if size of conjunction of their objects is equal to 1.
 """
 function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
-    xs = Tuple{Int64,Int64}[]
-    for obj in collect(keys(ex.obj2id))
+    es = map(collect(keys(ex.obj2id))) do obj
         pairs = ex.obj2pid[obj]
-        for i in eachindex(pairs)
-            pairs[i][2] != 1 && continue
+        es = map(eachindex(pairs)) do i 
+            pairs[i][2] != 1 && return(Vector{Tuple{Int,Int}}())
             pid = pairs[i][1]
-            es = [(pid, pairs[j][1]) for j in i+1:length(pairs) if pid != pairs[j][1]]
-            push!(xs, es...)
+            [(pid, pairs[j][1]) for j in i+1:length(pairs) if pid != pairs[j][1]]
         end
+        reduce(vcat, es)
     end
+    xs = reduce(vcat, es)
 
     x = map(1:2) do i
         ArrayNode(KBEntry(kid, map(p -> p[i], xs)))
@@ -323,12 +323,12 @@ function encode_predicates(ex::ObjectPair, pname::Symbol, preds, kid::Symbol)
 
 
     xs = Tuple{Int,Int}[]
-    for f in collect(preds)
+    es = map(collect(preds)) do f
         xss = unique(x[1] for x in ex.obj2pid[f.args[1].name])
         yss = unique(x[1] for x in ex.obj2pid[f.args[2].name])
-        es = [(x, y) for x in xss for y in yss if x != y]
-        push!(xs, es...)
+        [(x, y) for x in xss for y in yss if x != y]
     end
+    xs = reduce(vcat, es)
 
     x = map(1:2) do i
         ArrayNode(KBEntry(kid, map(p -> p[i], xs)))

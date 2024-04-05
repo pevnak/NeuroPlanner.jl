@@ -33,6 +33,7 @@ export initproblem
 #####
 #	A general support for architectures
 #####
+include("utils.jl")
 include("mill_extension/mill_extension.jl")
 include("relational/knowledge_base.jl")
 include("relational/knowledge_model.jl")

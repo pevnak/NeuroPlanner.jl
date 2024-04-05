@@ -10,11 +10,20 @@ The implementation is based on hashing columns
 """
 find_duplicates(x::AbstractMatrix) = find_duplicates(vec(mapslices(hash, x, dims = 1)))
 
-function find_duplicates(x::AbstractVector)
+function find_duplicates(xs::AbstractVector...)
+	h = hash.(first(xs))
+	for x in Base.tail(xs)
+		h .= hash.(x,h)
+	end
+	find_duplicates(h)
+end
+
+
+function find_duplicates(x::Vector{<:Integer})
 	cols = length(x)
 	si = Vector{Int}(undef, cols)
 	unique_cols = Vector{Bool}(undef, cols)
-	di = Dict{eltype(x),Integer}()
+	di = Dict{eltype(x), Integer}()
 	@inbounds for j in 1:cols 
 		n = length(di)
 		si[j] = get!(di, x[j], n + 1)
@@ -60,12 +69,12 @@ function deduplicate(kb::KnowledgeBase)
 		new_entry, ii = _deduplicate(kb, kb[k])
 		kb = replace(kb, k, new_entry)
 	end
-	if length(ii) == length(unique(ii))
-		println("all entries are unique")
-	else 
-		p = round(100*(1 - length(unique(ii)) / length(ii)), digits = 2)
-		println("$(p) entries are duplicate")
-	end
+	# if length(ii) == length(unique(ii))
+	# 	println("all entries are unique")
+	# else 
+	# 	p = round(100*(1 - length(unique(ii)) / length(ii)), digits = 2)
+	# 	println("$(p) entries are duplicate")
+	# end
 	kb
 end
 
@@ -91,15 +100,15 @@ function _deduplicate(kb::KnowledgeBase, ds::BagNode)
 	end
 	z, ii = _deduplicate(kb, ds.data)
 	mapped_bags = [sort(ii[b]) for b in ds.bags]
-	mask, ii = find_duplicates(mapped_bags)
+	mask, ii = find_duplicates(hash.(mapped_bags))
 	dedu_bn = z isa DeduplicatingNode ? BagNode(z.x, mapped_bags[mask]) : BagNode(z, ds.bags[mask])
 	dedu_ds = DeduplicatingNode(dedu_bn, ii)
 	dedu_ds, ii
 end
 
 function _deduplicate(kb::KnowledgeBase, ds::ProductNode)
-	xs = map(x -> _deduplicate(kb, x), ds.data)
-	mask, ii = find_duplicates(vcat(map(x -> x[2]', xs)...))
+	xs = _map_tuple(Base.Fix1(_deduplicate, kb), ds.data)
+	mask, ii = find_duplicates(_map_tuple(Base.Fix2(getindex,2), xs)...)
 	dedu_ds = ProductNode(map(x -> x[1][mask], xs))
 	dedu_ds = DeduplicatingNode(dedu_ds, ii)
 	dedu_ds, ii
@@ -108,7 +117,7 @@ end
 
 function _deduplicate(kb::KnowledgeBase, ds::MaskedNode)
     x, ii = _deduplicate(kb, ds.data)
-    mask, ii = find_duplicates(vcat(ii', ds.mask'))
+    mask, ii = find_duplicates(ii, ds.mask)
     dedu_ds = MaskedNode(x[mask], ds.mask[mask])
     dedu_ds = DeduplicatingNode(dedu_ds, ii)
     dedu_ds, ii

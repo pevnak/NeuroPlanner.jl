@@ -130,6 +130,7 @@ arch_name = "objectpair"
 	hnet = archs[arch_name]
 
 	filename = joinpath("super_amd", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+	@show filename
 	experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch; max_steps, max_time, graph_layers, residual, dense_layers, dense_dim, settings)
 end
 
