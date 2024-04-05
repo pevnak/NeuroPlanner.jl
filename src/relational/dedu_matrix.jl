@@ -17,7 +17,7 @@ Base.Matrix(x::DeduplicatedMatrix) = x.x[:,x.ii]
 (m::Flux.Chain)(x::DeduplicatedMatrix) = DeduplicatedMatrix(m(x.x), x.ii)
 (m::Flux.Dense)(x::DeduplicatedMatrix) = DeduplicatedMatrix(m(x.x), x.ii)
 
-function scatter_cols!(c::Matrix, a::AbstractMatrix, ii, α, β)
+function scatter_cols!(c::AbstractMatrix, a::AbstractMatrix, ii, α, β)
 	size(a,1) == size(c,1) || error("c and a should have the same number of rows")
 	size(a,2) ≤ maximum(ii) || error("a has to has to have at least $(maximum(ii)) columns")
 	size(c,2) ≤ length(ii) || error("c has to has to have at least $(length(ii)) columns")
@@ -28,7 +28,7 @@ function scatter_cols!(c::Matrix, a::AbstractMatrix, ii, α, β)
 	end
 end
 
-function gather_cols!(c::Matrix, a::AbstractMatrix, ii, α, β)
+function gather_cols!(c::AbstractMatrix, a::AbstractMatrix, ii, α, β)
 	size(a,1) == size(c,1) || error("c and a should have the same number of rows")
 	size(c,2) ≤ maximum(ii) || error("c has to has to have at least $(maximum(ii)) columns")
 	size(a,2) ≤ length(ii) || error("a has to has to have at least $(length(ii)) columns")
@@ -77,9 +77,11 @@ end
 function *(A::Matrix{T}, B::LinearAlgebra.Adjoint{T,LazyVCatMatrix{T, N, DeduplicatedMatrix{T}}}) where {T,N}
 	o = similar(A, size(A,1), size(B,2))
 	offset = 0
+	alllocA = Matrix{T}(undef, size(A,1), maximum(map(x -> size(x.x,2),B.parent.xs))) # this allows use to share the preallocation
 	for x in B.parent.xs
 		v = view(o, :, offset+1:offset+size(x,1))
-		subA = zeros(T, size(A,1), size(x.x,2))
+		subA = view(alllocA, :, 1:size(x.x,2))
+		subA .= 0
 		gather_cols!(subA, A, x.ii, true, true)
 		LinearAlgebra.mul!(v, subA, x.x')
 		offset += size(x,1)
