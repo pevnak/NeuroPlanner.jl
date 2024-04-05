@@ -19,17 +19,40 @@ function find_duplicates(xs::AbstractVector...)
 end
 
 
-function find_duplicates(x::Vector{<:Integer})
+function find_duplicates(x::Vector{T}) where {T<:Number}
 	cols = length(x)
 	si = Vector{Int}(undef, cols)
 	unique_cols = Vector{Bool}(undef, cols)
-	di = Dict{eltype(x), Integer}()
+	di = Dict{T, Int}()
 	@inbounds for j in 1:cols 
 		n = length(di)
 		si[j] = get!(di, x[j], n + 1)
 		unique_cols[j] = n < length(di)
 	end
 	unique_cols, si
+end
+
+# Custom key with overwritten hash function allows to bypass the hashing, since when values are already hashed
+# https://discourse.julialang.org/t/dictionary-with-custom-hash-function/49168
+struct HashedKey
+    val::UInt64
+end
+
+Base.hash(a::HashedKey, h::UInt) = xor(a.val, h)
+Base.:(==)(a::HashedKey, b::HashedKey) = a.val == b.val
+
+function find_duplicates(x::Vector{UInt64})
+	n = length(x)
+	si = Vector{Int}(undef, n)
+	uniques = Vector{Bool}(undef, n)
+	di = Dict{HashedKey, Int}()
+	@inbounds for j in 1:n 
+		u = length(di)
+		k = HashedKey(x[j])
+		si[j] = get!(di, k, u + 1)
+		uniques[j] = u < length(di)
+	end
+	uniques, si
 end
 
 
@@ -90,6 +113,9 @@ function _deduplicate(kb::KnowledgeBase, ds::ArrayNode{<:KBEntry{K}}) where {K}
 	dedu_ds, ii
 end
 
+_sethash(xs::AbstractVector) = sum(hash.(xs)) # this might be good enough for the bang
+# _sethash(xs::AbstractVector) = hash(sort(xs)) # this probably more correct
+
 function _deduplicate(kb::KnowledgeBase, ds::BagNode)
 	if numobs(ds.data) == 0 
 		@assert all(isempty(b) for b in ds.bags) "All bags should be empty when instances are empty"
@@ -99,8 +125,8 @@ function _deduplicate(kb::KnowledgeBase, ds::BagNode)
 		return(dedu_ds, ii)
 	end
 	z, ii = _deduplicate(kb, ds.data)
-	mapped_bags = [sort(ii[b]) for b in ds.bags]
-	mask, ii = find_duplicates(hash.(mapped_bags))
+	mapped_bags = [ii[b] for b in ds.bags]
+	mask, ii = find_duplicates(_sethash.(mapped_bags))
 	dedu_bn = z isa DeduplicatingNode ? BagNode(z.x, mapped_bags[mask]) : BagNode(z, ds.bags[mask])
 	dedu_ds = DeduplicatingNode(dedu_bn, ii)
 	dedu_ds, ii

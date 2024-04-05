@@ -144,7 +144,7 @@ function nunary_predicates(ex::MixedLRNN2, state)
     # encode types of objects
     for s in state.types
         i = ex.objtype2id[s.name]
-        j = ex.obj2id[only(s.args).name]
+        j = ex.obj2id[s.args[1].name]
         x[i, j] = 1
     end
 
@@ -152,13 +152,13 @@ function nunary_predicates(ex::MixedLRNN2, state)
         length(get_args(f)) > 1 && continue
         v = 1
         if (f isa PDDL.Compound) && (f.name == :not)
-            f = only(f.args)
+            f = f.args[1]
             v = 0
         end
         a = get_args(f)
         pid = ex.nunanary_predicates[f.name]
         if length(a) == 1
-            vid = ex.obj2id[only(get_args(f)).name]
+            vid = ex.obj2id[get_args(f)[1].name]
             x[pid, vid] = v
         else
             length(a) == 0

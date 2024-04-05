@@ -15,12 +15,12 @@ function _mapenumerate_tuple(f::Function, i::Int,  xs::Tuple)
 end
 
 
-function _map_tuple(f::F, xs::Tuple) where {F<:Union{Function, Base.Fix1, Base.Fix2}}
+@inline function _map_tuple(f::F, xs::Tuple) where {F<:Union{Function, Base.Fix1, Base.Fix2}}
     isempty(xs) && return(xs)
     tuple(f(first(xs)), _map_tuple(f, Base.tail(xs))...)
 end
 
-function _map_tuple(f::F, xs::NamedTuple{KS}) where {KS,F<:Union{Function, Base.Fix1, Base.Fix2}}
+@inline function _map_tuple(f::F, xs::NamedTuple{KS}) where {KS,F<:Union{Function, Base.Fix1, Base.Fix2}}
     isempty(xs) && return(xs)
     NamedTuple{KS}(tuple(f(first(xs)), _map_tuple(f, Base.tail(xs))...))
 end
