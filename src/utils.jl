@@ -14,6 +14,29 @@ function _mapenumerate_tuple(f::Function, i::Int,  xs::Tuple)
     tuple(f(i, first(xs)), _mapenumerate_tuple(f, i+1, Base.tail(xs))...)
 end
 
+"""
+    _inlined_search(s::Symbol, i::Int,  xs::Tuple)
+    _inlined_search(s::Symbol, xs::Tuple)
+
+    find a first occurence of Symbol `s` in xs starting at `i`-th element of xs
+    When symbol is not found, -1 is returned
+
+```julia
+julia> _inlined_search(:a, (:b,:a,:c))
+2
+
+julia> _inlined_search(:e, (:b,:a,:c))
+-1
+   
+"""
+@inline function _inlined_search(s::Symbol, i::Int,  xs::Tuple)
+    isempty(xs) && return(-1)
+    s == first(xs) && return(i)
+    return(_inlined_search(s, i+1, Base.tail(xs)))
+end
+
+@inline _inlined_search(s::Symbol, xs::Tuple) = _inlined_search(s, 1, xs)
+
 
 @inline function _map_tuple(f::F, xs::Tuple) where {F<:Union{Function, Base.Fix1, Base.Fix2}}
     isempty(xs) && return(xs)
