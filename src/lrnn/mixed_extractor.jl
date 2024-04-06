@@ -173,7 +173,7 @@ function multi_predicates(ex::MixedLRNN, kid::Symbol, state, prefix = nothing)
         preds = filter(f -> f.name == k, get_facts(state))
         encode_predicates(ex, k, preds,  kid)
     end
-    ns = isnothing(prefix) ? ks : tuple([Symbol(prefix,"_",k) for k in ks]...)
+    ns = isnothing(prefix) ? ks : _map_tuple(k -> Symbol(prefix, "_", k), ks)
     ProductNode(NamedTuple{ns}(xs))
 end
 

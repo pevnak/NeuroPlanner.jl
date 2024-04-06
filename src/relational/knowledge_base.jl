@@ -18,6 +18,11 @@ function Base.show(io::IO, kb::KnowledgeBase{KS,VS}) where {KS,VS}
 end
 
 KnowledgeBase() = KnowledgeBase(NamedTuple())
+function KnowledgeBase(xs::Vector{<:Pair{Symbol,Any}})
+    KS = map(first, xs)
+    VS = map(Base.Fix2(getindex,2), xs)
+    KnowledgeBase(NamedTuple{KS}(VS))
+end
 
 Base.getindex(kb::KnowledgeBase, k::Symbol) = kb.kb[k]
 Base.keys(kb::KnowledgeBase) = keys(kb.kb)

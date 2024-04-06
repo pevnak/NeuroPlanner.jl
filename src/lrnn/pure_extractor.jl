@@ -111,7 +111,6 @@ function encode_state(ex::LRNN, state::GenericState, prefix=nothing)
     message_passes, residual = ex.model_params
     # x = zeros(Float32, 1, length(ex.obj2id))
     x = ones(Float32, 1, length(ex.obj2id))
-
     kb = KnowledgeBase((; x1=x))
     n = size(x, 2)
     sₓ = :x1
@@ -145,7 +144,7 @@ layer_name(kb::KnowledgeBase, prefix)
 
 create a unique name of the layer for KnowledgeBase `kb`
 """
-layer_name(kb::KnowledgeBase{KS,<:Any}, prefix) where {KS} = Symbol(prefix * "_$(length(KS)+1)")
+layer_name(kb::KnowledgeBase{KS,<:Any}, prefix) where {KS} = Symbol(prefix,"_",length(KS)+1)
 
 """
 encode_predicates(ex::LRNN, kid::Symbol, state, prefix=nothing)
