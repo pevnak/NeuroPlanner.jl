@@ -18,9 +18,11 @@ struct KBEntryRenamer
     to::Symbol
 end
 
-function (kb::KBEntryRenamer)(x::KBEntry{E,T}) where {E,T}
-    kb.from != E && return(x)
-    KBEntry{kb.to,T}(x.ii)
+KBEntryRenamer(from_to::Pair{Symbol,Symbol}) = KBEntryRenamer(from_to[1],from_to[2])
+
+function (kb::KBEntryRenamer)(x::KBEntry{T}) where {T}
+    kb.from != x.e && return(x)
+    KBEntry{T}(x.e, x.ii)
 end
 
 (kb::KBEntryRenamer)(ds::BagNode) = BagNode(kb(ds.data), ds.bags, ds.metadata)

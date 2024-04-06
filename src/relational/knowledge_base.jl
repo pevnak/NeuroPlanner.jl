@@ -40,7 +40,7 @@ end
 MLUtils.batch(xs::Vector{<:KnowledgeBase}) = _catobs_kbs(xs)
 
 """
-struct KBEntry{E,T} <: AbstractMatrix{T}
+struct KBEntry{T} <: AbstractMatrix{T}
     ii::Vector{Int}
 end
 
@@ -52,57 +52,58 @@ E --- is a name of the entry taken from the knowledge base
 T --- is the datatype
 N --- is the number of items in the knowledge base. When
 """
-struct KBEntry{E,T} <: AbstractMatrix{T}
+struct KBEntry{T} <: AbstractMatrix{T}
+    e::Symbol
     ii::Vector{Int}
 end
 
 function KBEntry(T::DataType, e, ii)
-    KBEntry{Symbol(e),T}(ii)
+    KBEntry{T}(Symbol(e),ii)
 end
 
 KBEntry(e, ii) = KBEntry(Float32, e, ii)
 
 
-Base.show(io::IO, A::KBEntry{E,T}) where {E,T} = print(io, "KBEntry{$(E)} with $(length(A.ii)) items")
-Base.show(io::IO, ::MIME"text/plain", A::KBEntry{E,T}) where {E,T} = print(io, "KBEntry{$(E)} with $(length(A.ii)) items")
+Base.show(io::IO, A::KBEntry{T}) where {T} = print(io, "KBEntry{$(A.e)} with $(length(A.ii)) items")
+Base.show(io::IO, ::MIME"text/plain", A::KBEntry{T}) where {T} = print(io, "KBEntry{$(A.e)} with $(length(A.ii)) items")
 Base.show(io::IO, ::MIME"text/plain", @nospecialize(n::ArrayNode{<:KBEntry})) = print(io, "(: × ", length(n.data.ii), ")")
-Base.size(A::KBEntry{E,T}) where {E,T} = ((:), length(A.ii))
-Base.size(A::KBEntry{E,T}, d) where {E,T} = (d == 1) ? (:) : length(A.ii)
-Base.Matrix(kb::KnowledgeBase, X::KBEntry{E,T}) where {E,T} = kb[E][:, X.ii]
+Base.size(A::KBEntry{T}) where {T} = ((:), length(A.ii))
+Base.size(A::KBEntry{T}, d) where {T} = (d == 1) ? (:) : length(A.ii)
+Base.Matrix(kb::KnowledgeBase, x::KBEntry{T}) where {T} = kb[x.e][:, x.ii]
 Base.Matrix(X::KBEntry) = error("cannot instantiate Matrix from KBEntry without a KnowledgeBase, use Matrix(kb::KnowledgeBase, A::KBEntry)")
 Base.getindex(X::KBEntry, idcs) = _getindex(X, idcs)
 Base.axes(X::KBEntry, d) = d == 1 ? (:) : (1:length(X.ii))
-function ==(a::KBEntry{A,<:Any}, b::KBEntry{B,<:Any}) where {A,B}
-    A != B && return (false)
+function ==(a::KBEntry, b::KBEntry)
+    a.e != b.e && return (false)
     return (a.ii == b.ii)
 end
-_getindex(x::KBEntry{E,T}, i) where {E,T} = KBEntry{E,T}(x.ii[i])
-_getindex(x::KBEntry{E,T}) where {E,T} = x
-_getindex(x::KBEntry{E,T}, i::Integer) where {E,T} = KBEntry{E,T}(x.ii[i:i])
+_getindex(x::KBEntry{T}, i) where {T} = KBEntry{T}(x.e, x.ii[i])
+_getindex(x::KBEntry{T}) where {T} = x
+_getindex(x::KBEntry{T}, i::Integer) where {T} = KBEntry{T}(x.e, x.ii[i:i])
 MLUtils.numobs(a::KBEntry) = length(a.ii)
 HierarchicalUtils.NodeType(::Type{KBEntry}) = HierarchicalUtils.LeafNode()
 
-ChainRulesCore.ProjectTo(x::KBEntry{E,T}) where {E,T} = ProjectTo{KBEntry}(; E, T, ii=x.ii)
+ChainRulesCore.ProjectTo(x::KBEntry{T}) where {T} = ProjectTo{KBEntry}(; E, T, ii=x.ii)
 
 ########
 #   We do not do reduce, as it is potentially very dangerous as it might be dissinchronized with the knowledge base
 ########
-function Mill.catobs(A::KBEntry{E,T}, B::KBEntry{E,T}) where {E,T}
+function Mill.catobs(A::KBEntry{T}, B::KBEntry{T}) where {T}
     error("The catobs is not implemented for \"KBEntry\", as it might not be safe without KnowledgeBase")
 end
 
-function reduce(::typeof(Mill.catobs), As::Tuple{Vararg{KBEntry{E,T}}}) where {E,T}
+function reduce(::typeof(Mill.catobs), As::Tuple{Vararg{KBEntry{T}}}) where {T}
     error("The catobs is not implemented for \"KBEntry\", as it might not be safe without KnowledgeBase")
 end
 
-function reduce(::typeof(Mill.catobs), As::Vector{<:KBEntry{E,T}}) where {E,T}
+function reduce(::typeof(Mill.catobs), As::Vector{<:KBEntry{T}}) where {T}
     error("The catobs is not implemented for \"KBEntry\", as it might not be safe without KnowledgeBase")
 end
 
 ########
 #   THe dangerousness of getindex is questionably and will be removed on first trouble
 ########
-function Base.getindex(X::KBEntry{E,T}, idcs...) where {E,T}
+function Base.getindex(X::KBEntry{T}, idcs...) where {T}
     D = length(X.ii)
     if first(idcs) isa Colon
         idcs = idcs[2:end]
@@ -147,10 +148,12 @@ function _catobs_kbs(offsets, as::AbstractVector{<:ArrayNode})
     ArrayNode(_catobs_kbs(offsets, [a.data for a in as]))
 end
 
-function _catobs_kbs(offsets, as::AbstractVector{<:KBEntry{E,T}}) where {E,T}
+function _catobs_kbs(offsets, as::AbstractVector{<:KBEntry{T}}) where {T}
+    E = first(as).e 
+    all(E == a.e for a in as) || error("cannot concatenate KBEntries pointing to different keys in KnowledgeBase")
     i = [a.ii for a in as]
     ii = reduce(vcat, [a.ii .+ o for (a, o) in zip(as, offsets[E])])
-    KBEntry{E,T}(ii)
+    KBEntry{T}(E, ii)
 end
 
 function _catobs_kbs(offsets, as::AbstractVector{<:ProductNode{T,<:Nothing}}) where {T}
@@ -302,9 +305,9 @@ end
 #  replacement in mill structures.
 ###########
 
-function Base.replace(x::KBEntry{E,T}, ps::Pair{Symbol,Symbol}...) where {E,T}
+function Base.replace(x::KBEntry{T}, ps::Pair{Symbol,Symbol}...) where {T}
     for (a, b) in ps
-        E == a && return (KBEntry{b,T}(x.ii))
+        x.e == a && return (KBEntry{T}(b, x.ii))
     end
     return (x)
 end

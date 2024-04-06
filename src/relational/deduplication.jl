@@ -106,7 +106,8 @@ function _deduplicate(kb::KnowledgeBase, x::AbstractMatrix)
 	o, o.ii
 end
 
-function _deduplicate(kb::KnowledgeBase, ds::ArrayNode{<:KBEntry{K}}) where {K}
+function _deduplicate(kb::KnowledgeBase, ds::ArrayNode{<:KBEntry})
+	K = ds.data.e
 	x = kb[K]
 	mask, ii = (x isa DeduplicatedMatrix || x isa DeduplicatingNode) ? find_duplicates(x.ii[ds.data.ii]) : find_duplicates(x)
 	dedu_ds = DeduplicatingNode(ds[mask], ii)
