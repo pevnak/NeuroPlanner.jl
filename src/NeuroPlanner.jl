@@ -49,7 +49,8 @@ export MultiheadAttention
 include("lrnn/pure_extractor.jl")
 include("lrnn/mixed_extractor.jl")
 include("lrnn/mixed_extractor2.jl")
-export MixedLRNN, MixedLRNN2, LRNN 
+include("lrnn/mixed_extractor3.jl")
+export MixedLRNN, MixedLRNN2, MixedLRNN3, LRNN 
 
 # Object Binary structures by Sira and Horcik
 include("object_binary/object_binary.jl")

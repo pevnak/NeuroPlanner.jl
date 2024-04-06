@@ -186,17 +186,14 @@ function group_facts_fast(ex::MixedLRNN2, facts::Vector{<:Term})
         col = findfirst(==(f.name), ex.multiarg_predicates)
         occurences[i, col] = true
     end
-    # [k => (@view occurences[:,col]) for (col, k) in enumerate(ex.multiarg_predicates)]
     _mapenumerate_tuple((col,k) -> k => (@view occurences[:,col]), ex.multiarg_predicates)
 end
 
-# # this is better
+# this is better
 function multi_predicates(ex::MixedLRNN2, kid::Symbol, state, prefix=nothing)
     # Then, we specify the predicates the dirty way
     ks = ex.multiarg_predicates
     facts = collect(get_facts(state))
-    # gr = group_facts(ex, facts)
-    # xs = map(k -> encode_predicates(ex, k, facts[gr[k]], kid), ks)
     gr = group_facts_fast(ex, facts)
     xs = map(kii -> encode_predicates(ex, kii[1], facts[kii[2]], kid), gr)
     ns = isnothing(prefix) ? ks : tuple([Symbol(prefix, "_", k) for k in ks]...)

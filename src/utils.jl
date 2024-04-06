@@ -24,3 +24,12 @@ end
     isempty(xs) && return(xs)
     NamedTuple{KS}(tuple(f(first(xs)), _map_tuple(f, Base.tail(xs))...))
 end
+
+
+@inline function _map_tuple(f::F, i::Type{Val{I}},n::Type{Val{N}}) where {I,N,F<:Union{Function, Base.Fix1, Base.Fix2}}
+    I > N && return(tuple())
+    I == N && return(tuple(f(I)))
+    tuple(f(I), _map_tuple(f, Val{I+1}, n)...)
+end
+
+@inline _map_tuple(f::F, n::Type{Val{N}}) where {N,F<:Union{Function, Base.Fix1, Base.Fix2}} = _map_tuple(f, Val{1}, n)
