@@ -331,6 +331,8 @@ function encode_predicates(ex::ObjectPair, pname::Symbol, preds, kid::Symbol)
             offset += 1
             ii₁[offset] = x
             ii₂[offset] = y
+            push!(bags[x], offset)
+            push!(bags[y], offset)
         end
     end
 
@@ -338,12 +340,6 @@ function encode_predicates(ex::ObjectPair, pname::Symbol, preds, kid::Symbol)
         ArrayNode(KBEntry(kid, ii₁[1:offset])),
         ArrayNode(KBEntry(kid, ii₂[1:offset])),
     ))
-
-    for i in 1:offset
-        push!(bags[ii₁[i]], i)
-        push!(bags[ii₂[i]], i)
-    end
-
     BagNode(x, ScatteredBags(bags))
 end
 
