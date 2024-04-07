@@ -310,19 +310,15 @@ This function encodes predicates for binary relations.
 - `BagNode`: A bag node containing the encoded predicates.
 """
 function encode_predicates(ex::ObjectPair, pname::Symbol, preds, kid::Symbol)
-    if length(preds) == 0
-        bags = fill(Int[], length(ex.pairs))
-
-        xs = Tuple{Int,Int}[]
-        x = map(1:2) do i
-            ArrayNode(KBEntry(kid, map(p -> p[i], xs)))
-        end
-        x = ProductNode(tuple(x...))
-        return BagNode(x, ScatteredBags(bags))
+    if isempty(preds)
+        bags = ScatteredBags(fill(Int[], length(ex.pairs)))
+        x = ProductNode((
+            ArrayNode(KBEntry(kid, Int[])),
+            ArrayNode(KBEntry(kid, Int[])),
+        ))
+        return BagNode(x, bags)
     end
 
-
-    xs = Tuple{Int,Int}[]
     es = map(collect(preds)) do f
         xss = unique(x[1] for x in ex.obj2pid[f.args[1].name])
         yss = unique(x[1] for x in ex.obj2pid[f.args[2].name])
@@ -330,11 +326,10 @@ function encode_predicates(ex::ObjectPair, pname::Symbol, preds, kid::Symbol)
     end
     xs = reduce(vcat, es)
 
-    x = map(1:2) do i
-        ArrayNode(KBEntry(kid, map(p -> p[i], xs)))
-    end
-    x = ProductNode(tuple(x...))
-
+    x = ProductNode((
+        ArrayNode(KBEntry(kid, map(first, xs))),
+        ArrayNode(KBEntry(kid, map(Base.Fix2(getindex, 2), xs))),
+    ))
 
     bags = [Int64[] for _ in 1:length(ex.pairs)]
 
