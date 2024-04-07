@@ -310,33 +310,38 @@ This function encodes predicates for binary relations.
 - `BagNode`: A bag node containing the encoded predicates.
 """
 function encode_predicates(ex::ObjectPair, pname::Symbol, preds, kid::Symbol)
+    bags = fill(Int[], length(ex.pairs))
     if isempty(preds)
-        bags = ScatteredBags(fill(Int[], length(ex.pairs)))
         x = ProductNode((
             ArrayNode(KBEntry(kid, Int[])),
             ArrayNode(KBEntry(kid, Int[])),
         ))
-        return BagNode(x, bags)
+        return BagNode(x, ScatteredBags(bags))
     end
 
-    es = map(collect(preds)) do f
+    max_length = length(preds)*length(ex.obj2id)*length(ex.obj2id)
+    ii₁ = Vector{Int}(undef, max_length)
+    ii₂ = Vector{Int}(undef, max_length)
+    offset = 0
+    for f in preds
         xss = unique(x[1] for x in ex.obj2pid[f.args[1].name])
         yss = unique(x[1] for x in ex.obj2pid[f.args[2].name])
-        [(x, y) for x in xss for y in yss if x != y]
+        for (x,y) in Iterators.product(xss,yss)
+            x == y && continue
+            offset += 1
+            ii₁[offset] = x
+            ii₂[offset] = y
+        end
     end
-    xs = reduce(vcat, es)
 
     x = ProductNode((
-        ArrayNode(KBEntry(kid, map(first, xs))),
-        ArrayNode(KBEntry(kid, map(Base.Fix2(getindex, 2), xs))),
+        ArrayNode(KBEntry(kid, ii₁[1:offset])),
+        ArrayNode(KBEntry(kid, ii₂[1:offset])),
     ))
 
-    bags = [Int64[] for _ in 1:length(ex.pairs)]
-
-    for (i, f) in enumerate(xs)
-        for j in 1:2
-            push!(bags[f[j]], i)
-        end
+    for i in 1:offset
+        push!(bags[ii₁[i]], i)
+        push!(bags[ii₂[i]], i)
     end
 
     BagNode(x, ScatteredBags(bags))
