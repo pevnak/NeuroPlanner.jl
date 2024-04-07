@@ -250,29 +250,31 @@ function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
 Encodes `E` Edges, which connect two pairs of object if and only if size of conjunction of their objects is equal to 1.
 """
 function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
-    es = map(collect(keys(ex.obj2id))) do obj
-        pairs = ex.obj2pid[obj]
-        es = map(eachindex(pairs)) do i 
-            pairs[i][2] != 1 && return(Vector{Tuple{Int,Int}}())
-            pid = pairs[i][1]
-            [(pid, pairs[j][1]) for j in i+1:length(pairs) if pid != pairs[j][1]]
-        end
-        reduce(vcat, es)
-    end
-    xs = reduce(vcat, es)
-
-    x = map(1:2) do i
-        ArrayNode(KBEntry(kid, map(p -> p[i], xs)))
-    end
-    x = ProductNode(tuple(x...))
-
     bags = [Int64[] for _ in 1:length(ex.pairs)]
-    for (i, f) in enumerate(xs)
-        for j in 1:2
-            push!(bags[f[j]], i)
+    max_length = mapreduce(v -> length(v)^2, +, values(ex.obj2pid))
+    ii₁ = Vector{Int}(undef, max_length)
+    ii₂ = Vector{Int}(undef, max_length)
+    offset = 0
+    for pairs in values(ex.obj2pid)
+        for i in eachindex(pairs)
+            pairs[i][2] != 1 && continue
+            pidᵢ = pairs[i][1]
+            for j in i+1:length(pairs)
+                pidⱼ = pairs[j][1]
+                pidᵢ == pidⱼ && continue
+                offset+=1
+                ii₁[offset] = pidᵢ 
+                ii₂[offset] = pidⱼ
+                push!(bags[pidᵢ], offset)
+                push!(bags[pidⱼ], offset)
+            end
         end
     end
 
+    x = ProductNode((
+        ArrayNode(KBEntry(kid, ii₁[1:offset])),
+        ArrayNode(KBEntry(kid, ii₂[1:offset])),
+    ))
     name = isnothing(prefix) ? sym : Symbol(prefix, "_", sym)
     (name, BagNode(x, ScatteredBags(bags)))
 end
