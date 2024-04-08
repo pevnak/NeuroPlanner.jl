@@ -29,7 +29,7 @@ vertex corresponding to the hyper-edge and its vertices.
 --- `model_params` some parameters of an algorithm constructing the message passing passes 
 """
 
-struct ObjectPair{DO,D,MP,DV,DT,V,S,G}
+struct ObjectPair{DO,D,MP,DV,DUV,DT,V,S,G}
     domain::DO
     multiarg_predicates::Dict{Symbol,Int64}
     unary_predicates::Dict{Symbol,Int64}
@@ -39,25 +39,26 @@ struct ObjectPair{DO,D,MP,DV,DT,V,S,G}
     model_params::MP
     obj2id::D
     obj2pid::DV
+    obj2upid::DUV
     pair2id::DT
     pairs::V
     init_state::S
     goal_state::G
     function ObjectPair(domain::DO, multiarg_predicates::Dict{Symbol,Int64}, unary_predicates::Dict{Symbol,Int64}, nullary_predicates::Dict{Symbol,Int64},
-        objtype2id::Dict{Symbol,Int64}, constmap::Dict{Symbol,Int64}, model_params::MP, obj2id::D, obj2pid::DV, pair2id::DT,
-        pairs::V, init::S, goal::G) where {DO,D,MP<:NamedTuple,DV,DT,V,S,G}
+        objtype2id::Dict{Symbol,Int64}, constmap::Dict{Symbol,Int64}, model_params::MP, obj2id::D, obj2pid::DV, obj2upid::DUV, pair2id::DT,
+        pairs::V, init::S, goal::G) where {DO,D,MP<:NamedTuple,DV,DUV,DT,V,S,G}
 
         @assert issubset((:message_passes, :residual), keys(model_params)) "Parameters of the model are not fully specified"
         @assert (init === nothing || goal === nothing) "Fixing init and goal state is bizzaare, as the extractor would always create a constant"
-        new{DO,D,MP,DV,DT,V,S,G}(domain, multiarg_predicates, unary_predicates, nullary_predicates, objtype2id, constmap, model_params,
-            obj2id, obj2pid, pair2id, pairs, init, goal)
+        new{DO,D,MP,DV,DUV,DT,V,S,G}(domain, multiarg_predicates, unary_predicates, nullary_predicates, objtype2id, constmap, model_params,
+            obj2id, obj2pid, obj2upid, pair2id, pairs, init, goal)
     end
 end
 
 
-ObjectPairNoGoal{DO,D,MP,DV,DT,V} = ObjectPair{DO,D,MP,DV,DT,V,Nothing,Nothing} where {DO,D,MP,DV,DT,V}
-ObjectPairStart{DO,D,MP,DV,DT,V,S} = ObjectPair{DO,D,MP,DV,DT,V,S,Nothing} where {DO,D,MP,DV,DT,V,S<:KnowledgeBase}
-ObjectPairGoal{DO,D,MP,DV,DT,V,S} = ObjectPair{DO,D,MP,DV,DT,V,Nothing,S} where {DO,D,MP,DV,DT,V,S<:KnowledgeBase}
+ObjectPairNoGoal{DO,D,MP,DV,DUV,DT,V} = ObjectPair{DO,D,MP,DV,DUV,DT,V,Nothing,Nothing} where {DO,D,MP,DV,DUV,DT,V}
+ObjectPairStart{DO,D,MP,DV,DUV,DT,V,S} = ObjectPair{DO,D,MP,DV,DUV,DT,V,S,Nothing} where {DO,D,MP,DV,DUV,DT,V,S<:KnowledgeBase}
+ObjectPairGoal{DO,D,MP,DV,DUV,DT,V,S} = ObjectPair{DO,D,MP,DV,DUV,DT,V,Nothing,S} where {DO,D,MP,DV,DUV,DT,V,S<:KnowledgeBase}
 
 function ObjectPair(domain; message_passes=2, residual=:linear, kwargs...)
     model_params = (; message_passes, residual)
@@ -69,7 +70,7 @@ function ObjectPair(domain; message_passes=2, residual=:linear, kwargs...)
     objtype2id = Dict(s => i + length(unary_predicates) for (i, s) in enumerate(collect(keys(domain.typetree))))
     constmap = Dict{Symbol,Int}(dictmap([x.name for x in domain.constants]))
     ObjectPair(domain, multiarg_predicates, unary_predicates, nullary_predicates, objtype2id, constmap, model_params,
-        nothing, nothing, nothing, nothing, nothing, nothing)
+        nothing, nothing, nothing, nothing, nothing, nothing, nothing)
 end
 
 isspecialized(ex::ObjectPair) = ex.obj2id !== nothing
@@ -110,8 +111,11 @@ function specialize(ex::ObjectPair, problem)
         push!(obj2idv, (k, length(obj2idv) + 1))
     end
 
-    obj2pid = Dict(v[1] => Tuple{Int64,Int64}[] for v in obj2idv)
-    pair2id = Dict{Tuple{Symbol,Symbol},Int32}()
+    obj2pid = Dict(v[1] => Vector{Tuple{Int64,Int64}}(undef, length(obj2id) + 1) for v in obj2idv)
+    obj2upid = Dict(v[1] => Vector{Int64}(undef, length(obj2id)) for v in obj2idv)
+    indices = fill(1, length(obj2id))
+    uindices = fill(1, length(obj2id))
+    pair2id = Dict{Tuple{Symbol,Symbol},Int64}()
 
     pairs_count = Int((1 + length(obj2idv)) * length(obj2idv) / 2)
 
@@ -122,15 +126,29 @@ function specialize(ex::ObjectPair, problem)
         # global offset
         offset += length(obj2idv) + 1 - id
         for i in id:length(obj2idv)
-            push!(obj2pid[name], (offset + i, 1))
-            push!(obj2pid[obj2idv[i][1]], (offset + i, 2))
-            pairs[offset+i] = (name, obj2idv[i][1])
-            pair2id[(name, obj2idv[i][1])] = offset + i
+            obj2pid[name][indices[obj2id[name]]] = (offset + i, 1)
+            indices[obj2id[name]] += 1
+
+            obj2upid[name][uindices[obj2id[name]]] = offset + i
+            uindices[obj2id[name]] += 1
+
+            o₂ = obj2idv[i][1]
+
+            obj2pid[o₂][indices[obj2id[o₂]]] = (offset + i, 2)
+            indices[obj2id[o₂]] += 1
+
+            if (i != id)
+                obj2upid[o₂][uindices[obj2id[o₂]]] = offset + i
+                uindices[obj2id[o₂]] += 1
+            end
+
+            pairs[offset+i] = (name, o₂)
+            pair2id[(name, o₂)] = offset + i
         end
     end
 
     ObjectPair(ex.domain, ex.multiarg_predicates, ex.unary_predicates, ex.nullary_predicates, ex.objtype2id,
-        ex.constmap, ex.model_params, obj2id, obj2pid, pair2id, pairs, nothing, nothing)
+        ex.constmap, ex.model_params, obj2id, obj2pid, obj2upid, pair2id, pairs, nothing, nothing)
 end
 
 function (ex::ObjectPair)(state::GenericState)
@@ -251,20 +269,20 @@ Encodes `E` Edges, which connect two pairs of object if and only if size of conj
 """
 function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
     bags = [Int64[] for _ in 1:length(ex.pairs)]
-    max_length = mapreduce(v -> length(v)^2, +, values(ex.obj2pid))
+    max_length = Int((1 + (length(ex.obj2id) - 1)) * (length(ex.obj2id) - 1) / 2) * length(ex.obj2upid)
     ii₁ = Vector{Int}(undef, max_length)
     ii₂ = Vector{Int}(undef, max_length)
     offset = 0
-    for pairs in values(ex.obj2pid)
+    for pairs in values(ex.obj2upid)
         for i in eachindex(pairs)
-            pairs[i][2] != 1 && continue
-            pidᵢ = pairs[i][1]
+            pidᵢ = pairs[i]
             for j in i+1:length(pairs)
-                pidⱼ = pairs[j][1]
-                pidᵢ == pidⱼ && continue
-                offset+=1
-                ii₁[offset] = pidᵢ 
+                pidⱼ = pairs[j]
+                offset += 1
+
+                ii₁[offset] = pidᵢ
                 ii₂[offset] = pidⱼ
+
                 push!(bags[pidᵢ], offset)
                 push!(bags[pidⱼ], offset)
             end
@@ -272,8 +290,8 @@ function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
     end
 
     x = ProductNode((
-        ArrayNode(KBEntry(kid, ii₁[1:offset])),
-        ArrayNode(KBEntry(kid, ii₂[1:offset])),
+        ArrayNode(KBEntry(kid, ii₁)),
+        ArrayNode(KBEntry(kid, ii₂)),
     ))
     name = isnothing(prefix) ? sym : Symbol(prefix, "_", sym)
     (name, BagNode(x, ScatteredBags(bags)))
@@ -321,14 +339,14 @@ function encode_predicates(ex::ObjectPair, pname::Symbol, preds, kid::Symbol)
         return BagNode(x, ScatteredBags(bags))
     end
 
-    max_length = length(preds)*length(ex.obj2id)*length(ex.obj2id)
+    max_length = length(preds) * length(ex.obj2id) * length(ex.obj2id)
     ii₁ = Vector{Int}(undef, max_length)
     ii₂ = Vector{Int}(undef, max_length)
     offset = 0
     for f in preds
-        xss = unique(x[1] for x in ex.obj2pid[f.args[1].name])
-        yss = unique(x[1] for x in ex.obj2pid[f.args[2].name])
-        for (x,y) in Iterators.product(xss,yss)
+        xs = ex.obj2upid[f.args[1].name]
+        ys = ex.obj2upid[f.args[2].name]
+        for (x, y) in Iterators.product(xs, ys)
             x == y && continue
             offset += 1
             ii₁[offset] = x
@@ -350,14 +368,14 @@ function add_goalstate(ex::ObjectPair, problem, goal=goalstate(ex.domain, proble
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
     exg = encode_state(ex, goal, :goal)
     ObjectPair(ex.domain, ex.multiarg_predicates, ex.unary_predicates, ex.nullary_predicates, ex.objtype2id, ex.constmap,
-        ex.model_params, ex.obj2id, ex.obj2pid, ex.pair2id, ex.pairs, nothing, exg)
+        ex.model_params, ex.obj2id, ex.obj2pid, ex.obj2upid, ex.pair2id, ex.pairs, nothing, exg)
 end
 
 function add_initstate(ex::ObjectPair, problem, start=initstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
     exg = encode_state(ex, start, :start)
     ObjectPair(ex.domain, ex.multiarg_predicates, ex.unary_predicates, ex.nullary_predicates, ex.objtype2id, ex.constmap,
-        ex.model_params, ex.obj2id, ex.obj2pid, ex.pair2id, ex.pairs, exg, nothing)
+        ex.model_params, ex.obj2id, ex.obj2pid, ex.obj2upid, ex.pair2id, ex.pairs, exg, nothing)
 end
 
 function addgoal(ex::ObjectPairStart, kb::KnowledgeBase)
