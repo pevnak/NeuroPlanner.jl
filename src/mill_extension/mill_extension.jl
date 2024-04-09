@@ -1,5 +1,7 @@
 import Mill: catobs
 
+import Mill: _catbags, maxindex, remapbags, adjustbags
+
 import Base: *, ==
 
 # COMMON ALIASES
@@ -18,6 +20,9 @@ export MaskedModel
 
 include("lazyvcat.jl")
 export MaskedModel
+
+include("compressed_bags.jl")
+export CompressedBags
 
 
 import Mill: _levelparams, _show_submodels
