@@ -54,8 +54,9 @@ export MixedLRNN, MixedLRNN2, MixedLRNN3, LRNN
 
 # Object Binary structures by Sira and Horcik
 include("object_binary/object_binary.jl")
+include("object_binary/atom_binary.jl")
 include("object_binary/object_pair.jl")
-export ObjectBinary, ObjectPair
+export ObjectBinary, AtomBinary, ObjectPair
 
 # ASNet and HGNN by Silvia
 include("asnets/extractor.jl")
