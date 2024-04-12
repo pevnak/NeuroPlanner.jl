@@ -297,6 +297,67 @@ function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
     (name, BagNode(x, ScatteredBags(bags)))
 end
 
+
+function encode_E_edges_2(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
+
+    n = length(preds)
+    indices = Vector{Int}(undef, n * N)
+    counts = fill(0, length(ex.obj2id))
+    xs = _map_tuple(Val{N}) do i
+        ii = Vector{Int}(undef, n)
+        for j in 1:n
+            oi = preds[j][i]
+            ii[j] = oi
+            counts[oi] += 1
+            indices[(i-1)*n+j] = oi
+        end
+        ArrayNode(KBEntry(kid, ii))
+    end
+    BagNode(ProductNode(xs), CompressedBags(indices, counts, n))
+
+
+
+    bags = [Int64[] for _ in 1:length(ex.pairs)]
+    n = Int((1 + (length(ex.obj2id) - 1)) * (length(ex.obj2id) - 1) / 2) * length(ex.obj2upid)
+
+    indices = Vector{Int}(undef, n * 2)
+    counts = fill(0, length(ex.pairs))
+
+    ii₁ = Vector{Int}(undef, n)
+    ii₂ = Vector{Int}(undef, n)
+    offset = 0
+    for pairs in values(ex.obj2upid)
+        for i in eachindex(pairs)
+            pidᵢ = pairs[i]
+            for j in i+1:length(pairs)
+                pidⱼ = pairs[j]
+                offset += 1
+
+                ii₁[offset] = pidᵢ
+                ii₂[offset] = pidⱼ
+
+                # counts[pidᵢ] += 1
+                # counts[pidⱼ] += 1
+
+                # TODO no idea bruh
+                indices[(pidᵢ-1)*n+pidⱼ] = offset * 2 - 1
+                indices[(pidᵢ-1)*n+pidⱼ] = offset * 2
+
+                push!(bags[pidᵢ], offset)
+                push!(bags[pidⱼ], offset)
+            end
+        end
+    end
+
+    x = ProductNode((
+        ArrayNode(KBEntry(kid, ii₁)),
+        ArrayNode(KBEntry(kid, ii₂)),
+    ))
+    name = isnothing(prefix) ? sym : Symbol(prefix, "_", sym)
+    (name, BagNode(x, ScatteredBags(bags)))
+end
+
+
 """
 function multi_predicates(ex::ObjectPair, kid::Symbol, state, prefix=nothing)
 
@@ -336,6 +397,46 @@ function encode_predicates(ex::ObjectPair, pname::Symbol, preds, kid::Symbol)
             ArrayNode(KBEntry(kid, Int[])),
             ArrayNode(KBEntry(kid, Int[])),
         ))
+        return BagNode(x, ScatteredBags(bags))
+    end
+
+    max_length = length(preds) * length(ex.obj2id) * length(ex.obj2id)
+    ii₁ = Vector{Int}(undef, max_length)
+    ii₂ = Vector{Int}(undef, max_length)
+    offset = 0
+    for f in preds
+        xs = ex.obj2upid[f.args[1].name]
+        ys = ex.obj2upid[f.args[2].name]
+        for (x, y) in Iterators.product(xs, ys)
+            x == y && continue
+            offset += 1
+            ii₁[offset] = x
+            ii₂[offset] = y
+            push!(bags[x], offset)
+            push!(bags[y], offset)
+        end
+    end
+
+    x = ProductNode((
+        ArrayNode(KBEntry(kid, ii₁[1:offset])),
+        ArrayNode(KBEntry(kid, ii₂[1:offset])),
+    ))
+    BagNode(x, ScatteredBags(bags))
+end
+
+function encode_predicates_2(ex::ObjectPair, pname::Symbol, preds, kid::Symbol)
+    n = length(preds)
+    indices = Vector{Int}(undef, n * length(preds))
+    counts = fill(0, length(ex.obj2id))
+
+    bags = fill(Int[], length(ex.pairs))
+    if isempty(preds)
+        x = ProductNode((
+            ArrayNode(KBEntry(kid, Int[])),
+            ArrayNode(KBEntry(kid, Int[])),
+        ))
+        # TODO think this through, numobs counts
+        # return BagNode(x, CompressedBags())
         return BagNode(x, ScatteredBags(bags))
     end
 

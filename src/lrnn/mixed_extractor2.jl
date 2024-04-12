@@ -221,6 +221,29 @@ function encode_predicates(ex::MixedLRNN2, pname::Symbol, preds, kid::Symbol)
     BagNode(ProductNode(tuple(xs...)), ScatteredBags(bags))
 end
 
+
+function encode_predicates_2(ex::MixedLRNN2, pname::Symbol, preds, kid::Symbol)
+    p = ex.domain.predicates[pname]
+
+    n = length(preds)
+    indices = Vector{Int}(undef, n * length(p.args))
+    counts = fill(0, length(ex.obj2id))
+
+    obj2id = ex.obj2id
+    n = length(preds)
+    xs = map(1:length(p.args)) do i
+        ii = Vector{Int}(undef, n)
+        for j in 1:n
+            oi = obj2id[preds[j].args[i].name]
+            ii[j] = oi
+            counts[oi] += 1
+            indices[(i-1)*n+j] = oi
+        end
+        ArrayNode(KBEntry(kid, ii))
+    end
+    BagNode(ProductNode(tuple(xs...)), CompressedBags(indices, counts, n))
+end
+
 function encode_predicates_lowalloc(ex::MixedLRNN2, pname::Symbol, preds, kid::Symbol)
     n = length(preds)
     p = ex.domain.predicates[pname]

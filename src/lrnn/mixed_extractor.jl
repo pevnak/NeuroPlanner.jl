@@ -197,6 +197,32 @@ function encode_predicates(ex::MixedLRNN, pname::Symbol, preds, kid::Symbol)
     BagNode(x, ScatteredBags(bags))
 end
 
+function encode_predicates_2(ex::MixedLRNN, pname::Symbol, preds, kid::Symbol)
+    p = ex.domain.predicates[pname]
+
+    n = length(preds)
+    indices = Vector{Int}(undef, n * length(p.args))
+    counts = fill(0, length(ex.obj2id))
+
+    obj2id = ex.obj2id
+    constmap = ex.constmap
+    xs = map(1:length(p.args)) do i
+        syms = [f.args[i].name for f in preds]
+        ArrayNode(KBEntry(kid, [obj2id[s] for s in syms]))
+    end
+    x = ProductNode(tuple(xs...))
+
+    for (i, f) in enumerate(preds)
+        for (j, a) in enumerate(f.args)
+            a.name ∉ keys(obj2id) && continue
+            oi = obj2id[a.name]
+            counts[oi] += 1
+            indices[(j-1)*n+j] = oi
+        end
+    end
+    BagNode(x, CompressedBags(indices, counts, n))
+end
+
 
 function add_goalstate(ex::MixedLRNN, problem, goal=goalstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
