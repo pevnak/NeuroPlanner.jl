@@ -22,7 +22,11 @@ KBEntryRenamer(from_to::Pair{Symbol,Symbol}) = KBEntryRenamer(from_to[1],from_to
 
 function (kb::KBEntryRenamer)(x::KBEntry{T}) where {T}
     kb.from != x.e && return(x)
-    KBEntry{T}(x.e, x.ii)
+    KBEntry{T}(kb.to, x.ii)
+end
+
+function Base.replace(kb::KnowledgeBase, k::Symbol, v::Symbol)
+    KBEntryRenamer(k,v)(kb)
 end
 
 (kb::KBEntryRenamer)(ds::BagNode) = BagNode(kb(ds.data), ds.bags, ds.metadata)

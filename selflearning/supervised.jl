@@ -53,13 +53,16 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			dedu = @set ds.x = deduplicate(ds.x)
 			size_o, size_d =  Base.summarysize(ds), Base.summarysize(dedu)
 			println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size_o, digits =2),"%)")
+			GC.gc();GC.gc();GC.gc();GC.gc();GC.gc();GC.gc();
+			println(read(run(pipeline(`cat /proc/meminfo`,`grep MemFree`)), String))
+
 			dedu
 		end
 		logger=TBLogger(filename*"_events")
 		log_value(logger, "time_minibatch", t; step=0)
 		opt = AdaBelief();
 		ps = Flux.params(model);
-		t = @elapsed train!(NeuroPlanner.loss, model, ps, opt, () -> rand(minibatches), max_steps; logger, trn_data = minibatches, reset_fval=100)
+		t = @elapsed train!(NeuroPlanner.loss, model, ps, opt, () -> rand(minibatches), max_steps; logger, trn_data = minibatches, reset_fval=1000)
 		log_value(logger, "time_train", t; step=0)
 		serialize(modelfile, model)	
 		model
@@ -74,6 +77,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 		used_in_train = problem_file ∈ train_files
 		@show problem_file
 		GC.gc();GC.gc();GC.gc();GC.gc();GC.gc();GC.gc();
+		println(read(run(pipeline(`cat /proc/meminfo`,`grep MemFree`)), String))
 		t = @elapsed sol = solve_problem(pddld, problem_file, model, planner; return_unsolved = true, max_time)
 		println("time in the solver: ", t)
 		trajectory = sol.sol.status == :max_time ? nothing : sol.sol.trajectory
@@ -84,9 +88,10 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			t₀ = time()
 		end
 	end
-	rm(filename*"_stats_tmp.jls")
+	println("evaluation finished")
 	serialize(filename*"_stats.jls", stats)
 	CSV.write(filename*"_stats.csv", stats; transform = (col, val) -> something(val, missing))
+	rm(filename*"_stats_tmp.jls")
 	settings !== nothing && serialize(filename*"_settings.jls",settings)
 end
 
@@ -110,8 +115,9 @@ ArgParse example implemented in Comonicon.
 
 max_steps = 10_000; max_time = 30; graph_layers = 3; dense_dim = 16; dense_layers = 3; residual = "none"; seed = 1
 max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
-domain_name = "ipc23_ferry"
+domain_name = "ipc23_miconic"
 loss_name = "lstar"
+loss_name = "l2"
 arch_name = "objectpair"
 """
 
@@ -120,7 +126,7 @@ arch_name = "objectpair"
 	Random.seed!(seed)
 	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, dense_dim, dense_layers, residual, seed)
 	@show settings
-	archs = Dict("objectbinary" => ObjectBinary, "objectpair" => ObjectPair, "asnet" => ASNet, "lrnn" => LRNN, "mixedlrnn2" => MixedLRNN2, "mixedlrnn" => MixedLRNN, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
+	archs = Dict("objectbinary" => ObjectBinary, "objectpair" => ObjectPair, "asnet" => ASNet, "lrnn" => LRNN, "mixedlrnn2" => MixedLRNN2, "mixedlrnn3" => MixedLRNN3, "mixedlrnn" => MixedLRNN, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
 	residual = Symbol(residual)
 	domain_pddl, problem_files = getproblem(domain_name, false)
 	# problem_files = filter(s -> isfile(plan_file(domain_name, s)), problem_files)

@@ -110,8 +110,6 @@ function encode_state(ex::MixedLRNN3, state::GenericState, prefix=nothing)
     edge_structure = multi_predicates(ex, :x1, grouped_facts, prefix)
     if !isempty(ex.multiarg_predicates)
         for i in 1:message_passes
-            input_to_gnn = last(keys(kb))
-            # ds = Functors.fmap(ds -> rename_kbentry(ds, :x1, input_to_gnn), edge_structure)
             ds = KBEntryRenamer(:x1, input_to_gnn)(edge_structure)
             kb = append(kb, layer_name(kb, "gnn"), ds)
             if residual !== :none #if there is a residual connection, add it 

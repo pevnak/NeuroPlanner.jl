@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --time=42-00:00:00
-#SBATCH --nodes=1 --ntasks-per-node=16 --cpus-per-task=1
-#SBATCH --mem=64G
+#SBATCH --nodes=1 --cores-per-socket=8
+#SBATCH --mem=256G
 #SBATCH -p amdextralong
 #SBATCH --error=/home/pevnytom/logs/pddl.%j.err
 #SBATCH --out=/home/pevnytom/logs/pddl.%j.out

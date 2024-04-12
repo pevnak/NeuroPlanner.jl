@@ -116,6 +116,33 @@ using NeuroPlanner.Flux.Zygote
 			@test replace(ProductNode((;a,b)), :a => :c) == ProductNode((;a = c, b))
 		end
 
+		@testset "KBEntryRenamer" begin
+			atob = NeuroPlanner.KBEntryRenamer(:a, :b)
+			ctob = NeuroPlanner.KBEntryRenamer(:c, :b)
+			atoc = NeuroPlanner.KBEntryRenamer(:a, :c)
+			@test KBEntry(:a, [4,1,3,2]) == KBEntry(:a, [4,1,3,2]) 
+			@test KBEntry(:a, [4,1,3,2]) != KBEntry(:b, [4,1,3,2]) 
+			@test KBEntry(:a, [4,1,3,2]) != KBEntry(:a, [1,1,3,2]) 
+
+			a = KBEntry(:a, [4,1,3,2])
+			b = KBEntry(:b, [4,1,3,2])
+			@test atob(a) == b
+			@test ctob(a) == a
+
+
+			a = ArrayNode(KBEntry(:a, [4,1,3,2]))
+			b = ArrayNode(KBEntry(:b, [4,1,3,2]))
+			c = ArrayNode(KBEntry(:c, [4,1,3,2]))
+			@test atob(a) == b
+			@test ctob(a) == a
+			@test atob(BagNode(a,[1:4])) == BagNode(b, [1:4])
+			@test ctob(BagNode(a,[1:4])) == BagNode(a, [1:4])
+			@test atob(ProductNode((a,b))) == ProductNode((b,b))
+			@test atoc(ProductNode((a,b))) == ProductNode((c,b))
+			@test atob(ProductNode((;a,b))) == ProductNode((;a = b, b))
+			@test atoc(ProductNode((;a,b))) == ProductNode((;a = c, b))
+		end
+
 	end
 
 
