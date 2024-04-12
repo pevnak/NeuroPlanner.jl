@@ -110,8 +110,6 @@ function encode_state(ex::MixedLRNN3, state::GenericState, prefix=nothing)
     edge_structure = multi_predicates(ex, :x1, grouped_facts, prefix)
     if !isempty(ex.multiarg_predicates)
         for i in 1:message_passes
-            input_to_gnn = last(keys(kb))
-            # ds = Functors.fmap(ds -> rename_kbentry(ds, :x1, input_to_gnn), edge_structure)
             ds = KBEntryRenamer(:x1, input_to_gnn)(edge_structure)
             kb = append(kb, layer_name(kb, "gnn"), ds)
             if residual !== :none #if there is a residual connection, add it 
@@ -181,21 +179,6 @@ function group_facts(ex::MixedLRNN3, facts::Vector{<:Term})
         k => factargs2id(ex, facts, (@view occurences[:,col]), Val{N})
     end
 end
-
-# function group_facts(ex::MixedLRNN3, facts::Vector{<:Term})
-#     predicates = tuple(keys(ex.domain.predicates)...)
-#     occurences = falses(length(facts), length(predicates))
-#     for (i,f) in enumerate(facts)
-#         col = _inlined_search(f.name, predicates)
-#         col == -1 && continue
-#         occurences[i, col] = true
-#     end
-
-#     _mapenumerate_tuple(predicates) do col,k
-#         N = length(ex.domain.predicates[k].args)
-#         k => factargs2id(ex, facts, (@view occurences[:,col]), Val{N})
-#     end
-# end
 
 function factargs2id(ex::MixedLRNN3, facts, mask, arity::Type{Val{N}}) where N
     d = ex.obj2id
