@@ -98,7 +98,7 @@ end
 
 function encode_state(ex::AtomBinary, state::GenericState, prefix=nothing)
     message_passes, residual = ex.model_params
-    x = encode_type_of_atoms(ex, state)
+    x = unary_predicates(ex, state)
     kb = KnowledgeBase((; x1=x))
     n = size(x, 2)
     sₓ = :x1
@@ -121,14 +121,13 @@ end
 """
 nunary_predicates(ex::AtomBinary, state)
 
-Create matrix with one column per object and encode by one-hot-encoding unary predicates 
-and types of objects. Nunary predicates are encoded as properties of all objects.
+Create matrix with one column per atom and encode by one-hot-encoding the type of an atom
 """
-function nunary_predicates(ex::AtomBinary, state)
-    # first, we completely specify the matrix with properties
+function unary_predicates(ex::AtomBinary, state)
+    # There will be a Matrix, where each
+    error("do unary_predicates")
 
     # encode constants
-
     idim = length(ex.nunanary_predicates) + length(ex.objtype2id) + length(ex.constmap)
     x = zeros(Float32, idim, length(ex.obj2id))
     x
@@ -174,7 +173,7 @@ function encode_edges(ex::AtomBinary, pname::Symbol, preds, kid::Symbol)
 
             sd = symdiff(sa,sb)
             if !isempty(sd)
-                subsets = [preds[k].name for k in 1:length(preds) if issubset(sd, set_preds)]
+                subsets = [preds[k].name for k in 1:length(preds) if issubset(sd, set_preds[k])]
                 if !isempty(subsets)
                     println("there are symdiff edges of type ",subsets)
                 end
