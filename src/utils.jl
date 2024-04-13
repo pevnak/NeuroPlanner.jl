@@ -29,13 +29,13 @@ julia> _inlined_search(:e, (:b,:a,:c))
 -1
    
 """
-@inline function _inlined_search(s::Symbol, i::Int,  xs::Tuple)
+@inline function _inlined_search(s, i::Int,  xs::Tuple)
     isempty(xs) && return(-1)
     s == first(xs) && return(i)
     return(_inlined_search(s, i+1, Base.tail(xs)))
 end
 
-@inline _inlined_search(s::Symbol, xs::Tuple) = _inlined_search(s, 1, xs)
+@inline _inlined_search(s, xs::Tuple) = _inlined_search(s, 1, xs)
 
 
 @inline function _map_tuple(f::F, xs::Tuple) where {F<:Union{Function, Base.Fix1, Base.Fix2}}

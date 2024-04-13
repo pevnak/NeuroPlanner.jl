@@ -32,14 +32,15 @@ struct AtomBinary{DO,MP,D,S,G}
     domain::DO
     max_arity::Int
     constmap::Dict{Symbol,Int}
+    actionmap::Dict{Symbol,Int}
     model_params::MP
     obj2id::D
     init_state::S
     goal_state::G
-    function AtomBinary(domain::DO, max_arity, constmap, model_params::MP, obj2id::D, init::S, goal::G) where {DO,D,MP<:NamedTuple,S,G}
+    function AtomBinary(domain::DO, max_arity, constmap, actionmap, model_params::MP, obj2id::D, init::S, goal::G) where {DO,D,MP<:NamedTuple,S,G}
         @assert issubset((:message_passes, :residual), keys(model_params)) "Parameters of the model are not fully specified"
         @assert (init === nothing || goal === nothing) "Fixing init and goal state is bizzaare, as the extractor would always create a constant"
-        new{DO,MP,D,S,G}(domain, max_arity, constmap, model_params, obj2id, init, goal)
+        new{DO,MP,D,S,G}(domain, max_arity, constmap, actionmap, model_params, obj2id, init, goal)
     end
 end
 
@@ -50,9 +51,10 @@ AtomBinaryGoal{DO,MP,D,S} = AtomBinary{DO,MP,D,Nothing,S} where {DO,MP,D,S<:Know
 function AtomBinary(domain; message_passes=2, residual=:linear, kwargs...)
     dictmap(x) = Dict(reverse.(enumerate(sort(x))))
     model_params = (; message_passes, residual)
-    max_arity =  maximum(length(a.args) for a in values(domain.predicates))
-    constmap = Dict{Symbol,Int}(dictmap([x.name for x in domain.constants]))
-    AtomBinary(domain, max_arity, constmap, model_params, nothing, nothing, nothing)
+    max_arity =  maximum(length(a.args) for a in values(domain.predicates))     # maximum arity of a predicate
+    constmap = Dict{Symbol,Int}(dictmap([x.name for x in domain.constants]))    # identification of constants
+    actionmap = Dict{Symbol,Int}(dictmap(collect(keys(domain.predicates))))     # codes of actions
+    AtomBinary(domain, max_arity, constmap, actionmap, model_params, nothing, nothing, nothing)
 end
 
 isspecialized(ex::AtomBinary) = ex.obj2id !== nothing
@@ -87,7 +89,7 @@ function specialize(ex::AtomBinary, problem)
         i = length(obj2id) + 1
         obj2id[k] = (;id = i, set = BitSet(i))
     end
-    AtomBinary(ex.domain, ex.max_arity, ex.constmap, ex.model_params, obj2id, nothing, nothing)
+    AtomBinary(ex.domain, ex.max_arity, ex.constmap, ex.actionmap, ex.model_params, obj2id, nothing, nothing)
 end
 
 function (ex::AtomBinary)(state::GenericState)
@@ -98,11 +100,12 @@ end
 
 function encode_state(ex::AtomBinary, state::GenericState, prefix=nothing)
     message_passes, residual = ex.model_params
-    x = unary_predicates(ex, state)
+    atoms = collect(PDDL.get_facts(state))
+    x = unary_predicates(ex, atoms)
     kb = KnowledgeBase((; x1=x))
     n = size(x, 2)
     sₓ = :x1
-    edge_structure = encode_edges(ex, :x1, state, prefix)
+    edge_structure = encode_edges(ex, :x1, state)
     if !isempty(ex.multiarg_predicates)
         for i in 1:message_passes
             input_to_gnn = last(keys(kb))
@@ -121,30 +124,36 @@ end
 """
 nunary_predicates(ex::AtomBinary, state)
 
-Create matrix with one column per atom and encode by one-hot-encoding the type of an atom
+Create matrix with one column per atom and encode by one-hot-encoding the type (name) of an atom
 """
-function unary_predicates(ex::AtomBinary, state)
-    # There will be a Matrix, where each
-    error("do unary_predicates")
-
+function unary_predicates(ex::AtomBinary, atoms)
     # encode constants
-    idim = length(ex.nunanary_predicates) + length(ex.objtype2id) + length(ex.constmap)
+    idim = length(ex.actionmap)
     x = zeros(Float32, idim, length(ex.obj2id))
+    for (i, p) in enumerate(atoms)
+        x[ex.actionmap[p.name],i] = 1
+    end
     x
 end
 
-function pred2set(ex::AtomBinary, x::Julog.Term)
-    isempty(x.args) && return(BitSet())
-    mapreduce(k -> ex.obj2id[k.name].set, union, x.args)
-end
+"""
+    parse_atom(ex::AtomBinary, atom::Julog.Term)
+
+    convert arguments of an atom to ids `ex.obj2id`
+    and return them as a tuple of maximum size of predicates 
+    (filled by 0) and their bitset.
 
 """
-    pos_in_arg(ex::AtomBinary, k::Int, p::Compound)
-
-    position of an argument in the predicate
-"""
-function pos_in_arg(ex::AtomBinary, k::Int, p::Compound)
-    findfirst(a -> ex.obj2id[a.name].id == k, p.args)
+function parse_atoms(ex::AtomBinary, atom::Julog.Term)
+    ids = zeros(Int, ex.max_arity)
+    set = BitSet()
+    name = atom.name
+    for (i, k) in enumerate(atom.args)
+        e = ex.obj2id[k.name]
+        ids[i] = e.id
+        union!(set, e.set)
+    end
+    return((;name, set, ids = tuple(ids...)))
 end
 
 """
@@ -153,29 +162,28 @@ end
     Index of type of an edge. Type of an edge is defined by the index of the object in the predicates `sa` and `sb`.
 """
 function type_of_edge(ex::AtomBinary, k::Int, sa, sb)
-    i, j = pos_in_arg(ex, k, sa), pos_in_arg(ex, k, sb)
+    i, j = _inlined_search(k, sa.ids), _inlined_search(k, sb.ids)
     ex.max_arity*(i-1) + j
 end
 
-function encode_edges(ex::AtomBinary, pname::Symbol, preds, kid::Symbol)
-    preds = collect(PDDL.get_facts(state))
-    set_preds = map(Base.Fix1(pred2set, ex), preds) 
-    for i in 1:length(preds) # Can be replaced with Combinatorics.preds
-        sa = set_preds[i]
-        for j in 2:length(preds)
-            sb = set_preds[j]
-            is = intersect(sa,sb)
+function encode_edges(ex::AtomBinary, pname::Symbol, atoms)
+    set_atoms = map(Base.Fix1(parse_atoms, ex), atoms) 
+    for i in 1:length(atoms) # Can be replaced with Combinatorics.atoms
+        sa = set_atoms[i]
+        for j in 2:length(atoms)
+            sb = set_atoms[j]
+            is = intersect(sa.set, sb.set)
             if !isempty(is)
                 for k in is
-                   println("intersection edge: ",i," --> ",j, " of type ",type_of_edge(ex, k, preds[i], preds[j]))
+                   println("intersection edge: ",i," --> ",j, " of type ",type_of_edge(ex, k, sa, sb))
                 end
             end
 
-            sd = symdiff(sa,sb)
+            sd = symdiff(sa.set,sb.set)
             if !isempty(sd)
-                subsets = [preds[k].name for k in 1:length(preds) if issubset(sd, set_preds[k])]
+                subsets = [set_atoms[k].name for k in 1:length(set_atoms) if issubset(sd, set_atoms[k].set)]
                 if !isempty(subsets)
-                    println("there are symdiff edges of type ",subsets)
+                    println("there are symdiff edges of type ", subsets)
                 end
             end
         end
