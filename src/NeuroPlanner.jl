@@ -42,8 +42,9 @@ include("relational/deduplication.jl")
 export deduplicate
 include("relational/dedu_matrix.jl")
 include("relational/mha.jl")
-include("relational/renamer.jl")
 export MultiheadAttention
+include("relational/renamer.jl")
+include("relational/edgebuilder.jl")
 
 # a basic architecture based on hyper-graph representatation of predicates
 include("lrnn/pure_extractor.jl")
