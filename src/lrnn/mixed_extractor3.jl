@@ -177,11 +177,11 @@ function group_facts(ex::MixedLRNN3, facts::Vector{<:Term})
 
     _mapenumerate_tuple(ex.multiarg_predicates) do col,k
         N = length(ex.domain.predicates[k].args)
-        k => factargs2id(ex, facts, (@view occurences[:,col]), Val{N})
+        k => factargs2id(ex, facts, (@view occurences[:,col]), Val(N))
     end
 end
 
-function factargs2id(ex::MixedLRNN3, facts, mask, arity::Type{Val{N}}) where N
+function factargs2id(ex::MixedLRNN3, facts, mask, arity::Val{N}) where N
     d = ex.obj2id
     o = Vector{NTuple{N,Int}}(undef, sum(mask))
     index = 1

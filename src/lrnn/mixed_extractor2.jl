@@ -199,25 +199,18 @@ function multi_predicates(ex::MixedLRNN2, kid::Symbol, state, prefix=nothing)
     ProductNode(NamedTuple{ns}(xs))
 end
 
-function encode_predicates(ex::MixedLRNN2, pname::Symbol, preds, kid::Symbol)
-    p = ex.domain.predicates[pname]
-    obj2id = ex.obj2id
-    bags = [Int[] for _ in 1:length(obj2id)]
-    n = length(preds)
-    xs = map(1:length(p.args)) do i
-        # ii = [obj2id[f.args[i].name] for f in preds]
-        # for (j, oi) in enumerate(ii)
-        #     push!(bags[oi], j)
-        # end
-        ii = Vector{Int}(undef,n)
-        for j in 1:n
-            oi = obj2id[preds[j].args[i].name]
-            ii[j] = oi
-            push!(bags[oi], j)
-        end
-        ArrayNode(KBEntry(kid, ii))
+function encode_predicates(ex::MixedLRNN2, pred_name::Symbol, preds, kid::Symbol)
+    arity = length(ex.domain.predicates[pred_name].args)
+    encode_predicates(ex, Val(arity), preds, kid)
+end
+
+function encode_predicates(ex::MixedLRNN2, arity::Val{N}, preds, kid::Symbol) where {N}
+    eb = EdgeBuilder(N, length(preds), length(ex.obj2id))
+    for p in preds
+        edge = _map_tuple(i -> ex.obj2id[p.args[i].name], arity)
+        @inbounds push!(eb, edge)
     end
-    BagNode(ProductNode(tuple(xs...)), ScatteredBags(bags))
+    construct(eb, kid)
 end
 
 function add_goalstate(ex::MixedLRNN2, problem, goal=goalstate(ex.domain, problem))

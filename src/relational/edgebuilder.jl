@@ -16,13 +16,13 @@ end
 EdgeBuilder(arity::Integer, capacity::Integer, nv::Integer) = EdgeBuilder(Int, arity, capacity, nv)
 
 function EdgeBuilder(I::DataType, arity::Integer, capacity::Integer, nv::Integer)
-	ii = _map_tuple(i -> Vector{I}(undef, capacity), Val{arity})
+	ii = _map_tuple(i -> Vector{I}(undef, capacity), Val(arity))
 	bags = [I[] for _ in 1:nv]
 	EdgeBuilder(ii, bags, nv, 1)
 end
 
 function Base.push!(eb::EdgeBuilder{N,<:Any}, vertices::NTuple{N,I}) where {N,I<:Integer}
-	Base.@boundscheck boundscheck(eb, vertices)
+	# Base.@boundscheck boundscheck(eb, vertices)
 	_mapenumerate_tuple(vertices) do i, vᵢ
 		push!(eb.bags[vᵢ], eb.first_free)
 		eb.ii[i][eb.first_free] = vᵢ
