@@ -105,15 +105,13 @@ function encode_state(ex::AtomBinary, state::GenericState, prefix=nothing)
     kb = KnowledgeBase((; x1=x))
     n = size(x, 2)
     sₓ = :x1
-    edge_structure = encode_edges(ex, :x1, state)
-    if !isempty(ex.multiarg_predicates)
-        for i in 1:message_passes
-            input_to_gnn = last(keys(kb))
-            ds = KBEntryRenamer(:x1, input_to_gnn)(edge_structure)
-            kb = append(kb, layer_name(kb, "gnn"), ds)
-            if residual !== :none #if there is a residual connection, add it 
-                kb = add_residual_layer(kb, keys(kb)[end-1:end], n)
-            end
+    edge_structure = encode_edges(ex, atoms, :x1)
+    for i in 1:message_passes
+        input_to_gnn = last(keys(kb))
+        ds = KBEntryRenamer(:x1, input_to_gnn)(edge_structure)
+        kb = append(kb, layer_name(kb, "gnn"), ds)
+        if residual !== :none #if there is a residual connection, add it 
+            kb = add_residual_layer(kb, keys(kb)[end-1:end], n)
         end
     end
     s = last(keys(kb))
@@ -166,8 +164,13 @@ function type_of_edge(ex::AtomBinary, k::Int, sa, sb)
     ex.max_arity*(i-1) + j
 end
 
-function encode_edges(ex::AtomBinary, pname::Symbol, atoms)
+function encode_edges(ex::AtomBinary, atoms, kid::Symbol)
     set_atoms = map(Base.Fix1(parse_atoms, ex), atoms) 
+    l = length(atoms)
+    capacity = l * (l + 1) ÷ 2
+    symdiff_offset = ex.max_arity^2 + 1
+    ebs = tuple([EdgeBuilder(Val(2), capacity, length(ex.obj2id)) for _ in 1:ex.max_arity^2]...)
+    sbs = EdgeBuilder(Val(2), capacity, length(ex.obj2id))
     for i in 1:length(atoms) # Can be replaced with Combinatorics.atoms
         sa = set_atoms[i]
         for j in 2:length(atoms)
@@ -175,7 +178,9 @@ function encode_edges(ex::AtomBinary, pname::Symbol, atoms)
             is = intersect(sa.set, sb.set)
             if !isempty(is)
                 for k in is
-                   println("intersection edge: ",i," --> ",j, " of type ",type_of_edge(ex, k, sa, sb))
+                   # println("intersection edge: ",i," --> ",j, " of type ",type_of_edge(ex, k, sa, sb))
+                   ti = type_of_edge(ex, k, sa, sb)
+                   push!(ebs[ti], (i,j))
                 end
             end
 
@@ -183,11 +188,13 @@ function encode_edges(ex::AtomBinary, pname::Symbol, atoms)
             if !isempty(sd)
                 subsets = [set_atoms[k].name for k in 1:length(set_atoms) if issubset(sd, set_atoms[k].set)]
                 if !isempty(subsets)
-                    println("there are symdiff edges of type ", subsets)
+                    push!(sbs, (i,j))
+                    # println("there are symdiff edges of type ", subsets)
                 end
             end
         end
     end
+    ProductNode(map(Base.Fix2(construct, kid), tuple(ebs..., sbs)))
 end
 
 

@@ -14,9 +14,11 @@ mutable struct EdgeBuilder{N,I<:Integer}
 end
 
 EdgeBuilder(arity::Integer, capacity::Integer, nv::Integer) = EdgeBuilder(Int, arity, capacity, nv)
+EdgeBuilder(arity::Val, capacity::Integer, nv::Integer) = EdgeBuilder(Int, arity, capacity, nv)
+EdgeBuilder(I::Type, arity::Integer, capacity::Integer, nv::Integer) = EdgeBuilder(I, Val(arity), capacity, nv)
 
-function EdgeBuilder(I::DataType, arity::Integer, capacity::Integer, nv::Integer)
-	ii = _map_tuple(i -> Vector{I}(undef, capacity), Val(arity))
+function EdgeBuilder(I::Type, arity::Val{N}, capacity::Integer, nv::Integer) where {N}
+	ii = _map_tuple(i -> Vector{I}(undef, capacity), arity)
 	bags = [I[] for _ in 1:nv]
 	EdgeBuilder(ii, bags, nv, 1)
 end
