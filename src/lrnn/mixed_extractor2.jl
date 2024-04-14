@@ -215,14 +215,12 @@ end
 
 function add_goalstate(ex::MixedLRNN2, problem, goal=goalstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
-    exg = encode_state(ex, goal, :goal)
-    MixedLRNN2(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.constmap, ex.model_params, ex.obj2id, nothing, exg)
+    @set ex.goal_state = encode_state(ex, goal, :goal)
 end
 
 function add_initstate(ex::MixedLRNN2, problem, start=initstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
-    exg = encode_state(ex, start, :start)
-    MixedLRNN2(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.constmap, ex.model_params, ex.obj2id, exg, nothing)
+    @set ex.init_state = encode_state(ex, start, :start)
 end
 
 function addgoal(ex::MixedLRNN2Start, kb::KnowledgeBase)

@@ -33,8 +33,8 @@ function Base.push!(eb::EdgeBuilder{N,<:Any}, vertices::NTuple{N,I}) where {N,I<
 end
 
 function Base.push!(eb::EdgeBuilder{N,<:Any}, vertices::AbstractVector{<:Integer}) where {N}
-	Base.@boundscheck length(vertices) == N || error("The edge has to be of arity $(N)")
-	Base.@boundscheck boundscheck(eb, vertices)
+	# Base.@boundscheck length(vertices) == N || error("The edge has to be of arity $(N)")
+	# Base.@boundscheck boundscheck(eb, vertices)
 	for (i, vᵢ) in enumerate(vertices)
 		push!(eb.bags[vᵢ], eb.first_free)
 		eb.ii[i][eb.first_free] = vᵢ

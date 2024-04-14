@@ -366,16 +366,12 @@ end
 
 function add_goalstate(ex::ObjectPair, problem, goal=goalstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
-    exg = encode_state(ex, goal, :goal)
-    ObjectPair(ex.domain, ex.multiarg_predicates, ex.unary_predicates, ex.nullary_predicates, ex.objtype2id, ex.constmap,
-        ex.model_params, ex.obj2id, ex.obj2pid, ex.obj2upid, ex.pair2id, ex.pairs, nothing, exg)
+    @set ex.goal_state = encode_state(ex, goal, :goal)
 end
 
 function add_initstate(ex::ObjectPair, problem, start=initstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
-    exg = encode_state(ex, start, :start)
-    ObjectPair(ex.domain, ex.multiarg_predicates, ex.unary_predicates, ex.nullary_predicates, ex.objtype2id, ex.constmap,
-        ex.model_params, ex.obj2id, ex.obj2pid, ex.obj2upid, ex.pair2id, ex.pairs, exg, nothing)
+    @set ex.init_state = encode_state(ex, start, :start)
 end
 
 function addgoal(ex::ObjectPairStart, kb::KnowledgeBase)
