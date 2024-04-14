@@ -208,8 +208,7 @@ function encode_predicates(ex::MixedLRNN2, arity::Val{N}, preds, kid::Symbol) wh
     eb = EdgeBuilder(N, length(preds), length(ex.obj2id))
     for p in preds
         edge = _map_tuple(i -> ex.obj2id[p.args[i].name], arity)
-        # edge = map(i -> ex.obj2id[p.args[i].name], 1:N)
-        @inbounds push!(eb, edge)
+        push!(eb, edge)
     end
     construct(eb, kid)
 end
