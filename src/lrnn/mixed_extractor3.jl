@@ -177,26 +177,11 @@ function group_facts(ex::MixedLRNN3, facts::Vector{<:Term})
 
     _mapenumerate_tuple(ex.multiarg_predicates) do col, k
         N = length(ex.domain.predicates[k].args)
-        k => factargs2id(ex, facts, (@view occurences[:, col]), Val{N})
+        k => factargs2id(ex, facts, (@view occurences[:,col]), Val(N))
     end
 end
 
-# function group_facts(ex::MixedLRNN3, facts::Vector{<:Term})
-#     predicates = tuple(keys(ex.domain.predicates)...)
-#     occurences = falses(length(facts), length(predicates))
-#     for (i,f) in enumerate(facts)
-#         col = _inlined_search(f.name, predicates)
-#         col == -1 && continue
-#         occurences[i, col] = true
-#     end
-
-#     _mapenumerate_tuple(predicates) do col,k
-#         N = length(ex.domain.predicates[k].args)
-#         k => factargs2id(ex, facts, (@view occurences[:,col]), Val{N})
-#     end
-# end
-
-function factargs2id(ex::MixedLRNN3, facts, mask, arity::Type{Val{N}}) where {N}
+function factargs2id(ex::MixedLRNN3, facts, mask, arity::Val{N}) where {N}
     d = ex.obj2id
     o = Vector{NTuple{N,Int}}(undef, sum(mask))
     index = 1

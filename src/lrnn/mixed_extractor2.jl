@@ -170,7 +170,7 @@ end
 function group_facts(ex::MixedLRNN2, facts::Vector{<:Term})
     ps = [k => Int[] for k in ex.multiarg_predicates]
     occurences = Dict(ps)
-    for (i,f) in enumerate(facts)
+    for (i, f) in enumerate(facts)
         f.name ∉ keys(occurences) && continue
         push!(occurences[f.name], i)
     end
@@ -179,13 +179,13 @@ end
 
 function group_facts_fast(ex::MixedLRNN2, facts::Vector{<:Term})
     occurences = falses(length(facts), length(ex.multiarg_predicates))
-    for (i,f) in enumerate(facts)
+    for (i, f) in enumerate(facts)
         # f.name ∉ keys(occurences) && continue
         f.name ∉ ex.multiarg_predicates && continue
         col = findfirst(==(f.name), ex.multiarg_predicates)
         occurences[i, col] = true
     end
-    _mapenumerate_tuple((col,k) -> k => (@view occurences[:,col]), ex.multiarg_predicates)
+    _mapenumerate_tuple((col, k) -> k => (@view occurences[:, col]), ex.multiarg_predicates)
 end
 
 # this is better
@@ -199,25 +199,9 @@ function multi_predicates(ex::MixedLRNN2, kid::Symbol, state, prefix=nothing)
     ProductNode(NamedTuple{ns}(xs))
 end
 
-function encode_predicates(ex::MixedLRNN2, pname::Symbol, preds, kid::Symbol)
-    p = ex.domain.predicates[pname]
-    obj2id = ex.obj2id
-    bags = [Int[] for _ in 1:length(obj2id)]
-    n = length(preds)
-    xs = map(1:length(p.args)) do i
-        # ii = [obj2id[f.args[i].name] for f in preds]
-        # for (j, oi) in enumerate(ii)
-        #     push!(bags[oi], j)
-        # end
-        ii = Vector{Int}(undef,n)
-        for j in 1:n
-            oi = obj2id[preds[j].args[i].name]
-            ii[j] = oi
-            push!(bags[oi], j)
-        end
-        ArrayNode(KBEntry(kid, ii))
-    end
-    BagNode(ProductNode(tuple(xs...)), ScatteredBags(bags))
+function encode_predicates(ex::MixedLRNN2, pred_name::Symbol, preds, kid::Symbol)
+    arity = length(ex.domain.predicates[pred_name].args)
+    encode_predicates(ex, Val(arity), preds, kid)
 end
 
 
@@ -248,19 +232,19 @@ function encode_predicates_lowalloc(ex::MixedLRNN2, pname::Symbol, preds, kid::S
     p = ex.domain.predicates[pname]
     m = length(p.args)
     obj2id = ex.obj2id
-    bag_id = Vector{Int}(undef, n, m) 
+    bag_id = Vector{Int}(undef, n, m)
     bag_sizes = zeros(Int, n)
     xs = map(1:m) do i
-        ii = Vector{Int}(undef,n)
+        ii = Vector{Int}(undef, n)
         for j in 1:n
             oi = obj2id[preds[j].args[i].name]
             ii[j] = oi
             push!(bags[oi], j)
-            bag_sizes[oi] +=1
+            bag_sizes[oi] += 1
         end
         ArrayNode(KBEntry(kid, ii))
     end
-    BagNode(ProductNode(tuple(xs...)), ScatteredBags(bags))
+    construct(eb, kid)
 end
 
 function add_goalstate(ex::MixedLRNN2, problem, goal=goalstate(ex.domain, problem))

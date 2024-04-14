@@ -29,13 +29,13 @@ julia> _inlined_search(:e, (:b,:a,:c))
 -1
    
 """
-@inline function _inlined_search(s::Symbol, i::Int,  xs::Tuple)
+@inline function _inlined_search(s, i::Int,  xs::Tuple)
     isempty(xs) && return(-1)
     s == first(xs) && return(i)
     return(_inlined_search(s, i+1, Base.tail(xs)))
 end
 
-@inline _inlined_search(s::Symbol, xs::Tuple) = _inlined_search(s, 1, xs)
+@inline _inlined_search(s, xs::Tuple) = _inlined_search(s, 1, xs)
 
 
 @inline function _map_tuple(f::F, xs::Tuple) where {F<:Union{Function, Base.Fix1, Base.Fix2}}
@@ -49,10 +49,10 @@ end
 end
 
 
-@inline function _map_tuple(f::F, i::Type{Val{I}},n::Type{Val{N}}) where {I,N,F<:Union{Function, Base.Fix1, Base.Fix2}}
+@inline function _map_tuple(f::F, i::Val{I},n::Val{N}) where {I,N,F<:Union{Function, Base.Fix1, Base.Fix2}}
     I > N && return(tuple())
     I == N && return(tuple(f(I)))
-    tuple(f(I), _map_tuple(f, Val{I+1}, n)...)
+    tuple(f(I), _map_tuple(f, Val(I+1), n)...)
 end
 
-@inline _map_tuple(f::F, n::Type{Val{N}}) where {N,F<:Union{Function, Base.Fix1, Base.Fix2}} = _map_tuple(f, Val{1}, n)
+@inline _map_tuple(f::F, n::Val{N}) where {N,F<:Union{Function, Base.Fix1, Base.Fix2}} = _map_tuple(f, Val(1), n)
