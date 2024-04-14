@@ -204,59 +204,23 @@ function encode_predicates(ex::MixedLRNN2, pred_name::Symbol, preds, kid::Symbol
     encode_predicates(ex, Val(arity), preds, kid)
 end
 
-
-function encode_predicates_2(ex::MixedLRNN2, pname::Symbol, preds, kid::Symbol)
-    p = ex.domain.predicates[pname]
-
-    n = length(preds)
-    indices = Vector{Int}(undef, n * length(p.args))
-    counts = fill(0, length(ex.obj2id))
-
-    obj2id = ex.obj2id
-    n = length(preds)
-    xs = map(1:length(p.args)) do i
-        ii = Vector{Int}(undef, n)
-        for j in 1:n
-            oi = obj2id[preds[j].args[i].name]
-            ii[j] = oi
-            counts[oi] += 1
-            indices[(i-1)*n+j] = oi
-        end
-        ArrayNode(KBEntry(kid, ii))
-    end
-    BagNode(ProductNode(tuple(xs...)), CompressedBags(indices, counts, n))
-end
-
-function encode_predicates_lowalloc(ex::MixedLRNN2, pname::Symbol, preds, kid::Symbol)
-    n = length(preds)
-    p = ex.domain.predicates[pname]
-    m = length(p.args)
-    obj2id = ex.obj2id
-    bag_id = Vector{Int}(undef, n, m)
-    bag_sizes = zeros(Int, n)
-    xs = map(1:m) do i
-        ii = Vector{Int}(undef, n)
-        for j in 1:n
-            oi = obj2id[preds[j].args[i].name]
-            ii[j] = oi
-            push!(bags[oi], j)
-            bag_sizes[oi] += 1
-        end
-        ArrayNode(KBEntry(kid, ii))
+function encode_predicates(ex::MixedLRNN2, arity::Val{N}, preds, kid::Symbol) where {N}
+    eb = EdgeBuilder(N, length(preds), length(ex.obj2id))
+    for p in preds
+        edge = _map_tuple(i -> ex.obj2id[p.args[i].name], arity)
+        push!(eb, edge)
     end
     construct(eb, kid)
 end
 
 function add_goalstate(ex::MixedLRNN2, problem, goal=goalstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
-    exg = encode_state(ex, goal, :goal)
-    MixedLRNN2(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.constmap, ex.model_params, ex.obj2id, nothing, exg)
+    @set ex.goal_state = encode_state(ex, goal, :goal)
 end
 
 function add_initstate(ex::MixedLRNN2, problem, start=initstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
-    exg = encode_state(ex, start, :start)
-    MixedLRNN2(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.constmap, ex.model_params, ex.obj2id, exg, nothing)
+    @set ex.init_state = encode_state(ex, start, :start)
 end
 
 function addgoal(ex::MixedLRNN2Start, kb::KnowledgeBase)

@@ -14,16 +14,28 @@ mutable struct EdgeBuilder{N,I<:Integer}
 end
 
 EdgeBuilder(arity::Integer, capacity::Integer, nv::Integer) = EdgeBuilder(Int, arity, capacity, nv)
+EdgeBuilder(arity::Val, capacity::Integer, nv::Integer) = EdgeBuilder(Int, arity, capacity, nv)
+EdgeBuilder(I::Type, arity::Integer, capacity::Integer, nv::Integer) = EdgeBuilder(I, Val(arity), capacity, nv)
 
-function EdgeBuilder(I::DataType, arity::Integer, capacity::Integer, nv::Integer)
-	ii = _map_tuple(i -> Vector{I}(undef, capacity), Val(arity))
+function EdgeBuilder(I::Type, arity::Val{N}, capacity::Integer, nv::Integer) where {N}
+	ii = _map_tuple(i -> Vector{I}(undef, capacity), arity)
 	bags = [I[] for _ in 1:nv]
 	EdgeBuilder(ii, bags, nv, 1)
 end
 
 function Base.push!(eb::EdgeBuilder{N,<:Any}, vertices::NTuple{N,I}) where {N,I<:Integer}
 	# Base.@boundscheck boundscheck(eb, vertices)
-	_mapenumerate_tuple(vertices) do i, vᵢ
+	for (i, vᵢ) in enumerate(vertices)
+		push!(eb.bags[vᵢ], eb.first_free)
+		eb.ii[i][eb.first_free] = vᵢ
+	end
+	eb.first_free += 1
+end
+
+function Base.push!(eb::EdgeBuilder{N,<:Any}, vertices::AbstractVector{<:Integer}) where {N}
+	# Base.@boundscheck length(vertices) == N || error("The edge has to be of arity $(N)")
+	# Base.@boundscheck boundscheck(eb, vertices)
+	for (i, vᵢ) in enumerate(vertices)
 		push!(eb.bags[vᵢ], eb.first_free)
 		eb.ii[i][eb.first_free] = vᵢ
 	end
@@ -32,12 +44,12 @@ end
 
 function boundscheck(eb::EdgeBuilder, vertices)
 	eb.first_free ≤ length(first(eb.ii)) || error("The capacity of edgebuilder has exceeded")
-	all(_map_tuple(≤(eb.nv), vertices)) || error("index of vertices cannot be bigger then number of vertices")
+	all(map(≤(eb.nv), vertices)) || error("index of vertices cannot be bigger then number of vertices")
 	true	
 end
 
 function construct(eb::EdgeBuilder, input_sym::Symbol)
-	l = eb.first_free -1 
-	xs = _map_tuple(ii -> KBEntry(input_sym, view(ii, 1:l)), eb.ii)
+	l = eb.first_free - 1 
+	xs = map(ii -> KBEntry(input_sym, view(ii, 1:l)), eb.ii)
 	BagNode(ProductNode(xs), eb.bags)
 end

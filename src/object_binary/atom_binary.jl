@@ -35,8 +35,8 @@ struct AtomBinary{DO,MP,D,S,G}
     actionmap::Dict{Symbol,Int}
     model_params::MP
     obj2id::D
-    init_state::S
-    goal_state::G
+    init_atoms::S
+    goal_atoms::G
     function AtomBinary(domain::DO, max_arity, constmap, actionmap, model_params::MP, obj2id::D, init::S, goal::G) where {DO,D,MP<:NamedTuple,S,G}
         @assert issubset((:message_passes, :residual), keys(model_params)) "Parameters of the model are not fully specified"
         @assert (init === nothing || goal === nothing) "Fixing init and goal state is bizzaare, as the extractor would always create a constant"
@@ -45,8 +45,8 @@ struct AtomBinary{DO,MP,D,S,G}
 end
 
 AtomBinaryNoGoal{DO,MP,D} = AtomBinary{DO,MP,D,Nothing,Nothing} where {DO,MP,D}
-AtomBinaryStart{DO,MP,D,S} = AtomBinary{DO,MP,D,S,Nothing} where {DO,MP,D,S<:KnowledgeBase}
-AtomBinaryGoal{DO,MP,D,S} = AtomBinary{DO,MP,D,Nothing,S} where {DO,MP,D,S<:KnowledgeBase}
+AtomBinaryStart{DO,MP,D,S} = AtomBinary{DO,MP,D,S,Nothing} where {DO,MP,D,S<:AbstractVector{<:Julog.Term}}
+AtomBinaryGoal{DO,MP,D,S} = AtomBinary{DO,MP,D,Nothing,S} where {DO,MP,D,S<:AbstractVector{<:Julog.Term}}
 
 function AtomBinary(domain; message_passes=2, residual=:linear, kwargs...)
     dictmap(x) = Dict(reverse.(enumerate(sort(x))))
@@ -58,7 +58,7 @@ function AtomBinary(domain; message_passes=2, residual=:linear, kwargs...)
 end
 
 isspecialized(ex::AtomBinary) = ex.obj2id !== nothing
-hasgoal(ex::AtomBinary) = ex.init_state !== nothing || ex.goal_state !== nothing
+hasgoal(ex::AtomBinary) = ex.init_atoms !== nothing || ex.goal_atoms !== nothing
 
 
 function AtomBinary(domain, problem; embed_goal=true, kwargs...)
@@ -93,27 +93,24 @@ function specialize(ex::AtomBinary, problem)
 end
 
 function (ex::AtomBinary)(state::GenericState)
-    prefix = (ex.goal_state !== nothing) ? :start : ((ex.init_state !== nothing) ? :goal : nothing)
-    kb = encode_state(ex, state, prefix)
-    addgoal(ex, kb)
+    encode_state(ex, state)
 end
 
 function encode_state(ex::AtomBinary, state::GenericState, prefix=nothing)
     message_passes, residual = ex.model_params
-    atoms = collect(PDDL.get_facts(state))
-    x = unary_predicates(ex, atoms)
+    atoms = collect(get_facts(state))
+    atoms, gii = add_goalatoms(ex, atoms)
+    x = unary_predicates(ex, atoms, gii)
     kb = KnowledgeBase((; x1=x))
     n = size(x, 2)
     sₓ = :x1
-    edge_structure = encode_edges(ex, :x1, state)
-    if !isempty(ex.multiarg_predicates)
-        for i in 1:message_passes
-            input_to_gnn = last(keys(kb))
-            ds = KBEntryRenamer(:x1, input_to_gnn)(edge_structure)
-            kb = append(kb, layer_name(kb, "gnn"), ds)
-            if residual !== :none #if there is a residual connection, add it 
-                kb = add_residual_layer(kb, keys(kb)[end-1:end], n)
-            end
+    edge_structure = encode_edges(ex, atoms, :x1)
+    for i in 1:message_passes
+        input_to_gnn = last(keys(kb))
+        ds = KBEntryRenamer(:x1, input_to_gnn)(edge_structure)
+        kb = append(kb, layer_name(kb, "gnn"), ds)
+        if residual !== :none #if there is a residual connection, add it 
+            kb = add_residual_layer(kb, keys(kb)[end-1:end], n)
         end
     end
     s = last(keys(kb))
@@ -122,17 +119,20 @@ end
 
 
 """
-nunary_predicates(ex::AtomBinary, state)
+    nunary_predicates(ex::AtomBinary, atoms, gii)
 
-Create matrix with one column per atom and encode by one-hot-encoding the type (name) of an atom
+    Create matrix with one column per atom and encode by one-hot-encoding the type (name) 
+    of an atom. `gii` contains indices of the goal state, which are identified by `1` in the 
+    last row.
 """
-function unary_predicates(ex::AtomBinary, atoms)
+function unary_predicates(ex::AtomBinary, atoms, gii)
     # encode constants
-    idim = length(ex.actionmap)
-    x = zeros(Float32, idim, length(ex.obj2id))
+    idim = length(ex.actionmap) + 1
+    x = zeros(Float32, idim, length(atoms))
     for (i, p) in enumerate(atoms)
         x[ex.actionmap[p.name],i] = 1
     end
+    x[end, gii] .= 1
     x
 end
 
@@ -166,8 +166,13 @@ function type_of_edge(ex::AtomBinary, k::Int, sa, sb)
     ex.max_arity*(i-1) + j
 end
 
-function encode_edges(ex::AtomBinary, pname::Symbol, atoms)
+function encode_edges(ex::AtomBinary, atoms, kid::Symbol)
     set_atoms = map(Base.Fix1(parse_atoms, ex), atoms) 
+    l = length(atoms)
+    capacity = l * (l + 1) ÷ 2
+    symdiff_offset = ex.max_arity^2 + 1
+    ebs = tuple([EdgeBuilder(Val(2), capacity, l) for _ in 1:ex.max_arity^2]...)
+    sbs = EdgeBuilder(Val(2), capacity, l)
     for i in 1:length(atoms) # Can be replaced with Combinatorics.atoms
         sa = set_atoms[i]
         for j in 2:length(atoms)
@@ -175,7 +180,9 @@ function encode_edges(ex::AtomBinary, pname::Symbol, atoms)
             is = intersect(sa.set, sb.set)
             if !isempty(is)
                 for k in is
-                   println("intersection edge: ",i," --> ",j, " of type ",type_of_edge(ex, k, sa, sb))
+                   # println("intersection edge: ",i," --> ",j, " of type ",type_of_edge(ex, k, sa, sb))
+                   ti = type_of_edge(ex, k, sa, sb)
+                   push!(ebs[ti], (i,j))
                 end
             end
 
@@ -183,36 +190,39 @@ function encode_edges(ex::AtomBinary, pname::Symbol, atoms)
             if !isempty(sd)
                 subsets = [set_atoms[k].name for k in 1:length(set_atoms) if issubset(sd, set_atoms[k].set)]
                 if !isempty(subsets)
-                    println("there are symdiff edges of type ", subsets)
+                    push!(sbs, (i,j))
+                    # println("there are symdiff edges of type ", subsets)
                 end
             end
         end
     end
+    ProductNode(map(Base.Fix2(construct, kid), tuple(ebs..., sbs)))
 end
 
 
 function add_goalstate(ex::AtomBinary, problem, goal=goalstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
-    exg = encode_state(ex, goal, :goal)
-    AtomBinary(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.constmap, ex.model_params, ex.obj2id, nothing, exg)
+    @set ex.goal_atoms = collect(get_facts(goal))
 end
 
 function add_initstate(ex::AtomBinary, problem, start=initstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
-    exg = encode_state(ex, start, :start)
-    AtomBinary(ex.domain, ex.multiarg_predicates, ex.nunanary_predicates, ex.objtype2id, ex.constmap, ex.model_params, ex.obj2id, exg, nothing)
+    @set ex.init_atoms = collect(get_facts(start))
 end
 
-function addgoal(ex::AtomBinaryStart, kb::KnowledgeBase)
-    error("implement me")
-    return (stack_hypergraphs(ex.init_state, kb))
+"""
+    atoms, gid = add_goalatoms(ex, atoms)
+
+    Add atoms determining goal (or init) state to atoms and return indices of goal state.
+    The addition is made such that goal states are always first. 
+"""
+function add_goalatoms(ex::AtomBinaryStart, atoms)
+    gid = 1:length(atoms)
+    vcat(atoms, ex.init_atoms), gid
 end
 
-function addgoal(ex::AtomBinaryGoal, kb::KnowledgeBase)
-    error("implement me")
-    return (stack_hypergraphs(kb, ex.goal_state))
+function add_goalatoms(ex::AtomBinaryGoal, atoms)
+    gid = 1:length(ex.goal_atoms)
+    vcat(ex.goal_atoms, atoms), gid
 end
 
-function addgoal(ex::AtomBinaryNoGoal, kb::KnowledgeBase)
-    return (kb)
-end
