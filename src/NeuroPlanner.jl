@@ -16,6 +16,7 @@ using HierarchicalUtils
 using ChainRulesCore
 using Accessors
 using LinearAlgebra
+using StaticBitSets
 
 
 """

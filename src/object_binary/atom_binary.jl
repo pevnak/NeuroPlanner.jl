@@ -84,10 +84,14 @@ from objects to id of vertices. Goals are not changed added to the
 extractor.
 """
 function specialize(ex::AtomBinary, problem)
-    obj2id = Dict(v.name => (;id = i, set = BitSet(i)) for (i, v) in enumerate(problem.objects))
+    T = BitSet
+    # N = ceil(Int, log(256, length(problem.objects) + length(ex.constmap)))
+    # T = SBitSet{N, UInt8}
+
+    obj2id = Dict(v.name => (;id = i, set = T(i)) for (i, v) in enumerate(problem.objects))
     for k in keys(ex.constmap)
         i = length(obj2id) + 1
-        obj2id[k] = (;id = i, set = BitSet(i))
+        obj2id[k] = (;id = i, set = T(i))
     end
     AtomBinary(ex.domain, ex.max_arity, ex.constmap, ex.actionmap, ex.model_params, obj2id, nothing, nothing)
 end
@@ -157,48 +161,77 @@ function parse_atoms(ex::AtomBinary, atom::Julog.Term)
 end
 
 """
-    type_of_edge(ex::AtomBinary, i::Int, sa, sb)
+    _type_of_edge(ex::AtomBinary, i::Int, sa, sb)
 
     Index of type of an edge. Type of an edge is defined by the index of the object in the predicates `sa` and `sb`.
 """
-function type_of_edge(ex::AtomBinary, k::Int, sa, sb)
+function _type_of_edge(ex::AtomBinary, k::Int, sa, sb)
     i, j = _inlined_search(k, sa.ids), _inlined_search(k, sb.ids)
     ex.max_arity*(i-1) + j
 end
 
-function encode_edges(ex::AtomBinary, atoms, kid::Symbol)
+"""
+
+    _id2atoms(ex::AtomBinary, set_atoms)
+
+    Create a map of objectids to atom_ids, such that we can quickly check
+    in which atoms the object id occurs in
+"""
+function _id2atoms(ex::AtomBinary, set_atoms)
+    id2atoms = [BitSet() for _ in 1:length(ex.obj2id)]
+    for (i,sa) in enumerate(set_atoms)
+        for id in sa.ids 
+            id == 0 && continue
+            union!(id2atoms[id], i)
+        end 
+    end
+    id2atoms
+end
+
+function encode_edges(ex::AtomBinary, atoms::Vector{Julog.Term}, kid::Symbol)
     set_atoms = map(Base.Fix1(parse_atoms, ex), atoms) 
-    l = length(atoms)
+    encode_edges(ex, set_atoms, kid)
+end
+
+function encode_edges(ex::AtomBinary, set_atoms, kid::Symbol)
+    id2atoms = _id2atoms(ex, set_atoms)
+    l = length(set_atoms)
     capacity = l * (l + 1) ÷ 2
     symdiff_offset = ex.max_arity^2 + 1
     ebs = tuple([CompEdgeBuilder(2, capacity, l) for _ in 1:ex.max_arity^2]...)
-    sbs = CompEdgeBuilder(2, capacity, l)
-    # ebs = tuple([EdgeBuilder(Val(2), capacity, l) for _ in 1:ex.max_arity^2]...)
-    # sbs = EdgeBuilder(Val(2), capacity, l)
-    for i in 1:length(atoms) # Can be replaced with Combinatorics.atoms
+    sbs = tuple([CompEdgeBuilder(2, capacity, l) for _ in 1:length(ex.actionmap)]...)
+    inserted = falses(length(sbs))
+    @inbounds for i in 1:l # Can be replaced with Combinatorics.atoms
         sa = set_atoms[i]
-        for j in 2:length(atoms)
+        for j in 2:l
             sb = set_atoms[j]
+
+            # encoding intersection
             is = intersect(sa.set, sb.set)
             if !isempty(is)
                 for k in is
-                   # println("intersection edge: ",i," --> ",j, " of type ",type_of_edge(ex, k, sa, sb))
-                   ti = type_of_edge(ex, k, sa, sb)
+                   ti = _type_of_edge(ex, k, sa, sb)
                    push!(ebs[ti], (i,j))
                 end
             end
 
+            # encoding symdiff
             sd = symdiff(sa.set,sb.set)
             if !isempty(sd)
-                subsets = [set_atoms[k].name for k in 1:length(set_atoms) if issubset(sd, set_atoms[k].set)]
-                if !isempty(subsets)
-                    push!(sbs, (i,j))
-                    # println("there are symdiff edges of type ", subsets)
+                subsets2 = reduce(intersect, [id2atoms[k] for k in sd])
+                if !isempty(subsets2)
+                    inserted .= false
+                    for k in subsets2
+                        id = ex.actionmap[set_atoms[k].name] 
+                        inserted[id] && continue
+                        push!(sbs[id], (i,j))
+                        inserted[id] = true
+                    end
                 end
             end
         end
     end
-    ProductNode(map(Base.Fix2(construct, kid), tuple(ebs..., sbs)))
+    ProductNode(map(Base.Fix2(construct, kid), tuple(ebs..., sbs...)))
 end
 
 
