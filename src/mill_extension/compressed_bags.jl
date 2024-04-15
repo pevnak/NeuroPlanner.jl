@@ -5,13 +5,13 @@ using DataStructures: SortedDict, OrderedDict
 
 [`CompressedBags`](@ref) struct stores indices of bags' instances that are not necessarily contiguous.
 
-See also: [`AlignedBags`](@ref).
+See also: [`AlignedBags`](@ref), [`ScatteredBags`](@ref).
 """
 struct CompressedBags{T<:Integer} <: AbstractBags{T}
     indices::Vector{T}
-    bags::Vector{UnitRange{Int64}}
-    num_observations::Int64
-    function CompressedBags(indices::Vector{T}, bags::Vector{UnitRange{Int64}}, num_observations::Int64) where {T}
+    bags::Vector{UnitRange{T}}
+    num_observations::T
+    function CompressedBags(indices::Vector{T}, bags::Vector{UnitRange{T}}, num_observations::T) where {T<:Integer}
         @assert length(indices) == sum(length.(bags)) "Dimensionality mismatch, number of observations in `indices` must match the `bags`.
         `number of observations in `indices` = $(length(indices)) and bags size = $(sum(length.(bags)))."
         new{T}(indices, bags, num_observations)
@@ -21,18 +21,18 @@ end
 Flux.@forward CompressedBags.bags Base.firstindex, Base.lastindex, Base.eachindex, Base.length, MLUtils.numobs
 
 Base.getindex(b::CompressedBags, i::Int) = view(b.indices, b.bags[i])
-Base.getindex(b::CompressedBags, I::AbstractUnitRange{<:Integer}) = [view(b.indices, b.bags[i]) for i in I]
+Base.getindex(b::CompressedBags, I::AbstractUnitRange{<:Integer}) = [b[i] for i in I]
 
 Base.first(b::CompressedBags) = b[1]
 function Base.first(b::CompressedBags, n::Int)
-    n < 0 && throw(ArgumentError("Number of elements must be nonnegative"))
+    n < 0 && throw(ArgumentError("Number of elements must be nonnegative."))
     n > length(b) && return b[1:end]
     b[1:n]
 end
 
 Base.last(b::CompressedBags) = b[end]
 function Base.last(b::CompressedBags, n::Int)
-    n < 0 && throw(ArgumentError("Number of elements must be nonnegative"))
+    n < 0 && throw(ArgumentError("Number of elements must be nonnegative."))
     n > length(b) && return b[1:end]
     b[end-n+1:end]
 end
@@ -42,9 +42,7 @@ function Base.iterate(b::CompressedBags, i=1)
     b[i], i + 1
 end
 
-Base.mapreduce(f, op, b::CompressedBags) = mapreduce(f, op, b.indices)
 maxindex(b::CompressedBags) = isempty(b) ? -1 : b.num_observations
-
 
 """
     CompressedBags()
@@ -91,7 +89,7 @@ This function takes two input vectors `k` and `counts`, where `k` represents the
 
 The function calculates the starting points of each bag based on the cumulative sum of `counts` and then creates bags for each bag using `map`. Finally, it initializes `vals` as a vector of uninitialized integers of length `n`.
 """
-function CompressedBags(ks::Vector{T}, counts::Vector{Int}, num_observations::Int, offset::Int) where {T<:Integer}
+function CompressedBags(ks::Vector{T}, counts::Vector{T}, num_observations::T, offset::T) where {T<:Integer}
     ends = cumsum(counts)
     start = ends .- (counts .- 1)
     bags = map((x, y) -> x:y, start, ends)
@@ -106,11 +104,6 @@ function CompressedBags(ks::Vector{T}, counts::Vector{Int}, num_observations::In
             start[k] += 1
         end
     end
-    # for (i, k) in enumerate(ks)
-    #     # indices[start[k]] = i % num_observations == 0 ? num_observations : i % num_observations
-    #     indices[start[k]] = (i - 1) % num_observations + 1
-    #     start[k] += 1
-    # end
 
     CompressedBags(indices, bags, offset)
 end
