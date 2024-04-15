@@ -46,7 +46,7 @@ export MultiheadAttention
 include("relational/renamer.jl")
 include("relational/edgebuilder.jl")
 include("relational/edgebuilder_comp.jl")
-export EdgeBuilder, EdgeBuilderComp
+export EdgeBuilder, EdgeBuilderComp, EdgeBuilderCompMat
 
 # a basic architecture based on hyper-graph representatation of predicates
 include("lrnn/pure_extractor.jl")

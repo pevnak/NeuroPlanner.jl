@@ -202,7 +202,7 @@ function multi_predicates(ex::MixedLRNN3, kid::Symbol, grouped_facts, prefix=not
 end
 
 function encode_predicates(ex::MixedLRNN3, preds::Vector{NTuple{N,Int64}}, kid::Symbol) where {N}
-    eb = EdgeBuilderComp(Val(N), length(preds), length(ex.obj2id))
+    eb = EdgeBuilderCompMat(Val(N), length(preds), length(ex.obj2id))
     for p in preds
         push!(eb, p)
     end

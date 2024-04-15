@@ -108,6 +108,25 @@ function CompressedBags(ks::Vector{T}, counts::Vector{T}, num_observations::T, o
     CompressedBags(indices, bags, offset)
 end
 
+function CompressedBags(ks::Matrix{T}, counts::Vector{T}, num_observations::T, offset::T) where {T<:Integer}
+    ends = cumsum(counts)
+    start = ends .- (counts .- 1)
+    bags = map((x, y) -> x:y, start, ends)
+
+    ar = length(ks) == 0 ? 0 : Int(length(ks) / num_observations)
+    indices = Vector{Int}(undef, ar * offset)
+
+    for i in 1:ar
+        for j in 1:offset
+            k = ks[i, j]
+            indices[start[k]] = (j - 1) % num_observations + 1
+            start[k] += 1
+        end
+    end
+
+    CompressedBags(indices, bags, offset)
+end
+
 """
     remapbags(b::AbstractBags, idcs::VecOrRange{<:Integer}) -> (rb, I)
 
