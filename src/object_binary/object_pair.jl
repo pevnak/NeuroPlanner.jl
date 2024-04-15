@@ -269,7 +269,7 @@ function encode_edges(ex::ObjectPair, kid::Symbol, grouped_facts, prefix=nothing
     ProductNode(NamedTuple{(name, ns...)}((edges_bn, xs...)))
 end
 
-function prepare_pids(ex::ObjectPair, eb::EdgeBuilderComp)
+function prepare_pids(ex::ObjectPair, eb::EdgeBuilderCompMat)
     counts = fill(0, length(ex.pairs))
     pids = Vector{Int}(undef, eb.num_observations)
 
