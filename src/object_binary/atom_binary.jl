@@ -84,9 +84,9 @@ from objects to id of vertices. Goals are not changed added to the
 extractor.
 """
 function specialize(ex::AtomBinary, problem)
-    T = BitSet
-    # N = ceil(Int, log(256, length(problem.objects) + length(ex.constmap)))
-    # T = SBitSet{N, UInt8}
+    # T = BitSet
+    N = ceil(Int, (length(problem.objects) + length(ex.constmap))/8)
+    T = SBitSet{N, UInt8}
 
     obj2id = Dict(v.name => (;id = i, set = T(i)) for (i, v) in enumerate(problem.objects))
     for k in keys(ex.constmap)
@@ -140,6 +140,54 @@ function unary_predicates(ex::AtomBinary, atoms, gii)
     x
 end
 
+
+function encode_edges(ex::AtomBinary, atoms::Vector{Julog.Term}, kid::Symbol)
+    set_atoms = map(Base.Fix1(parse_atoms, ex), atoms) 
+    id2atoms = _id2atoms(ex, set_atoms)
+    l = length(set_atoms)
+    capacity = l * (l + 1) ÷ 2
+    ebs = tuple([CompEdgeBuilder(2, capacity, l) for _ in 1:ex.max_arity^2]...)
+    sbs = tuple([CompEdgeBuilder(2, capacity, l) for _ in 1:length(ex.actionmap)]...)
+    encode_edges(ebs, sbs, ex, kid, set_atoms, id2atoms)
+end
+
+function encode_edges(ebs, sbs, ex::AtomBinary, kid::Symbol, set_atoms, id2atoms)
+    l = length(set_atoms)
+    inserted = falses(length(sbs))
+    @inbounds for i in 1:l # Can be replaced with Combinatorics.atoms
+        sa = set_atoms[i]
+        for j in 2:l
+            sb = set_atoms[j]
+
+            # encoding intersection
+            is = intersect(sa.set, sb.set)
+            if !isempty(is)
+                for k in is
+                   ti = _type_of_edge(ex, k, sa, sb)
+                   push!(ebs[ti], (i,j))
+                end
+            end
+
+            # encoding symdiff
+            sd = symdiff(sa.set,sb.set)
+            if !isempty(sd)
+                subsets2 = getindex_reduce(id2atoms, sd)
+                if !isempty(subsets2)
+                    fill!(inserted, false)
+                    for k in subsets2
+                        id = ex.actionmap[set_atoms[k].name] 
+                        inserted[id] && continue
+                        push!(sbs[id], (i,j))
+                        inserted[id] = true
+                    end
+                end
+            end
+        end
+    end
+    ProductNode(map(Base.Fix2(construct, kid), tuple(ebs..., sbs...)))
+end
+
+
 """
     parse_atom(ex::AtomBinary, atom::Julog.Term)
 
@@ -149,13 +197,14 @@ end
 
 """
 function parse_atoms(ex::AtomBinary, atom::Julog.Term)
+    T = typeof(first(values(ex.obj2id)).set)
     ids = zeros(Int, ex.max_arity)
-    set = BitSet()
+    set = T()
     name = atom.name
     for (i, k) in enumerate(atom.args)
         e = ex.obj2id[k.name]
         ids[i] = e.id
-        union!(set, e.set)
+        set = union(set, e.set)
     end
     return((;name, set, ids = tuple(ids...)))
 end
@@ -178,61 +227,43 @@ end
     in which atoms the object id occurs in
 """
 function _id2atoms(ex::AtomBinary, set_atoms)
-    id2atoms = [BitSet() for _ in 1:length(ex.obj2id)]
+    N = ceil(Int, (length(set_atoms))/8)
+    T = SBitSet{N,UInt8}    
+    _id2atoms(T, ex, set_atoms)
+end
+
+function _id2atoms(T, ex::AtomBinary, set_atoms)
+    id2atoms = [T() for _ in 1:length(ex.obj2id)]
     for (i,sa) in enumerate(set_atoms)
         for id in sa.ids 
             id == 0 && continue
-            union!(id2atoms[id], i)
+            id2atoms[id] = union(id2atoms[id], T(i))
         end 
     end
     id2atoms
 end
 
-function encode_edges(ex::AtomBinary, atoms::Vector{Julog.Term}, kid::Symbol)
-    set_atoms = map(Base.Fix1(parse_atoms, ex), atoms) 
-    encode_edges(ex, set_atoms, kid)
-end
 
-function encode_edges(ex::AtomBinary, set_atoms, kid::Symbol)
-    id2atoms = _id2atoms(ex, set_atoms)
-    l = length(set_atoms)
-    capacity = l * (l + 1) ÷ 2
-    symdiff_offset = ex.max_arity^2 + 1
-    ebs = tuple([CompEdgeBuilder(2, capacity, l) for _ in 1:ex.max_arity^2]...)
-    sbs = tuple([CompEdgeBuilder(2, capacity, l) for _ in 1:length(ex.actionmap)]...)
-    inserted = falses(length(sbs))
-    @inbounds for i in 1:l # Can be replaced with Combinatorics.atoms
-        sa = set_atoms[i]
-        for j in 2:l
-            sb = set_atoms[j]
+"""
+    getindex_reduce(id2atoms, sd)
 
-            # encoding intersection
-            is = intersect(sa.set, sb.set)
-            if !isempty(is)
-                for k in is
-                   ti = _type_of_edge(ex, k, sa, sb)
-                   push!(ebs[ti], (i,j))
-                end
-            end
-
-            # encoding symdiff
-            sd = symdiff(sa.set,sb.set)
-            if !isempty(sd)
-                subsets2 = reduce(intersect, [id2atoms[k] for k in sd])
-                if !isempty(subsets2)
-                    inserted .= false
-                    for k in subsets2
-                        id = ex.actionmap[set_atoms[k].name] 
-                        inserted[id] && continue
-                        push!(sbs[id], (i,j))
-                        inserted[id] = true
-                    end
-                end
-            end
-        end
+    compute `reduce(intersect, [id2atoms[k] for k in sd])` while knowing
+    that there is at least one element and avoding to allocate the 
+    intermediate array
+"""
+function getindex_reduce(id2atoms, sd)
+    i, state = iterate(sd)
+    v = id2atoms[i]
+    next = iterate(sd, state)
+    while(next !== nothing)
+        i, state = next
+        @inbounds v = intersect(v, id2atoms[i])
+        next = iterate(sd, state)
     end
-    ProductNode(map(Base.Fix2(construct, kid), tuple(ebs..., sbs...)))
+    return(v)
 end
+
+
 
 
 function add_goalstate(ex::AtomBinary, problem, goal=goalstate(ex.domain, problem))
