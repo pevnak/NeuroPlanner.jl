@@ -56,3 +56,10 @@ end
 end
 
 @inline _map_tuple(f::F, n::Val{N}) where {N,F<:Union{Function, Base.Fix1, Base.Fix2}} = _map_tuple(f, Val(1), n)
+
+
+# symmetric difference for SBitSet
+@inline function Base.symdiff(s1::SBitSet{N,T},s2::SBitSet{N,T}) where {N,T<:Unsigned}
+    SBitSet{N,T}(xor.(s1.pieces,s2.pieces))
+end
+
