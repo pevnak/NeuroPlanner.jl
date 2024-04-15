@@ -38,3 +38,19 @@ using Test
 end
 
 
+@testset "EdgeBuilderComp" begin
+    nv = 7
+    capacity = 5
+    arity = 2
+    for (arity, capacity, nv) in [(2, 5, 7), (3, 7, 5)]
+        eb = EdgeBuilder(arity, capacity, nv)
+        edges = [tuple([rand(1:nv) for _ in 1:arity]...) for _ in 1:capacity]
+        foreach(e -> push!(eb, e), edges)
+
+        @testset "correctness of construction" begin
+            ds = construct(eb, :x)
+            @test all(ds.data.data[i].data.ii == [e[i] for e in edges] for i in 1:arity)
+            @test all(all(j ∈ ds.bags[e] for (j, e) in enumerate(ds.data.data[i].data.ii)) for i in 1:arity)
+        end
+    end
+end

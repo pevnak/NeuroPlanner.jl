@@ -176,10 +176,7 @@ end
 function multi_predicates(ex::ObjectBinary, kid::Symbol, grouped_facts, prefix=nothing)
     # Then, we specify the predicates the dirty way
     ks = ex.multiarg_predicates
-    xs = map(kii -> encode_predicates(ex, kii[1], kii[2], kid), grouped_facts)
-    # xs = map(kii -> encode_predicates_compressed(ex, kii[2], kid), grouped_facts)
-
-    # xs = map(kii -> encode_predicates_comp(ex, kii[2], kid), grouped_facts)
+    xs = map(kii -> encode_predicates(ex, kii[2], kid), grouped_facts)
     ns = isnothing(prefix) ? ks : _map_tuple(k -> Symbol(prefix, "_", k), ks)
     ProductNode(NamedTuple{ns}(xs))
 end
@@ -229,50 +226,9 @@ Returns:
 This function encodes predicates for an ObjectBinary instance using the given predicate name, predicates, and key ID.
 """
 
-function encode_predicates(ex::ObjectBinary, pname::Symbol, preds, kid::Symbol)
-    if length(preds) == 0
-        bags = fill(Int[], length(ex.obj2id))
-
-        xs = Tuple{Int,Int}[]
-        x = map(1:2) do i
-            ArrayNode(KBEntry(kid, map(p -> p[i], xs)))
-        end
-        x = ProductNode(tuple(x...))
-        return BagNode(x, ScatteredBags(bags))
-    end
-
-    p = ex.domain.predicates[pname]
-    obj2id = ex.obj2id
-
-    xs = Tuple{Int,Int}[]
-    for f in preds
-        es = [(f[i], f[j]) for i in 1:length(f)-1 for j in i+1:length(f)]
-        push!(xs, es...)
-    end
-
-    x = map(1:2) do i
-        ArrayNode(KBEntry(kid, map(p -> p[i], xs)))
-    end
-    x = ProductNode(tuple(x...))
-
-    bags = [Int[] for _ in 1:length(obj2id)]
-    for (i, f) in enumerate(xs)
-        for j in 1:2
-            push!(bags[f[j]], i)
-        end
-    end
-
-    BagNode(x, ScatteredBags(bags))
-end
-
-function encode_predicates_comp(ex::ObjectBinary, preds::Vector{NTuple{N,Int64}}, kid::Symbol) where {N}
-    if length(preds) == 0
-        eb = CompEdgeBuilder(2, 0, length(ex.pairs))
-        return construct(eb, kid)
-    end
-
+function encode_predicates(ex::ObjectBinary, preds::Vector{NTuple{N,Int64}}, kid::Symbol) where {N}
     pred_length = Int(((N - 1) + 1) * (N - 1) / 2)
-    eb = CompEdgeBuilder(2, pred_length * length(preds), length(ex.obj2id))
+    eb = EdgeBuilderComp(2, pred_length * length(preds), length(ex.obj2id))
     for p in preds
         for i in 1:length(p)-1
             oᵢ = p[i]

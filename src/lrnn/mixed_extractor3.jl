@@ -197,42 +197,17 @@ function multi_predicates(ex::MixedLRNN3, kid::Symbol, grouped_facts, prefix=not
     # Then, we specify the predicates the dirty way
     ks = ex.multiarg_predicates
     xs = map(kii -> encode_predicates(ex, kii[2], kid), grouped_facts)
-    # xs = map(kii -> encode_predicates_comp(ex, kii[2], kid), grouped_facts)
     ns = isnothing(prefix) ? ks : _map_tuple(k -> Symbol(prefix, "_", k), ks)
     ProductNode(NamedTuple{ns}(xs))
 end
 
 function encode_predicates(ex::MixedLRNN3, preds::Vector{NTuple{N,Int64}}, kid::Symbol) where {N}
-    eb = EdgeBuilder(Val(N), length(preds), length(ex.obj2id))
+    eb = EdgeBuilderComp(Val(N), length(preds), length(ex.obj2id))
     for p in preds
         push!(eb, p)
     end
     construct(eb, kid)
 end
-
-function encode_predicates_comp(ex::MixedLRNN3, preds::Vector{NTuple{N,Int64}}, kid::Symbol) where {N}
-    eb = CompEdgeBuilder(N, length(preds), length(ex.obj2id))
-    for p in preds
-        push!(eb, p)
-    end
-    construct(eb, kid)
-end
-
-
-# function encode_predicates(ex::MixedLRNN3, preds::Vector{NTuple{N,Int64}}, kid::Symbol) where {N}
-#     bags = [Int[] for _ in 1:length(ex.obj2id)]
-#     n = length(preds)
-#     xs = _map_tuple(Val{N}) do i
-#         ii = Vector{Int}(undef,n)
-#         for j in 1:n
-#             oi = preds[j][i]
-#             ii[j] = oi
-#             push!(bags[oi], j)
-#         end
-#         ArrayNode(KBEntry(kid, ii))
-#     end
-#     BagNode(ProductNode(xs), ScatteredBags(bags))
-# end
 
 function add_goalstate(ex::MixedLRNN3, problem, goal=goalstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
