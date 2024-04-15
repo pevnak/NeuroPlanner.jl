@@ -170,7 +170,7 @@ end
 function group_facts(ex::MixedLRNN2, facts::Vector{<:Term})
     ps = [k => Int[] for k in ex.multiarg_predicates]
     occurences = Dict(ps)
-    for (i,f) in enumerate(facts)
+    for (i, f) in enumerate(facts)
         f.name ∉ keys(occurences) && continue
         push!(occurences[f.name], i)
     end
@@ -179,13 +179,13 @@ end
 
 function group_facts_fast(ex::MixedLRNN2, facts::Vector{<:Term})
     occurences = falses(length(facts), length(ex.multiarg_predicates))
-    for (i,f) in enumerate(facts)
+    for (i, f) in enumerate(facts)
         # f.name ∉ keys(occurences) && continue
         f.name ∉ ex.multiarg_predicates && continue
         col = findfirst(==(f.name), ex.multiarg_predicates)
         occurences[i, col] = true
     end
-    _mapenumerate_tuple((col,k) -> k => (@view occurences[:,col]), ex.multiarg_predicates)
+    _mapenumerate_tuple((col, k) -> k => (@view occurences[:, col]), ex.multiarg_predicates)
 end
 
 # this is better
@@ -202,10 +202,20 @@ end
 function encode_predicates(ex::MixedLRNN2, pred_name::Symbol, preds, kid::Symbol)
     arity = length(ex.domain.predicates[pred_name].args)
     encode_predicates(ex, Val(arity), preds, kid)
+    # encode_predicates_comp(ex, Val(arity), preds, kid)
 end
 
 function encode_predicates(ex::MixedLRNN2, arity::Val{N}, preds, kid::Symbol) where {N}
     eb = EdgeBuilder(N, length(preds), length(ex.obj2id))
+    for p in preds
+        edge = _map_tuple(i -> ex.obj2id[p.args[i].name], arity)
+        push!(eb, edge)
+    end
+    construct(eb, kid)
+end
+
+function encode_predicates_comp(ex::MixedLRNN2, arity::Val{N}, preds, kid::Symbol) where {N}
+    eb = CompEdgeBuilder(N, length(preds), length(ex.obj2id))
     for p in preds
         edge = _map_tuple(i -> ex.obj2id[p.args[i].name], arity)
         push!(eb, edge)

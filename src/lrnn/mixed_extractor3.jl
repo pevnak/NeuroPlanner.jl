@@ -72,10 +72,10 @@ end
 
 function Base.show(io::IO, ex::MixedLRNN3)
     if !isspecialized(ex)
-        print(io, "Unspecialized extractor for ", ex.domain.name, " (", length(ex.nunanary_predicates), ", ", length(ex.multiarg_predicates), ")")
+        print(io, "Unspecialized MixedLRNN3 extractor for ", ex.domain.name, " (", length(ex.nunanary_predicates), ", ", length(ex.multiarg_predicates), ")")
     else
         g = hasgoal(ex) ? "with" : "without"
-        print(io, "Specialized extractor ", g, " goal for ", ex.domain.name, " (", length(ex.nunanary_predicates), ", ", length(ex.multiarg_predicates), ", ", length(ex.obj2id), ")")
+        print(io, "Specialized MixedLRNN3 extractor ", g, " goal for ", ex.domain.name, " (", length(ex.nunanary_predicates), ", ", length(ex.multiarg_predicates), ", ", length(ex.obj2id), ")")
     end
 end
 
@@ -169,19 +169,19 @@ end
 
 function group_facts(ex::MixedLRNN3, facts::Vector{<:Term})
     occurences = falses(length(facts), length(ex.multiarg_predicates))
-    for (i,f) in enumerate(facts)
+    for (i, f) in enumerate(facts)
         col = _inlined_search(f.name, ex.multiarg_predicates)
         col == -1 && continue
         occurences[i, col] = true
     end
 
-    _mapenumerate_tuple(ex.multiarg_predicates) do col,k
+    _mapenumerate_tuple(ex.multiarg_predicates) do col, k
         N = length(ex.domain.predicates[k].args)
-        k => factargs2id(ex, facts, (@view occurences[:,col]), Val(N))
+        k => factargs2id(ex, facts, (@view occurences[:, col]), Val(N))
     end
 end
 
-function factargs2id(ex::MixedLRNN3, facts, mask, arity::Val{N}) where N
+function factargs2id(ex::MixedLRNN3, facts, mask, arity::Val{N}) where {N}
     d = ex.obj2id
     o = Vector{NTuple{N,Int}}(undef, sum(mask))
     index = 1
@@ -193,11 +193,11 @@ function factargs2id(ex::MixedLRNN3, facts, mask, arity::Val{N}) where N
     end
     o
 end
-
 function multi_predicates(ex::MixedLRNN3, kid::Symbol, grouped_facts, prefix=nothing)
     # Then, we specify the predicates the dirty way
     ks = ex.multiarg_predicates
     xs = map(kii -> encode_predicates(ex, kii[2], kid), grouped_facts)
+    # xs = map(kii -> encode_predicates_comp(ex, kii[2], kid), grouped_facts)
     ns = isnothing(prefix) ? ks : _map_tuple(k -> Symbol(prefix, "_", k), ks)
     ProductNode(NamedTuple{ns}(xs))
 end
@@ -209,6 +209,15 @@ function encode_predicates(ex::MixedLRNN3, preds::Vector{NTuple{N,Int64}}, kid::
     end
     construct(eb, kid)
 end
+
+function encode_predicates_comp(ex::MixedLRNN3, preds::Vector{NTuple{N,Int64}}, kid::Symbol) where {N}
+    eb = CompEdgeBuilder(N, length(preds), length(ex.obj2id))
+    for p in preds
+        push!(eb, p)
+    end
+    construct(eb, kid)
+end
+
 
 # function encode_predicates(ex::MixedLRNN3, preds::Vector{NTuple{N,Int64}}, kid::Symbol) where {N}
 #     bags = [Int[] for _ in 1:length(ex.obj2id)]
