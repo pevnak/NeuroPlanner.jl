@@ -18,11 +18,10 @@ struct CompressedBags{T<:Integer} <: AbstractBags{T}
     end
 end
 
-Flux.@forward CompressedBags.bags Base.firstindex, Base.lastindex,
-Base.eachindex, Base.eltype
+Flux.@forward CompressedBags.bags Base.firstindex, Base.lastindex, Base.eachindex, Base.length, MLUtils.numobs
 
 Base.getindex(b::CompressedBags, i::Int) = view(b.indices, b.bags[i])
-Base.getindex(b::CompressedBags, I::AbstractUnitRange{<:Integer}) = [b[i] for i in I]
+Base.getindex(b::CompressedBags, I::AbstractUnitRange{<:Integer}) = [view(b.indices, b.bags[i]) for i in I]
 
 Base.first(b::CompressedBags) = b[1]
 function Base.first(b::CompressedBags, n::Int)
@@ -35,33 +34,16 @@ Base.last(b::CompressedBags) = b[end]
 function Base.last(b::CompressedBags, n::Int)
     n < 0 && throw(ArgumentError("Number of elements must be nonnegative"))
     n > length(b) && return b[1:end]
-    b[end-1:end]
+    b[end-n+1:end]
 end
 
-
-
-function Base.iterate(bags::CompressedBags, i=1)
-    i > length(bags.bags) && return (nothing)
-    bags[i], i + 1
+function Base.iterate(b::CompressedBags, i=1)
+    i > length(b) && return (nothing)
+    b[i], i + 1
 end
-
-MLUtils.numobs(b::CompressedBags) = length(b.bags)
-Base.length(b::CompressedBags) = length(b.bags)
 
 Base.mapreduce(f, op, b::CompressedBags) = mapreduce(f, op, b.indices)
 maxindex(b::CompressedBags) = isempty(b) ? -1 : b.num_observations
-
-
-
-
-
-"""
-Base.enumerate(b::CompressedBags)
-"""
-# function Base.enumerate(b::CompressedBags)
-# return Base.Iterators.enumerate(@view b.indices[range] for range in b.bags)
-# end
-
 
 
 """
@@ -82,8 +64,6 @@ CompressedBags() = CompressedBags(Vector{Int}(), Vector{UnitRange{Int}}(), 0)
 
 Construct a new [`CompressedBags`](@ref) struct from `Vector` `k` specifying the index of the bag each instance belongs to.
 
-
-TODO 
 
 # Examples
 ```jldoctest
@@ -111,19 +91,28 @@ This function takes two input vectors `k` and `counts`, where `k` represents the
 
 The function calculates the starting points of each bag based on the cumulative sum of `counts` and then creates bags for each bag using `map`. Finally, it initializes `vals` as a vector of uninitialized integers of length `n`.
 """
-function CompressedBags(ks::Vector{T}, counts::Vector{Int}, num_observations::Int) where {T<:Integer}
+function CompressedBags(ks::Vector{T}, counts::Vector{Int}, num_observations::Int, offset::Int) where {T<:Integer}
     ends = cumsum(counts)
     start = ends .- (counts .- 1)
     bags = map((x, y) -> x:y, start, ends)
-    indices = Vector{Int}(undef, length(ks))
 
-    for (i, k) in enumerate(ks)
-        # indices[start[k]] = i % num_observations == 0 ? num_observations : i % num_observations
-        indices[start[k]] = (i - 1) % num_observations + 1
-        start[k] += 1
+    ar = length(ks) == 0 ? 0 : Int(length(ks) / num_observations)
+    indices = Vector{Int}(undef, ar * offset)
+
+    for i in 1:ar
+        for j in 1:offset
+            k = ks[(i-1)*num_observations+j]
+            indices[start[k]] = (j - 1) % num_observations + 1
+            start[k] += 1
+        end
     end
+    # for (i, k) in enumerate(ks)
+    #     # indices[start[k]] = i % num_observations == 0 ? num_observations : i % num_observations
+    #     indices[start[k]] = (i - 1) % num_observations + 1
+    #     start[k] += 1
+    # end
 
-    CompressedBags(indices, bags, num_observations)
+    CompressedBags(indices, bags, offset)
 end
 
 """

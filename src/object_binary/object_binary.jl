@@ -107,15 +107,16 @@ end
 
 function encode_state(ex::ObjectBinary, state::GenericState, prefix=nothing)
     message_passes, residual = ex.model_params
-    # rename to feature vectors
+    grouped_facts = group_facts(ex, collect(PDDL.get_facts(state)))
     x = nunary_predicates(ex, state)
     kb = KnowledgeBase((; x1=x))
     n = size(x, 2)
     sₓ = :x1
+    edge_structure = multi_predicates(ex, :x1, grouped_facts, prefix)
     if !isempty(ex.multiarg_predicates)
         for i in 1:message_passes
             input_to_gnn = last(keys(kb))
-            ds = multi_predicates(ex, input_to_gnn, state, prefix)
+            ds = KBEntryRenamer(:x1, input_to_gnn)(edge_structure)
             kb = append(kb, layer_name(kb, "gnn"), ds)
             if residual !== :none #if there is a residual connection, add it 
                 kb = add_residual_layer(kb, keys(kb)[end-1:end], n)
@@ -125,6 +126,7 @@ function encode_state(ex::ObjectBinary, state::GenericState, prefix=nothing)
     s = last(keys(kb))
     kb = append(kb, :o, BagNode(ArrayNode(KBEntry(s, 1:n)), [1:n]))
 end
+
 
 """
 nunary_predicates(ex::ObjectBinary, state)
@@ -171,15 +173,43 @@ function nunary_predicates(ex::ObjectBinary, state)
 end
 
 
-function multi_predicates(ex::ObjectBinary, kid::Symbol, state, prefix=nothing)
+function multi_predicates(ex::ObjectBinary, kid::Symbol, grouped_facts, prefix=nothing)
     # Then, we specify the predicates the dirty way
     ks = ex.multiarg_predicates
-    xs = map(ks) do k
-        preds = filter(f -> f.name == k, get_facts(state))
-        encode_predicates(ex, k, preds, kid)
-    end
+    xs = map(kii -> encode_predicates(ex, kii[1], kii[2], kid), grouped_facts)
+    # xs = map(kii -> encode_predicates_compressed(ex, kii[2], kid), grouped_facts)
+
+    # xs = map(kii -> encode_predicates_comp(ex, kii[2], kid), grouped_facts)
     ns = isnothing(prefix) ? ks : _map_tuple(k -> Symbol(prefix, "_", k), ks)
     ProductNode(NamedTuple{ns}(xs))
+end
+
+
+function group_facts(ex::ObjectBinary, facts::Vector{<:Term})
+    occurences = falses(length(facts), length(ex.multiarg_predicates))
+    for (i, f) in enumerate(facts)
+        col = _inlined_search(f.name, ex.multiarg_predicates)
+        col == -1 && continue
+        occurences[i, col] = true
+    end
+
+    _mapenumerate_tuple(ex.multiarg_predicates) do col, k
+        N = length(ex.domain.predicates[k].args)
+        k => factargs2id(ex, facts, (@view occurences[:, col]), Val(N))
+    end
+end
+
+function factargs2id(ex::ObjectBinary, facts, mask, arity::Val{N}) where {N}
+    d = ex.obj2id
+    o = Vector{NTuple{N,Int}}(undef, sum(mask))
+    index = 1
+    for i in 1:length(mask)
+        mask[i] || continue
+        p = facts[i]
+        o[index] = _map_tuple(j -> d[p.args[j].name], arity)
+        index += 1
+    end
+    o
 end
 
 """
@@ -215,8 +245,8 @@ function encode_predicates(ex::ObjectBinary, pname::Symbol, preds, kid::Symbol)
     obj2id = ex.obj2id
 
     xs = Tuple{Int,Int}[]
-    for f in collect(preds)
-        es = [(obj2id[f.args[i].name], obj2id[f.args[j].name]) for i in 1:length(f.args)-1 for j in i+1:length(f.args)]
+    for f in preds
+        es = [(f[i], f[j]) for i in 1:length(f)-1 for j in i+1:length(f)]
         push!(xs, es...)
     end
 
@@ -233,6 +263,26 @@ function encode_predicates(ex::ObjectBinary, pname::Symbol, preds, kid::Symbol)
     end
 
     BagNode(x, ScatteredBags(bags))
+end
+
+function encode_predicates_comp(ex::ObjectBinary, preds::Vector{NTuple{N,Int64}}, kid::Symbol) where {N}
+    if length(preds) == 0
+        eb = CompEdgeBuilder(2, 0, length(ex.pairs))
+        return construct(eb, kid)
+    end
+
+    pred_length = Int(((N - 1) + 1) * (N - 1) / 2)
+    eb = CompEdgeBuilder(2, pred_length * length(preds), length(ex.obj2id))
+    for p in preds
+        for i in 1:length(p)-1
+            oᵢ = p[i]
+            for j in i+1:length(p)
+                oⱼ = p[j]
+                @inbounds push!(eb, (oᵢ, oⱼ))
+            end
+        end
+    end
+    construct(eb, kid)
 end
 
 function add_goalstate(ex::ObjectBinary, problem, goal=goalstate(ex.domain, problem))

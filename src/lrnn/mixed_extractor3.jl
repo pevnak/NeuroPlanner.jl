@@ -193,11 +193,11 @@ function factargs2id(ex::MixedLRNN3, facts, mask, arity::Val{N}) where {N}
     end
     o
 end
-
 function multi_predicates(ex::MixedLRNN3, kid::Symbol, grouped_facts, prefix=nothing)
     # Then, we specify the predicates the dirty way
     ks = ex.multiarg_predicates
     xs = map(kii -> encode_predicates(ex, kii[2], kid), grouped_facts)
+    # xs = map(kii -> encode_predicates_comp(ex, kii[2], kid), grouped_facts)
     ns = isnothing(prefix) ? ks : _map_tuple(k -> Symbol(prefix, "_", k), ks)
     ProductNode(NamedTuple{ns}(xs))
 end
@@ -209,6 +209,15 @@ function encode_predicates(ex::MixedLRNN3, preds::Vector{NTuple{N,Int64}}, kid::
     end
     construct(eb, kid)
 end
+
+function encode_predicates_comp(ex::MixedLRNN3, preds::Vector{NTuple{N,Int64}}, kid::Symbol) where {N}
+    eb = CompEdgeBuilder(N, length(preds), length(ex.obj2id))
+    for p in preds
+        push!(eb, p)
+    end
+    construct(eb, kid)
+end
+
 
 # function encode_predicates(ex::MixedLRNN3, preds::Vector{NTuple{N,Int64}}, kid::Symbol) where {N}
 #     bags = [Int[] for _ in 1:length(ex.obj2id)]
@@ -224,24 +233,6 @@ end
 #     end
 #     BagNode(ProductNode(xs), ScatteredBags(bags))
 # end
-
-function encode_predicates_2(ex::MixedLRNN3, preds::Vector{NTuple{N,Int64}}, kid::Symbol) where {N}
-    n = length(preds)
-    indices = Vector{Int}(undef, n * N)
-    counts = fill(0, length(ex.obj2id))
-    xs = _map_tuple(Val{N}) do i
-        ii = Vector{Int}(undef, n)
-        for j in 1:n
-            oi = preds[j][i]
-            ii[j] = oi
-            counts[oi] += 1
-            indices[(i-1)*n+j] = oi
-        end
-        ArrayNode(KBEntry(kid, ii))
-    end
-    BagNode(ProductNode(xs), CompressedBags(indices, counts, n))
-end
-
 
 function add_goalstate(ex::MixedLRNN3, problem, goal=goalstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)

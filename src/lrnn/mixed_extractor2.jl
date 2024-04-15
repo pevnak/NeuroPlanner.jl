@@ -202,10 +202,20 @@ end
 function encode_predicates(ex::MixedLRNN2, pred_name::Symbol, preds, kid::Symbol)
     arity = length(ex.domain.predicates[pred_name].args)
     encode_predicates(ex, Val(arity), preds, kid)
+    # encode_predicates_comp(ex, Val(arity), preds, kid)
 end
 
 function encode_predicates(ex::MixedLRNN2, arity::Val{N}, preds, kid::Symbol) where {N}
     eb = EdgeBuilder(N, length(preds), length(ex.obj2id))
+    for p in preds
+        edge = _map_tuple(i -> ex.obj2id[p.args[i].name], arity)
+        push!(eb, edge)
+    end
+    construct(eb, kid)
+end
+
+function encode_predicates_comp(ex::MixedLRNN2, arity::Val{N}, preds, kid::Symbol) where {N}
+    eb = CompEdgeBuilder(N, length(preds), length(ex.obj2id))
     for p in preds
         edge = _map_tuple(i -> ex.obj2id[p.args[i].name], arity)
         push!(eb, edge)

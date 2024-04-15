@@ -23,10 +23,10 @@ initproblem(ex, problem; add_goal = true)
 
 Specialize extractor for the given problem instance and return init state 
 """
-function initproblem(ex, problem; add_goal = true)
-	ex = specialize(ex, problem)
-	pddle = add_goal ? add_goalstate(ex, problem) : ex
-	pddle, initstate(ex.domain, problem)
+function initproblem(ex, problem; add_goal=true)
+    ex = specialize(ex, problem)
+    pddle = add_goal ? add_goalstate(ex, problem) : ex
+    pddle, initstate(ex.domain, problem)
 end
 export initproblem
 
@@ -45,13 +45,15 @@ include("relational/mha.jl")
 export MultiheadAttention
 include("relational/renamer.jl")
 include("relational/edgebuilder.jl")
+include("relational/compressed_edgebuilder.jl")
+export EdgeBuilder, CompEdgeBuilder
 
 # a basic architecture based on hyper-graph representatation of predicates
 include("lrnn/pure_extractor.jl")
 include("lrnn/mixed_extractor.jl")
 include("lrnn/mixed_extractor2.jl")
 include("lrnn/mixed_extractor3.jl")
-export MixedLRNN, MixedLRNN2, MixedLRNN3, LRNN 
+export MixedLRNN, MixedLRNN2, MixedLRNN3, LRNN
 
 # Object Binary structures by Sira and Horcik
 include("object_binary/object_binary.jl")
