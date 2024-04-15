@@ -21,6 +21,14 @@ function CompEdgeBuilder(arity::Int, num_observations::Int, numobs::Int)
     CompEdgeBuilder(indices, counts, arity, num_observations, offset)
 end
 
+
+function CompEdgeBuilder(::Val{arity}, num_observations::Int, numobs::Int) where {arity}
+    indices = Vector{Int}(undef, arity * num_observations)
+    counts = fill(0, numobs)
+    offset = 0
+    CompEdgeBuilder(indices, counts, arity, num_observations, offset)
+end
+
 function Base.push!(eb::CompEdgeBuilder, vertices::NTuple{N,I}) where {N,I<:Integer}
     eb.offset += 1
     _mapenumerate_tuple(vertices) do i, vᵢ

@@ -171,8 +171,10 @@ function encode_edges(ex::AtomBinary, atoms, kid::Symbol)
     l = length(atoms)
     capacity = l * (l + 1) ÷ 2
     symdiff_offset = ex.max_arity^2 + 1
-    ebs = tuple([EdgeBuilder(Val(2), capacity, l) for _ in 1:ex.max_arity^2]...)
-    sbs = EdgeBuilder(Val(2), capacity, l)
+    ebs = tuple([CompEdgeBuilder(2, capacity, l) for _ in 1:ex.max_arity^2]...)
+    sbs = CompEdgeBuilder(2, capacity, l)
+    # ebs = tuple([EdgeBuilder(Val(2), capacity, l) for _ in 1:ex.max_arity^2]...)
+    # sbs = EdgeBuilder(Val(2), capacity, l)
     for i in 1:length(atoms) # Can be replaced with Combinatorics.atoms
         sa = set_atoms[i]
         for j in 2:length(atoms)

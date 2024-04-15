@@ -50,7 +50,7 @@ struct ObjectPair{DO,D,MP,DV,DUV,DT,V,S,G}
 
         @assert issubset((:message_passes, :residual), keys(model_params)) "Parameters of the model are not fully specified"
         @assert (init === nothing || goal === nothing) "Fixing init and goal state is bizzaare, as the extractor would always create a constant"
-        new{DO,D,MP,DV,DUV,DT,TD,V,S,G}(domain, multiarg_predicates, unary_predicates, nullary_predicates, objtype2id, constmap, model_params,
+        new{DO,D,MP,DV,DUV,DT,V,S,G}(domain, multiarg_predicates, unary_predicates, nullary_predicates, objtype2id, constmap, model_params,
             obj2id, obj2pid, obj2upid, pair2pid, pairs, init, goal)
     end
 end
