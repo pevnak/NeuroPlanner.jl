@@ -126,7 +126,7 @@ arch_name = "objectpair"
 	Random.seed!(seed)
 	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, dense_dim, dense_layers, residual, seed)
 	@show settings
-	archs = Dict("objectbinary" => ObjectBinary, "objectpair" => ObjectPair, "asnet" => ASNet, "lrnn" => LRNN, "mixedlrnn2" => MixedLRNN2, "mixedlrnn3" => MixedLRNN3, "mixedlrnn" => MixedLRNN, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
+	archs = Dict("objectbinary" => ObjectBinary, "atombinary" => AtomBinary, "objectpair" => ObjectPair, "asnet" => ASNet, "lrnn" => LRNN, "mixedlrnn2" => MixedLRNN2, "mixedlrnn3" => MixedLRNN3, "mixedlrnn" => MixedLRNN, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
 	residual = Symbol(residual)
 	domain_pddl, problem_files = getproblem(domain_name, false)
 	# problem_files = filter(s -> isfile(plan_file(domain_name, s)), problem_files)
