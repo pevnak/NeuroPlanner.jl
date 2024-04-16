@@ -146,8 +146,8 @@ function encode_edges(ex::AtomBinary, atoms::Vector{Julog.Term}, kid::Symbol)
     id2atoms = _id2atoms(ex, set_atoms)
     l = length(set_atoms)
     capacity = l * (l + 1) ÷ 2
-    ebs = tuple([EdgeBuilder(2, capacity, l) for _ in 1:ex.max_arity^2]...)
-    sbs = tuple([EdgeBuilder(2, ex.max_arity*capacity, l) for _ in 1:length(ex.actionmap)]...)
+    ebs = tuple([EdgeBuilderCompMat(2, capacity, l) for _ in 1:ex.max_arity^2]...)
+    sbs = tuple([EdgeBuilderCompMat(2, ex.max_arity*capacity, l) for _ in 1:length(ex.actionmap)]...)
     encode_edges(ebs, sbs, ex, kid, set_atoms, id2atoms)
 end
 
