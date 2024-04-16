@@ -206,7 +206,7 @@ function encode_predicates(ex::MixedLRNN2, pred_name::Symbol, preds, kid::Symbol
 end
 
 function encode_predicates(ex::MixedLRNN2, arity::Val{N}, preds, kid::Symbol) where {N}
-    eb = CompEdgeBuilder(N, length(preds), length(ex.obj2id))
+    eb = EdgeBuilderCompMat(N, length(preds), length(ex.obj2id))
     for p in preds
         edge = _map_tuple(i -> ex.obj2id[p.args[i].name], arity)
         push!(eb, edge)

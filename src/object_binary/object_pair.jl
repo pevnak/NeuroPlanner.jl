@@ -260,13 +260,20 @@ function encode_edges(ex::ObjectPair, kid::Symbol, state, prefix=nothing)
 Creates ProductNode of named BagNodes each representing one labeled edge in multigraph.
 """
 function encode_edges(ex::ObjectPair, kid::Symbol, grouped_facts, prefix=nothing)
-    # name, edges = encode_E_edges(ex, kid; prefix=prefix)
-    name, edges_bn, E_eb = encode_E_edges_comp(ex, kid; prefix=prefix)
+    name, edges_bn, E_eb = encode_E_edges(ex, kid; prefix=prefix)
 
+    pids, bags = prepare_pids(ex, E_eb)
+
+    ns, xs = multi_predicates(ex, kid, grouped_facts, pids, bags, prefix)
+
+    ProductNode(NamedTuple{(name, ns...)}((edges_bn, xs...)))
+end
+
+function prepare_pids(ex::ObjectPair, eb::EdgeBuilderCompMat)
     counts = fill(0, length(ex.pairs))
-    pids = Vector{Int}(undef, E_eb.num_observations)
+    pids = Vector{Int}(undef, eb.num_observations)
 
-    for pid in E_eb.indices[1:E_eb.num_observations]
+    for pid in eb.indices[1:eb.num_observations]
         counts[pid] += 1
     end
 
@@ -274,14 +281,11 @@ function encode_edges(ex::ObjectPair, kid::Symbol, grouped_facts, prefix=nothing
     start = ends .- (counts .- 1)
     bags = map((x, y) -> x:y, start, ends)
 
-    for (i, pid) in enumerate(E_eb.indices[1:E_eb.num_observations])
-        pids[start[pid]] = E_eb.indices[E_eb.num_observations+i]
+    for (i, pid) in enumerate(eb.indices[1:eb.num_observations])
+        pids[start[pid]] = eb.indices[eb.num_observations+i]
         start[pid] += 1
     end
-
-    ns, xs = multi_predicates(ex, kid, grouped_facts, E_eb, pids, bags, prefix)
-
-    ProductNode(NamedTuple{(name, ns...)}((edges_bn, xs...)))
+    return (pids, bags)
 end
 
 """
@@ -289,16 +293,16 @@ function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
 
 Encodes `E` Edges, which connect two pairs of object if and only if size of conjunction of their objects is equal to 1.
 """
-function encode_E_edges_comp(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
+function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
     n = Int((1 + (length(ex.obj2id) - 1)) * (length(ex.obj2id) - 1) / 2) * length(ex.obj2pid)
-    eb = CompEdgeBuilder(2, n, length(ex.pairs))
+    eb = EdgeBuilderCompMat(2, n, length(ex.pairs))
 
     for pairs in values(ex.obj2upid)
         for i in eachindex(pairs)
             pidᵢ = pairs[i]
             for j in i+1:length(pairs)
                 pidⱼ = pairs[j]
-                @inbounds push!(eb, (pidᵢ, pidⱼ))
+                push!(eb, (pidᵢ, pidⱼ))
             end
         end
     end
@@ -324,7 +328,7 @@ function group_facts(ex::ObjectPair, facts::Vector{<:Term})
 end
 
 function factargs2id(ex::ObjectPair, facts, mask, arity::Val{N}) where {N}
-    d = ex.obj2id
+    # d = ex.obj2id
     o = Vector{NTuple{N,Symbol}}(undef, sum(mask))
     index = 1
     for i in 1:length(mask)
@@ -343,11 +347,10 @@ function multi_predicates(ex::ObjectPair, kid::Symbol, state, prefix=nothing)
 
 Encodes predicates with arity greater than 1 to edges that connect pairs of objects whose objects are related by given predicate.
 """
-function multi_predicates(ex::ObjectPair, kid::Symbol, grouped_facts, E_eb::CompEdgeBuilder, pids::Vector{Int}, bags::Vector{UnitRange{Int64}}, prefix=nothing)
+function multi_predicates(ex::ObjectPair, kid::Symbol, grouped_facts, pids::Vector{Int}, bags::Vector{UnitRange{Int64}}, prefix=nothing)
     # Then, we specify the predicates the dirty way
     ks = tuple(collect(keys(ex.multiarg_predicates))...)
-    xs = map(kii -> encode_predicates(ex, kii[2], kid), grouped_facts)
-    # xs = map(kii -> encode_predicates_comb(ex, kii[2], E_eb, pids, bags, kid), grouped_facts)
+    xs = map(kii -> encode_predicates(ex, kii[2], pids, bags, kid), grouped_facts)
     ns = isnothing(prefix) ? ks : _map_tuple(k -> Symbol(prefix, "_", k), ks)
     (ns, xs)
 end
@@ -367,56 +370,18 @@ This function encodes predicates for binary relations.
 # Returns
 - `BagNode`: A bag node containing the encoded predicates.
 """
-function encode_predicates(ex::ObjectPair, preds, kid::Symbol)
-    bags = fill(Int[], length(ex.pairs))
-    if isempty(preds)
-        x = ProductNode((
-            ArrayNode(KBEntry(kid, Int[])),
-            ArrayNode(KBEntry(kid, Int[])),
-        ))
-        return BagNode(x, ScatteredBags(bags))
-    end
 
-    max_length = length(preds) * length(ex.obj2id) * length(ex.obj2id)
-    ii₁ = Vector{Int}(undef, max_length)
-    ii₂ = Vector{Int}(undef, max_length)
-    offset = 0
-    for f in preds
-        xs = ex.obj2upid[f.args[1].name]
-        ys = ex.obj2upid[f.args[2].name]
-        for (x, y) in Iterators.product(xs, ys)
-            x == y && continue
-            offset += 1
-            ii₁[offset] = x
-            ii₂[offset] = y
-            push!(bags[x], offset)
-            push!(bags[y], offset)
-        end
-    end
-
-    x = ProductNode((
-        ArrayNode(KBEntry(kid, ii₁[1:offset])),
-        ArrayNode(KBEntry(kid, ii₂[1:offset])),
-    ))
-    BagNode(x, ScatteredBags(bags))
-end
-
-function encode_predicates_comb(ex::ObjectPair, preds, E_eb::CompEdgeBuilder, pids::Vector{Int}, bags::Vector{UnitRange{Int}}, kid::Symbol)
-    if length(preds) == 0
-        eb = CompEdgeBuilder(2, 0, length(ex.pairs))
-        return construct(eb, kid)
-    end
-
-    max_length = E_eb.num_observations * length(preds)
-    eb = CompEdgeBuilder(2, max_length, length(ex.pairs))
+function encode_predicates(ex::ObjectPair, preds, pids::Vector{Int}, bags::Vector{UnitRange{Int}}, kid::Symbol)
+    max_length = length(pids) * length(preds)
+    eb = EdgeBuilderCompMat(2, max_length, length(ex.pairs))
 
     for f in preds
         xs = ex.obj2upid[f[1]]
         ys = ex.obj2upid[f[2]]
         for (x, y) in Iterators.product(xs, ys)
             x == y && continue
-            y in view(pids, bags[x]) || x in view(pids, bags[y]) || continue
-            @inbounds push!(eb, (x, y))
+            y ∈ view(pids, bags[x]) || x ∈ view(pids, bags[y]) || continue
+            push!(eb, (x, y))
         end
     end
     construct(eb, kid)

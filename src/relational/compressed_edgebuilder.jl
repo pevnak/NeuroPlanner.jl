@@ -41,3 +41,4 @@ function construct(eb::CompEdgeBuilder, input_sym::Symbol)
     xs = Tuple([ArrayNode(KBEntry(input_sym, eb.indices[(i-1)*eb.offset+1:i*eb.offset])) for i in 1:eb.arity])
     CompressedBagNode(ProductNode(xs), CompressedBags(eb.indices, eb.counts, eb.num_observations, eb.offset))
 end
+

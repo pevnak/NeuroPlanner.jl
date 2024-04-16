@@ -225,9 +225,10 @@ Returns:
 
 This function encodes predicates for an ObjectBinary instance using the given predicate name, predicates, and key ID.
 """
+
 function encode_predicates(ex::ObjectBinary, preds::Vector{NTuple{N,Int64}}, kid::Symbol) where {N}
     pred_length = Int(((N - 1) + 1) * (N - 1) / 2)
-    eb = CompEdgeBuilder(2, pred_length * length(preds), length(ex.obj2id))
+    eb = EdgeBuilderComp(2, pred_length * length(preds), length(ex.obj2id))
     for p in preds
         for i in 1:length(p)-1
             oᵢ = p[i]
