@@ -118,7 +118,7 @@ max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layer
 domain_name = "ipc23_miconic"
 loss_name = "lstar"
 loss_name = "l2"
-arch_name = "objectpair"
+arch_name = "atombinary"
 """
 
 @main function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
@@ -135,7 +135,7 @@ arch_name = "objectpair"
 	fminibatch = NeuroPlanner.minibatchconstructor(loss_name)
 	hnet = archs[arch_name]
 
-	filename = joinpath("super_amd", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+	filename = joinpath("super_amd_fast", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
 	@show filename
 	experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch; max_steps, max_time, graph_layers, residual, dense_layers, dense_dim, settings)
 end

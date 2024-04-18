@@ -155,32 +155,6 @@ function vitek_table(df, k, high; max_time = 30, backend = Val(:text))
 	da
 end
 
-function collect_stats()
-	max_steps = 10_000
-	max_time = 30
-	dense_layers = 2
-	seed = 1
-	dry_run = true
-	problems = ["blocks","ferry","npuzzle","spanner","elevators_00"]
-	stats = map(Iterators.product(("hgnn","hgnnlite","pddl","asnet"), ("bellman", "lstar", "l2", "lrt", "lgbfs",), problems, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
-		# submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
-		read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
-	end |> vec
-
-	amd_stats = map(Iterators.product(("mixedlrnn",), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
-		submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
-	end |> vec
-
-	lstats = map(Iterators.product(("levinasnet",), ("levinloss",), problems, (4, 8, 16), (1, 2, 3), (:none, :linear, :dense), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
-		# submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
-		read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed)
-	end |> vec;
-
-	df = reduce(vcat, filter(!isempty, vec(vcat(stats, lstats))))
-	df = CSV.read("super/results.csv", DataFrame)
-	df
-end
-
 function show_vitek()
 	max_steps = 10_000
 	max_time = 30
@@ -197,20 +171,20 @@ function show_vitek()
 	seed = 2
 	problems = ["blocks","ferry","npuzzle","spanner","elevators_00"]
 
-	# map(Iterators.product(("objectpair",), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
-	# 	submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
+	# map(Iterators.product(("atombinary",), ("lstar", "l2"), IPC_PROBLEMS, (4, 16, 64), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
+	# 	submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_fast")
 	# end |> vec |> mean
 
 	# amd_stats = map(Iterators.product(("objectbinary",), ("lstar", "l2"), ("ipc23_rovers","ipc23_childsnack"), (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
-	# 	submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
+	# 	submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_fast")
 	# end |> vec |> mean
 
 	# amd_stats = map(Iterators.product(("mixedlrnn2",), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3))) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
-	# 	submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd")
+	# 	submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_fast")
 	# end |> vec |> mean
 
 	
-	df = isfile("super_amd/results.csv") ? CSV.read("super_amd/results.csv", DataFrame) :  DataFrame()
+	df = isfile("super_amd_fast/results.csv") ? CSV.read("super_amd_fast/results.csv", DataFrame) :  DataFrame()
 
 	cases = Iterators.product(("objectpair","objectbinary","lrnn", "mixedlrnn", "mixedlrnn2", "mixedlrnn3", "asnet"), ("lstar", "l2"), IPC_PROBLEMS, (4, 8, 16), (1, 2, 3), (:none, :linear), (1, 2, 3));
 	if !isempty(df)
@@ -219,7 +193,7 @@ function show_vitek()
 	end;
 
 	amd_stats = map(cases) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
-		read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir="super_amd")
+		read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir="super_amd_fast")
 	end |> vec;
 	amd_stats = filter(!isempty, amd_stats)
 	if !isempty(amd_stats)
@@ -227,11 +201,11 @@ function show_vitek()
 		println("adding results from following architectures: ",unique(dff.arch_name))
 
 		df = isempty(df) ? dff : vcat(df, dff);
-		CSV.write("super_amd/results.csv", df)
+		CSV.write("super_amd_fast/results.csv", df)
 	end
 
 	df1 = vitek_table(df, :tst_solved, highlight_max);
-	highlight_table(rdf)
+	# highlight_table(rdf)
 
 	# df1 = filter(r -> r.arch_name == "mixedlrnn" && r.planner == "AStarPlanner", df)
 	# df2 = filter(r -> r.arch_name == "mixedlrnn2" && r.planner == "AStarPlanner", df)

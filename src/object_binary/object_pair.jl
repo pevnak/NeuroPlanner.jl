@@ -169,7 +169,6 @@ function encode_state(ex::ObjectPair, state::GenericState, prefix=nothing)
     if !isempty(ex.multiarg_predicates)
         for i in 1:message_passes
             input_to_gnn = last(keys(kb))
-            # ds = encode_edges(ex, input_to_gnn, state, prefix)
             ds = KBEntryRenamer(:x1, input_to_gnn)(edge_structure)
             kb = append(kb, layer_name(kb, "gnn"), ds)
             if residual !== :none #if there is a residual connection, add it 

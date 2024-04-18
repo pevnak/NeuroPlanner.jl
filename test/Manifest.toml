@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.1"
+julia_version = "1.10.2"
 manifest_format = "2.0"
 project_hash = "2c397cf2930db1fc400d78a3323cf044a4679724"
 
@@ -713,7 +713,7 @@ uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
 
 [[deps.NeuroPlanner]]
-deps = ["Accessors", "ChainRulesCore", "Combinatorics", "Compose", "DataStructures", "Flux", "Graphs", "HierarchicalUtils", "Julog", "LinearAlgebra", "MLUtils", "Mill", "OneHotArrays", "PDDL", "Parameters", "Statistics", "StatsBase", "SymbolicPlanners"]
+deps = ["Accessors", "ChainRulesCore", "Combinatorics", "Compose", "DataStructures", "Flux", "Graphs", "HierarchicalUtils", "Julog", "LinearAlgebra", "MLUtils", "Mill", "OneHotArrays", "PDDL", "Parameters", "StaticBitSets", "Statistics", "StatsBase", "SymbolicPlanners"]
 path = ".."
 uuid = "628e68bf-2596-4972-a53b-69fd3c43dbca"
 version = "0.1.0"
@@ -970,6 +970,11 @@ weakdeps = ["ChainRulesCore", "Statistics"]
 git-tree-sha1 = "36b3d696ce6366023a0ea192b4cd442268995a0d"
 uuid = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
 version = "1.4.2"
+
+[[deps.StaticBitSets]]
+git-tree-sha1 = "8dd696134184782aa9327b0d9c4696229e60957a"
+uuid = "72d6c30d-a10b-4e7e-bc09-3079d9530bdf"
+version = "0.1.0"
 
 [[deps.Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]

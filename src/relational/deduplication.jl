@@ -114,8 +114,8 @@ function _deduplicate(kb::KnowledgeBase, ds::ArrayNode{<:KBEntry})
 	dedu_ds, ii
 end
 
-_sethash(xs::AbstractVector) = sum(hash.(xs)) # this might be good enough for the bang
-# _sethash(xs::AbstractVector) = hash(sort(xs)) # this probably more correct
+# _sethash(xs::AbstractVector) = sum(hash.(xs)) # this might be good enough for the bang
+_sethash(xs::AbstractVector) = hash(sort(xs)) # this probably more correct
 
 function _deduplicate(kb::KnowledgeBase, ds::BagNode)
 	if numobs(ds.data) == 0 
