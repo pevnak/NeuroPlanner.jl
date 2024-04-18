@@ -167,16 +167,6 @@ function nunary_predicates(ex::MixedLRNN2, state)
     x
 end
 
-function group_facts(ex::MixedLRNN2, facts::Vector{<:Term})
-    ps = [k => Int[] for k in ex.multiarg_predicates]
-    occurences = Dict(ps)
-    for (i, f) in enumerate(facts)
-        f.name ∉ keys(occurences) && continue
-        push!(occurences[f.name], i)
-    end
-    occurences
-end
-
 function group_facts_fast(ex::MixedLRNN2, facts::Vector{<:Term})
     occurences = falses(length(facts), length(ex.multiarg_predicates))
     for (i, f) in enumerate(facts)
