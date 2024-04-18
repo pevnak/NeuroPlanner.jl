@@ -51,9 +51,7 @@ export EdgeBuilder, EdgeBuilderComp, EdgeBuilderCompMat
 
 # a basic architecture based on hyper-graph representatation of predicates
 include("lrnn/pure_extractor.jl")
-include("lrnn/mixed_extractor.jl")
-include("lrnn/mixed_extractor2.jl")
-export MixedLRNN, MixedLRNN2, ObjectAtom, LRNN
+export LRNN
 
 # Object Binary structures by Sira and Horcik
 include("object_binary/object_binary.jl")

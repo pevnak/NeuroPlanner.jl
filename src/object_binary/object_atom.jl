@@ -108,10 +108,6 @@ function encode_state(ex::ObjectAtom, state::GenericState, prefix=nothing)
     n = size(x, 2)
     sₓ = :x1
     edge_structure = multi_predicates(ex, :x1, grouped_facts, prefix)
-    # ds = KBEntryRenamer(:x1, :x1)(edge_structure)
-    # kb = append(kb, layer_name(kb, "gnn"), ds)
-    # ds = KBEntryRenamer(:x1, :gnn_2)(edge_structure)
-    # kb = append(kb, layer_name(kb, "gnn"), ds)
     if !isempty(ex.multiarg_predicates)
         for i in 1:message_passes
             input_to_gnn = last(keys(kb))
