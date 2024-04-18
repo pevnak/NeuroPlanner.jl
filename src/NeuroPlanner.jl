@@ -53,14 +53,14 @@ export EdgeBuilder, EdgeBuilderComp, EdgeBuilderCompMat
 include("lrnn/pure_extractor.jl")
 include("lrnn/mixed_extractor.jl")
 include("lrnn/mixed_extractor2.jl")
-include("lrnn/mixed_extractor3.jl")
-export MixedLRNN, MixedLRNN2, MixedLRNN3, LRNN
+export MixedLRNN, MixedLRNN2, ObjectAtom, LRNN
 
 # Object Binary structures by Sira and Horcik
 include("object_binary/object_binary.jl")
 include("object_binary/atom_binary.jl")
 include("object_binary/object_pair.jl")
-export ObjectBinary, AtomBinary, ObjectPair
+include("object_binary/object_atom.jl")
+export ObjectBinary, AtomBinary, ObjectAtom, ObjectPair
 
 # ASNet and HGNN by Silvia
 include("asnets/extractor.jl")

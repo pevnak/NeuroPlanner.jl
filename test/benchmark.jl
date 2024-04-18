@@ -76,14 +76,14 @@ function benchmark_domain_arch(archs, domain_name)
 	end
 end
 
-archs = [ObjectBinary, MixedLRNN2, MixedLRNN3, AtomBinary, ObjectPair]
+archs = [ObjectBinary, MixedLRNN2, ObjectAtom, AtomBinary, ObjectPair]
 data = map(problem -> benchmark_domain_arch(archs, problem), setdiff(IPC_PROBLEMS,["ipc23_sokoban"]))
 df = DataFrame(reduce(vcat, data))
 gdf = DataFrames.groupby(df, ["domain_name"])
 combine(gdf) do sub_df 
 	 (;ObjectBinary = round(1e6*mean(sub_df.ObjectBinary), digits = 1),
 	 	MixedLRNN2 = round(1e6*mean(sub_df.MixedLRNN2), digits = 1), 
-	 	MixedLRNN3 = round(1e6*mean(sub_df.MixedLRNN3), digits = 1), 
+	 	ObjectAtom = round(1e6*mean(sub_df.ObjectAtom), digits = 1), 
 	 	AtomBinary = round(1e6*mean(sub_df.AtomBinary), digits = 1),
 	 	ObjectPair = round(1e6*mean(sub_df.ObjectPair), digits = 1),
 	 )
@@ -91,7 +91,7 @@ end
 
 # f0a267e17a8bce06bd0f88233902279471f6f605
 # EdgeBuilderComp on M3 in μs with a HMGNNnetwork with config (graph_layers = 2, dense_dim = 16, dense_layers = 2, residual = "none")
-#  Row │ domain_name        ObjectBinary  MixedLRNN2  MixedLRNN3  AtomBinary  ObjectPair
+#  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary  ObjectPair
 #      │ String             Float64       Float64     Float64     Float64     Float64
 # ─────┼─────────────────────────────────────────────────────────────────────────────────
 #    1 │ ipc23_ferry                44.1        33.3        31.6       141.8  16597.2
@@ -108,7 +108,7 @@ end
 
 # f0a267e17a8bce06bd0f88233902279471f6f605
 # EdgeBuilderComp on M3 in μs
-#  Row │ domain_name        ObjectBinary  MixedLRNN2  MixedLRNN3  AtomBinary  ObjectPair
+#  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary  ObjectPair
 #      │ String             Float64       Float64     Float64     Float64     Float64
 # ─────┼─────────────────────────────────────────────────────────────────────────────────
 #    1 │ ipc23_ferry                 9.7         9.7         9.2        45.1       305.8
@@ -125,7 +125,7 @@ end
 
 # f0a267e17a8bce06bd0f88233902279471f6f605
 # EdgeBuilderCompMat on M3 in μs
-#  Row │ domain_name        ObjectBinary  MixedLRNN2  MixedLRNN3  AtomBinary
+#  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary
 #      │ String             Float64       Float64     Float64     Float64
 # ─────┼─────────────────────────────────────────────────────────────────────
 #    1 │ ipc23_ferry                10.6         9.4         8.6        53.8
@@ -140,7 +140,7 @@ end
 #   10 │ ipc23_transport            28.7        46.0        29.6       213.0
 
 # [vitek ce6a7bf] ScatteredBags on M3 in μs
-#  Row │ domain_name        ObjectBinary  MixedLRNN2  MixedLRNN3  AtomBinary
+#  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary
 #      │ String             Float64       Float64     Float64     Float64
 # ─────┼─────────────────────────────────────────────────────────────────────
 #    1 │ ipc23_ferry                18.0        14.2        13.0        94.4
