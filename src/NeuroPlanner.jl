@@ -40,7 +40,8 @@ include("relational/knowledge_base.jl")
 include("relational/knowledge_model.jl")
 export KBEntry, KnowledgeBase, append
 include("relational/deduplication.jl")
-export deduplicate
+include("relational/coloring.jl")
+export deduplicate, color
 include("relational/dedu_matrix.jl")
 include("relational/mha.jl")
 export MultiheadAttention

@@ -27,7 +27,7 @@ vertex corresponding to the hyper-edge and its vertices.
 --- `objtype2id` maps unary predicates to an index in one-hot encoded vertex' properties 
 --- `constmap` maps constants to an index in one-hot encoded vertex' properties 
 --- `model_params` some parameters of an algorithm constructing the message passing passes 
-"""
+"""     
 struct ObjectAtom{DO,D,N,MP,S,G}
     domain::DO
     multiarg_predicates::NTuple{N,Symbol}
