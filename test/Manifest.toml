@@ -713,7 +713,7 @@ uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
 
 [[deps.NeuroPlanner]]
-deps = ["Accessors", "ChainRulesCore", "Combinatorics", "Compose", "DataStructures", "Flux", "Graphs", "HierarchicalUtils", "Julog", "LinearAlgebra", "MLUtils", "Mill", "OneHotArrays", "PDDL", "Parameters", "StaticBitSets", "Statistics", "StatsBase", "SymbolicPlanners"]
+deps = ["Accessors", "ChainRulesCore", "Combinatorics", "Compose", "DataStructures", "Flux", "Graphs", "HierarchicalUtils", "Julog", "LinearAlgebra", "MLUtils", "Mill", "OneHotArrays", "PDDL", "Parameters", "SparseArrays", "StaticBitSets", "Statistics", "StatsBase", "SymbolicPlanners"]
 path = ".."
 uuid = "628e68bf-2596-4972-a53b-69fd3c43dbca"
 version = "0.1.0"

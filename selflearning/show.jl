@@ -100,8 +100,8 @@ function read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, gra
 end
 
 function vitek_table(df, k, high; max_time = 30, backend = Val(:text))
-	df = filter(r -> r.planner == "AStarPlanner" && r.loss_name == "l2", df)
-	# df = filter(r -> r.planner == "AStarPlanner" && r.loss_name == "lstar", df)
+	# df = filter(r -> r.planner == "AStarPlanner" && r.loss_name == "l2", df)
+	df = filter(r -> r.planner == "AStarPlanner" && r.loss_name == "lstar", df)
 	ds = compute_stats(df;max_time)
 	gdf = DataFrames.groupby(ds, [:domain_name, :arch_name])
 	dfs = combine(gdf) do sub_df
@@ -124,8 +124,8 @@ function vitek_table(df, k, high; max_time = 30, backend = Val(:text))
 end
 
 function finished(df; max_time = 30)
-	df = filter(r -> r.planner == "AStarPlanner" && r.loss_name == "l2", df)
-	# df = filter(r -> r.planner == "AStarPlanner" && r.loss_name == "lstar", df)
+	# df = filter(r -> r.planner == "AStarPlanner" && r.loss_name == "l2", df)
+	df = filter(r -> r.planner == "AStarPlanner" && r.loss_name == "lstar", df)
 	ds = compute_stats(df;max_time)
 	gdf = DataFrames.groupby(ds, [:domain_name, :arch_name])
 	dfs = combine(gdf) do sub_df
@@ -184,7 +184,7 @@ function show_vitek()
 		CSV.write("super_amd_fast/results.csv", df)
 	end
 
-	# finished(df);
+	finished(df);
 	vitek_table(df, :tst_solved, highlight_max);
 end
 show_vitek();

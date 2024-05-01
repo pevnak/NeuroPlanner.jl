@@ -2,7 +2,7 @@
 
 julia_version = "1.10.2"
 manifest_format = "2.0"
-project_hash = "df950cee7315f0757cdb7c61519859c3d13a8285"
+project_hash = "76e521a8846ac9850c0cf8a12cfb8d62648055c1"
 
 [[deps.ATK_jll]]
 deps = ["Artifacts", "Glib_jll", "JLLWrappers", "Libdl"]
@@ -762,6 +762,18 @@ git-tree-sha1 = "bf36f528eec6634efc60d7ec062008f171071434"
 uuid = "88015f11-f218-50d7-93a8-a6af411a945d"
 version = "3.0.0+1"
 
+[[deps.LIBLINEAR]]
+deps = ["Libdl", "SparseArrays", "liblinear_jll"]
+git-tree-sha1 = "81e40115c23acca9dfa30944050096b958271e5a"
+uuid = "2d691ee1-e668-5016-a719-b2531b85e0f5"
+version = "0.6.0"
+
+[[deps.LIBSVM]]
+deps = ["LIBLINEAR", "LinearAlgebra", "ScikitLearnBase", "SparseArrays", "libsvm_jll"]
+git-tree-sha1 = "a5e607649aeb9ae3bbde19dc629faaa3b3d8955d"
+uuid = "b1bec4e5-fd48-53fe-b0cb-9723c09d164b"
+version = "0.8.0"
+
 [[deps.LLVM]]
 deps = ["CEnum", "LLVMExtra_jll", "Libdl", "Preferences", "Printf", "Requires", "Unicode"]
 git-tree-sha1 = "ab01dde107f21aa76144d0771dccc08f152ccac7"
@@ -1048,7 +1060,7 @@ uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
 
 [[deps.NeuroPlanner]]
-deps = ["Accessors", "ChainRulesCore", "Combinatorics", "Compose", "DataStructures", "Flux", "Graphs", "HierarchicalUtils", "Julog", "LinearAlgebra", "MLUtils", "Mill", "OneHotArrays", "PDDL", "Parameters", "StaticBitSets", "Statistics", "StatsBase", "SymbolicPlanners"]
+deps = ["Accessors", "ChainRulesCore", "Combinatorics", "Compose", "DataStructures", "Flux", "Graphs", "HierarchicalUtils", "Julog", "LinearAlgebra", "MLUtils", "Mill", "OneHotArrays", "PDDL", "Parameters", "SparseArrays", "StaticBitSets", "Statistics", "StatsBase", "SymbolicPlanners"]
 path = ".."
 uuid = "628e68bf-2596-4972-a53b-69fd3c43dbca"
 version = "0.1.0"
@@ -1300,6 +1312,12 @@ version = "1.1.0"
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 version = "0.7.0"
+
+[[deps.ScikitLearnBase]]
+deps = ["LinearAlgebra", "Random", "Statistics"]
+git-tree-sha1 = "7877e55c1523a4b336b433da39c8e8c08d2f221f"
+uuid = "6e75b9c4-186b-50bd-896f-2d2496a4843e"
+version = "0.5.0"
 
 [[deps.Scratch]]
 deps = ["Dates"]
@@ -1844,11 +1862,23 @@ deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
 version = "5.8.0+1"
 
+[[deps.liblinear_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl"]
+git-tree-sha1 = "7f5f1953394b74739eaebd345f4515515a022a5b"
+uuid = "275f1f90-abd2-5ca1-9ad8-abd4e3d66eb7"
+version = "2.47.0+0"
+
 [[deps.libpng_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Zlib_jll"]
 git-tree-sha1 = "d7015d2e18a5fd9a4f47de711837e980519781a4"
 uuid = "b53b4c65-9356-5827-b1ea-8c7a1a84506f"
 version = "1.6.43+1"
+
+[[deps.libsvm_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LLVMOpenMP_jll", "Libdl", "Pkg"]
+git-tree-sha1 = "7625dde5e9eab416c1cb791627f065ce55297eff"
+uuid = "08558c22-525a-5d2a-acf6-0ac6658ffce4"
+version = "3.25.0+0"
 
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]

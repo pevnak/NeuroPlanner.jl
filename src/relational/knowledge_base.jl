@@ -25,9 +25,11 @@ function KnowledgeBase(xs::Vector{<:Pair{Symbol,Any}})
 end
 
 Base.getindex(kb::KnowledgeBase, k::Symbol) = kb.kb[k]
+Base.getindex(kb::KnowledgeBase, k::Integer) = kb.kb[k]
 Base.keys(kb::KnowledgeBase) = keys(kb.kb)
 Base.tail(kb::KnowledgeBase) = KnowledgeBase(Base.tail(kb.kb))
 Base.isempty(kb::KnowledgeBase) = isempty(kb.kb)
+Base.lastindex(kb::KnowledgeBase) = length(kb.kb)
 append(kb::KnowledgeBase, k::Symbol, x) = KnowledgeBase(merge(kb.kb, NamedTuple{(k,)}((x,))))
 function Base.replace(kb::KnowledgeBase, k::Symbol, v)
     l = Accessors.PropertyLens{k}() ∘ Accessors.PropertyLens{:kb}()
