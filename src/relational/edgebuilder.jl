@@ -1,7 +1,7 @@
 """
     EdgeBuilder
 
-    Simplifies construction of edges in the graph. The graph is assumed to be directed.
+    Simplifies construction of edges in the graph. The graph is assumed to be undirected.
     The idea is that at the start, we know the maximal number of edges and vertices in the graph.
     The constructor allocates approximate space. Then we can add edges one by one using the `push!.`
     Finally, when done, we `construct`, returns the computational graph.
