@@ -1,7 +1,10 @@
 """
 	function color(kb::KnowledgeBase)
 	
-	compute color of each vertex in the  knowledge base
+	Compute color of each vertex in the  knowledge base. This is used mainly to extract features
+	from the graph for the Weisfeler-leman graph kernel. The color of a vertex is a hash of the
+	vertex and its neighbors. The color is computed through the knowledge base, which means that
+	if you want multipled message passes, they have to be present in the KnowledgeBase.
 """
 function color(kb::KnowledgeBase{KS,VS}) where {KS,VS}
 	o = KnowledgeBase(NamedTuple())
@@ -41,7 +44,6 @@ function color(kb::KnowledgeBase, ds::ProductNode)
 	o = map(hash, zip(xs...))
 	o
 end
-
 
 function color(kb::KnowledgeBase, ds::MaskedNode)
     x = fill(0x77cfa1eef01bca90, length(ds.mask))
