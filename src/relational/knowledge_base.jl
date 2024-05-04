@@ -36,6 +36,12 @@ function Base.replace(kb::KnowledgeBase, k::Symbol, v)
     set(kb, l, v)
 end
 
+function MLUtils.getobs(data::KnowledgeBase, args...)
+    Error("MLUtils.getobs is not implemented for KnowledgeBase, 
+        since it would be relatively complicated, as we do not keep 
+        track of components of graphs.")
+end
+
 """
 atoms(kb::KnowledgeBase)
 
