@@ -268,7 +268,7 @@ function encode_edges(ex::ObjectPair, kid::Symbol, grouped_facts, prefix=nothing
     ProductNode(NamedTuple{(name, ns...)}((edges_bn, xs...)))
 end
 
-function prepare_pids(ex::ObjectPair, eb::EdgeBuilderComp)
+function prepare_pids(ex::ObjectPair, eb::EdgeBuilder)
     counts = fill(0, length(ex.pairs))
     pids = Vector{Int}(undef, eb.num_observations)
 
@@ -294,7 +294,7 @@ Encodes `E` Edges, which connect two pairs of object if and only if size of conj
 """
 function encode_E_edges(ex::ObjectPair, kid::Symbol; sym=:edge, prefix=nothing)
     n = Int((1 + (length(ex.obj2id) - 1)) * (length(ex.obj2id) - 1) / 2) * length(ex.obj2pid)
-    eb = EdgeBuilderComp(2, n, length(ex.pairs))
+    eb = EdgeBuilder(2, n, length(ex.pairs))
 
     for pairs in values(ex.obj2upid)
         for i in eachindex(pairs)
@@ -372,7 +372,7 @@ This function encodes predicates for binary relations.
 
 function encode_predicates(ex::ObjectPair, preds, pids::Vector{Int}, bags::Vector{UnitRange{Int}}, kid::Symbol)
     max_length = length(pids) * length(preds)
-    eb = EdgeBuilderComp(2, max_length, length(ex.pairs))
+    eb = EdgeBuilder(2, max_length, length(ex.pairs))
 
     for f in preds
         xs = ex.obj2upid[f[1]]

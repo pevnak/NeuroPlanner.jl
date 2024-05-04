@@ -89,7 +89,7 @@ combine(gdf) do sub_df
 end
 
 # f0a267e17a8bce06bd0f88233902279471f6f605
-# EdgeBuilderComp on M3 in μs with a HMGNNnetwork with config (graph_layers = 2, dense_dim = 16, dense_layers = 2, residual = "none")
+# EdgeBuilder on M3 in μs with a HMGNNnetwork with config (graph_layers = 2, dense_dim = 16, dense_layers = 2, residual = "none")
 #  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary  ObjectPair
 #      │ String             Float64       Float64     Float64     Float64     Float64
 # ─────┼─────────────────────────────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ end
 
 
 # f0a267e17a8bce06bd0f88233902279471f6f605
-# EdgeBuilderComp on M3 in μs
+# EdgeBuilder on M3 in μs
 #  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary  ObjectPair
 #      │ String             Float64       Float64     Float64     Float64     Float64
 # ─────┼─────────────────────────────────────────────────────────────────────────────────
@@ -123,7 +123,7 @@ end
 
 
 # f0a267e17a8bce06bd0f88233902279471f6f605
-# EdgeBuilderCompMat on M3 in μs
+# EdgeBuilderMat on M3 in μs
 #  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary
 #      │ String             Float64       Float64     Float64     Float64
 # ─────┼─────────────────────────────────────────────────────────────────────
