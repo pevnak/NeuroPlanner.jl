@@ -141,3 +141,4 @@ The appropriate model can be created by `reflectinmodel.`
 
 ### Remarks
   * `KnowledgeBase` behaves like samples, therefore `numobs,`  `Mill.catobs`, and `batch` are overloaded for minibatching. Though we do not implement `MLUtils.getobs,` since that would be quite complicated.
+  * `deduplicate` remove duplicities from the knowledgebase without intacting the output.
