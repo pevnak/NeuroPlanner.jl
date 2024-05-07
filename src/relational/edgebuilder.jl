@@ -60,6 +60,60 @@ function Base.push!(eb::EdgeBuilder, vertices::NTuple{N,I}) where {N,I<:Integer}
 end
 
 function construct(eb::EdgeBuilder, input_sym::Symbol)
-    xs = Tuple([ArrayNode(KBEntry(input_sym, eb.indices[i, 1:eb.num_edges])) for i in 1:eb.arity])
-    CompressedBagNode(ProductNode(xs), CompressedBags(eb.indices, eb.num_vertices, eb.num_edges, eb.arity))
+    indices = view(eb.indices, :, 1:eb.offset)
+    xs = Tuple([ArrayNode(KBEntry(input_sym, indices[i, :])) for i in 1:eb.arity])
+    CompressedBagNode(ProductNode(xs), CompressedBags(indices, eb.num_vertices, eb.num_edges, eb.arity))
 end
+
+
+"""
+    struct FeaturedEdgeBuilder{EB<:EdgeBuilder,T}
+        eb::EB
+        xe::Matrix{T}
+    end
+
+    Wraps `EdgeBuilder` and adds features on edges. When edges are constructed
+    edges are duplicated and their feaures are summed. The `Matrix` for features
+    one edges are duplicated. 
+"""
+struct FeaturedEdgeBuilder{EB<:EdgeBuilder,M,F}
+    eb::EB
+    xe::M
+    agg::F
+end
+
+function FeaturedEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features; agg=+)
+    xe = zeros(num_features, max_edges)
+    eb = EdgeBuilder(arity, max_edges, num_vertices)
+    FeaturedEdgeBuilder(eb, xe, agg)
+end
+
+function Base.push!(feb::FeaturedEdgeBuilder, vertices::NTuple{N,I}, x) where {N,I<:Integer}
+    push!(feb.eb, vertices)
+    feb.xe[:, feb.eb.offset] .= x
+end
+
+function construct(feb::FeaturedEdgeBuilder, input_sym::Symbol)
+    x = @view feb.xe[:, 1:feb.eb.offset]
+    indices = @view feb.eb.indices[:, 1:feb.eb.offset]
+
+    # let's deduplicate edges and aggregate information on edges
+    mask, ii = NeuroPlanner.find_duplicates(indices)
+    for (src, dst) in enumerate(ii)
+        mask[src] && continue # jump over the first sample
+        for k in 1:size(x, 1)
+            x[k, dst] = feb.agg(x[k, dst], x[k, src])
+        end
+    end
+    x = x[:, mask]
+
+    # Finally, we need to redo the 
+    xs = Tuple([ArrayNode(KBEntry(input_sym, indices[i, mask])) for i in 1:feb.eb.arity])
+    xs = tuple(xs..., x)
+
+    # we need to correctly remap
+end
+
+
+
+

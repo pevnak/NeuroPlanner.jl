@@ -109,7 +109,7 @@ end
 # EdgeBuilder on M3 in μs
 #  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary  ObjectPair
 #      │ String             Float64       Float64     Float64     Float64     Float64
-# ─────┼─────────────────────────────────────────────────────────────────────────────────
+
 #    1 │ ipc23_ferry                 9.7         9.7         9.2        45.1       305.8
 #    2 │ ipc23_rovers              107.8       252.6       114.6      5197.7     11985.7
 #    3 │ ipc23_blocksworld          13.7         9.6         8.8        82.9       133.2

@@ -115,9 +115,8 @@ ArgParse example implemented in Comonicon.
 
 max_steps = 10_000; max_time = 30; graph_layers = 3; dense_dim = 16; dense_layers = 3; residual = "none"; seed = 1
 max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
-domain_name = "ipc23_miconic"
+domain_name = "ipc23_floortile"
 loss_name = "lstar"
-loss_name = "l2"
 arch_name = "atombinary"
 """
 

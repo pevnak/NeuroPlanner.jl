@@ -1,4 +1,4 @@
-using NeuroPlanner: EdgeBuilder, construct
+using NeuroPlanner: EdgeBuilder, construct, FeaturedEdgeBuilder
 using Test
 
 @testset "EdgeBuilder" begin
@@ -29,3 +29,15 @@ using Test
         end
     end
 end
+
+
+# @testset "FeaturedEdgeBuilder" begin
+#     nv = 7; max_edges = 13; arity = 2; num_features = 5
+#     feb = FeaturedEdgeBuilder(arity, max_edges, nv, num_features)
+#     edges = [(1,2),(2,3),(3,4),(1,2),(3,4)]
+#     for (i,e) in enumerate(edges)
+#         x = NeuroPlanner.Flux.onehot(i,1:num_features)
+#         push!(feb, e, x)
+#     end
+    
+# end
