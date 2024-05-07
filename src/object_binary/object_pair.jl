@@ -270,9 +270,9 @@ end
 
 function prepare_pids(ex::ObjectPair, eb::EdgeBuilder)
     counts = fill(0, length(ex.pairs))
-    pids = Vector{Int}(undef, eb.num_observations)
+    pids = Vector{Int}(undef, eb.max_edges)
 
-    for pid in eb.indices[1:eb.num_observations]
+    for pid in eb.indices[1:eb.max_edges]
         counts[pid] += 1
     end
 
@@ -280,8 +280,8 @@ function prepare_pids(ex::ObjectPair, eb::EdgeBuilder)
     start = ends .- (counts .- 1)
     bags = map((x, y) -> x:y, start, ends)
 
-    for (i, pid) in enumerate(eb.indices[1:eb.num_observations])
-        pids[start[pid]] = eb.indices[eb.num_observations+i]
+    for (i, pid) in enumerate(eb.indices[1:eb.max_edges])
+        pids[start[pid]] = eb.indices[eb.max_edges+i]
         start[pid] += 1
     end
     return (pids, bags)
