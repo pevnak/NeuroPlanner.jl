@@ -27,7 +27,7 @@ vertex corresponding to the hyper-edge and its vertices.
 --- `objtype2id` maps unary predicates to an index in one-hot encoded vertex' properties 
 --- `constmap` maps constants to an index in one-hot encoded vertex' properties 
 --- `model_params` some parameters of an algorithm constructing the message passing passes 
-"""
+"""     
 struct ObjectAtom{DO,D,N,MP,S,G}
     domain::DO
     multiarg_predicates::NTuple{N,Symbol}
@@ -202,7 +202,7 @@ function multi_predicates(ex::ObjectAtom, kid::Symbol, grouped_facts, prefix=not
 end
 
 function encode_predicates(ex::ObjectAtom, preds::Vector{NTuple{N,Int64}}, kid::Symbol) where {N}
-    eb = EdgeBuilderCompMat(Val(N), length(preds), length(ex.obj2id))
+    eb = EdgeBuilder(Val(N), length(preds), length(ex.obj2id))
     for p in preds
         push!(eb, p)
     end

@@ -25,11 +25,21 @@ function KnowledgeBase(xs::Vector{<:Pair{Symbol,Any}})
 end
 
 Base.getindex(kb::KnowledgeBase, k::Symbol) = kb.kb[k]
+Base.getindex(kb::KnowledgeBase, k::Integer) = kb.kb[k]
 Base.keys(kb::KnowledgeBase) = keys(kb.kb)
+Base.tail(kb::KnowledgeBase) = KnowledgeBase(Base.tail(kb.kb))
+Base.isempty(kb::KnowledgeBase) = isempty(kb.kb)
+Base.lastindex(kb::KnowledgeBase) = length(kb.kb)
 append(kb::KnowledgeBase, k::Symbol, x) = KnowledgeBase(merge(kb.kb, NamedTuple{(k,)}((x,))))
 function Base.replace(kb::KnowledgeBase, k::Symbol, v)
     l = Accessors.PropertyLens{k}() ∘ Accessors.PropertyLens{:kb}()
     set(kb, l, v)
+end
+
+function MLUtils.getobs(data::KnowledgeBase, args...)
+    Error("MLUtils.getobs is not implemented for KnowledgeBase, 
+        since it would be relatively complicated, as we do not keep 
+        track of components of graphs.")
 end
 
 """
@@ -203,29 +213,6 @@ end
 (m::BagModel)(kb::KnowledgeBase, x::BagNode{Missing}) = m.bm(m.a(x.data, x.bags))
 
 (m::MaskedModel)(kb::KnowledgeBase, x::MaskedNode{<:AbstractMillNode}) = m.m(kb, x.data) .* x.mask'
-
-# @generated function (m::ProductModel{<:NamedTuple{KM}})(kb::KnowledgeBase, x::ProductNode{<:NamedTuple{KD}}) where {KM,KD}
-#     @assert issubset(KM, KD)
-#     chs = map(KM) do k
-#         :(m.ms.$k(kb, x.data.$k))
-#     end
-#     quote
-#         m.m(vcat($(chs...)))
-#     end
-# end
-
-# @generated function (m::ProductModel{T})(kb::KnowledgeBase, x::ProductNode{U}) where {T<:Tuple,U<:Tuple}
-#     l1 = T.parameters |> length
-#     l2 = U.parameters |> length
-#     @assert l1 ≤ l2 "Applied ProductModel{<:Tuple} has more children than ProductNode"
-#     chs = map(1:l1) do i
-#         :(m.ms[$i](kb, x.data[$i]))
-#     end
-#     quote
-#         m.m(vcat($(chs...)))
-#     end
-# end
-
 
 
 @generated function (m::ProductModel{<:NamedTuple{KM}})(kb::KnowledgeBase, x::ProductNode{<:NamedTuple{KD}}) where {KM,KD}

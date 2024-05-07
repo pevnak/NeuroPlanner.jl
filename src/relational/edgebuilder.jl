@@ -1,55 +1,69 @@
-mutable struct EdgeBuilder{N,I<:Integer}
-	ii::NTuple{N,Vector{I}}
-	bags::Vector{<:Vector{I}}
-	nv::Integer
-	first_free::I 
-	function EdgeBuilder(ii::NTuple{N,Vector{I}}, bags::Vector{<:Vector{I}}, nv, first_free::I) where {N, I<:Integer}
-		N > 0 || error("Can create only edge of positive arity.")
-		first_free == 1 || error("EdgeBuilder should be initialized with empty counters")
-		n = length(first(ii))
-		all(length(i) == n for i in ii) || error("length of all vectors to hold vertex indices should be the same")
-		length(bags) == nv || error("length of bags should be equal to the length of vertices")
-		new{N,I}(ii, bags, nv, first_free)
-	end
+"""
+    EdgeBuilder
+
+    Simplifies construction of edges in the graph. The graph is assumed to be undirected.
+    The idea is that at the start, we know the maximal number of edges and vertices in the graph.
+    The constructor allocates approximate space. Then we can add edges one by one using the `push!.`
+    Finally, when done, we `construct`, returns the computational graph.
+
+
+Example of use
+```julia
+nv = 7          # number of vertices in the graph
+capacity = 5    # number of edges
+arity = 2       # arity of the edge
+
+eb = EdgeBuilder(arity, capacity, nv)
+push!(eb, (1, 2))   # add edge (1, 2)
+push!(eb, (2, 3))   # add edge (1, 2)
+
+ds = construct(eb, :x)  # returns the computational graph pointing to `:x` in knowledge graph
+BagNode  # 7 obs, 304 bytes
+  ╰── ProductNode  # 2 obs, 32 bytes
+        ├── ArrayNode(Colon()×2 KBEntry with Float32 elements)  # 2 obs, 88 bytes
+        ╰── ArrayNode(Colon()×2 KBEntry with Float32 elements)  # 2 obs, 88 bytes
+```    
+"""
+mutable struct EdgeBuilder{T<:Integer,I<:Integer}
+    indices::Matrix{T}
+    counts::Vector{I}
+    arity::Int
+    max_edges::Int
+    offset::Int
+    function EdgeBuilder(indices::Matrix{T}, counts::Vector{I}, arity::Int, max_edges::Int, offset::Int) where {T,I}
+        arity > 0 || error("Can create only edge of positive arity.")
+        offset == 0 || error("Offset needs to start at 0.")
+        length(indices) == arity * max_edges || error("Length of indices must be equal to `arity * max_edges`.")
+        new{T,I}(indices, counts, arity, max_edges, offset)
+    end
 end
 
-EdgeBuilder(arity::Integer, capacity::Integer, nv::Integer) = EdgeBuilder(Int, arity, capacity, nv)
-EdgeBuilder(arity::Val, capacity::Integer, nv::Integer) = EdgeBuilder(Int, arity, capacity, nv)
-EdgeBuilder(I::Type, arity::Integer, capacity::Integer, nv::Integer) = EdgeBuilder(I, Val(arity), capacity, nv)
-
-function EdgeBuilder(I::Type, arity::Val{N}, capacity::Integer, nv::Integer) where {N}
-	ii = _map_tuple(i -> Vector{I}(undef, capacity), arity)
-	bags = [I[] for _ in 1:nv]
-	EdgeBuilder(ii, bags, nv, 1)
+function EdgeBuilder(::Val{arity}, max_edges::Int, num_vertices::Int) where {arity}
+    indices = Matrix{Int}(undef, arity, max_edges)
+    counts = fill(0, num_vertices)
+    offset = 0
+    EdgeBuilder(indices, counts, arity, max_edges, offset)
 end
 
-function Base.push!(eb::EdgeBuilder{N,<:Any}, vertices::NTuple{N,I}) where {N,I<:Integer}
-	# Base.@boundscheck boundscheck(eb, vertices)
-	for (i, vᵢ) in enumerate(vertices)
-		push!(eb.bags[vᵢ], eb.first_free)
-		eb.ii[i][eb.first_free] = vᵢ
-	end
-	eb.first_free += 1
+
+function EdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int)
+    indices = Matrix{Int}(undef, arity, max_edges)
+    counts = fill(0, num_vertices)
+    offset = 0
+    EdgeBuilder(indices, counts, arity, max_edges, offset)
 end
 
-function Base.push!(eb::EdgeBuilder{N,<:Any}, vertices::AbstractVector{<:Integer}) where {N}
-	# Base.@boundscheck length(vertices) == N || error("The edge has to be of arity $(N)")
-	# Base.@boundscheck boundscheck(eb, vertices)
-	for (i, vᵢ) in enumerate(vertices)
-		push!(eb.bags[vᵢ], eb.first_free)
-		eb.ii[i][eb.first_free] = vᵢ
-	end
-	eb.first_free += 1
-end
-
-function boundscheck(eb::EdgeBuilder, vertices)
-	eb.first_free ≤ length(first(eb.ii)) || error("The capacity of edgebuilder has exceeded")
-	all(map(≤(eb.nv), vertices)) || error("index of vertices cannot be bigger then number of vertices")
-	true	
+function Base.push!(eb::EdgeBuilder, vertices::NTuple{N,I}) where {N,I<:Integer}
+    eb.offset += 1
+    _mapenumerate_tuple(vertices) do i, vᵢ
+        eb.counts[vᵢ] += 1
+        eb.indices[i, eb.offset] = vᵢ
+    end
 end
 
 function construct(eb::EdgeBuilder, input_sym::Symbol)
-	l = eb.first_free - 1 
-	xs = map(ii -> KBEntry(input_sym, view(ii, 1:l)), eb.ii)
-	BagNode(ProductNode(xs), eb.bags)
+    xs = Tuple([ArrayNode(KBEntry(input_sym, eb.indices[i, 1:eb.offset])) for i in 1:eb.arity])
+    CompressedBagNode(ProductNode(xs), CompressedBags(eb.indices, eb.counts, eb.max_edges, eb.offset))
 end
+
+

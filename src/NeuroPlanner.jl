@@ -15,6 +15,7 @@ using DataStructures
 using HierarchicalUtils
 using ChainRulesCore
 using Accessors
+using SparseArrays
 using LinearAlgebra
 using StaticBitSets
 
@@ -40,14 +41,14 @@ include("relational/knowledge_base.jl")
 include("relational/knowledge_model.jl")
 export KBEntry, KnowledgeBase, append
 include("relational/deduplication.jl")
-export deduplicate
+include("relational/coloring.jl")
+export deduplicate, color
 include("relational/dedu_matrix.jl")
 include("relational/mha.jl")
 export MultiheadAttention
 include("relational/renamer.jl")
 include("relational/edgebuilder.jl")
-include("relational/edgebuilder_comp.jl")
-export EdgeBuilder, EdgeBuilderComp, EdgeBuilderCompMat
+export EdgeBuilder
 
 # a basic architecture based on hyper-graph representatation of predicates
 include("lrnn/pure_extractor.jl")
@@ -65,6 +66,9 @@ include("asnets/extractor.jl")
 export ASNet
 include("hgnn/extractor.jl")
 export HGNNLite, HGNN
+
+include("graphkernel/graphkernel.jl")
+export GraphKernel
 
 # ASNet is a pain in ...
 include("levin_asnet/extractor.jl")

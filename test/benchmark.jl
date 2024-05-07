@@ -66,8 +66,8 @@ function benchmark_domain_arch(archs, domain_name)
 		ts = map(models, archs) do model, hnet
 			pddld = hnet(domain; message_passes = graph_layers, residual)
 			pddle, state = initproblem(pddld, problem)
-			map(model ∘ pddle, states)
-			mean(@elapsed map(model ∘ pddle, states) for _ in 1:100) / length(states)
+			map(model ∘ deduplicate ∘ pddle, states)
+			mean(@elapsed map(model ∘ deduplicate ∘ pddle, states) for _ in 1:100) / length(states)
 		end
 		ns = tuple([Symbol("$(a)") for a in archs]...)
 		stats = merge((;domain_name, problem_file), NamedTuple{ns}(ts))
@@ -76,21 +76,20 @@ function benchmark_domain_arch(archs, domain_name)
 	end
 end
 
-archs = [ObjectBinary, MixedLRNN2, ObjectAtom, AtomBinary, ObjectPair]
+# archs = [ObjectBinary,ObjectAtom, AtomBinary, ObjectPair]
+archs = [ObjectBinary,ObjectAtom, AtomBinary]
 data = map(problem -> benchmark_domain_arch(archs, problem), setdiff(IPC_PROBLEMS,["ipc23_sokoban"]))
 df = DataFrame(reduce(vcat, data))
 gdf = DataFrames.groupby(df, ["domain_name"])
 combine(gdf) do sub_df 
 	 (;ObjectBinary = round(1e6*mean(sub_df.ObjectBinary), digits = 1),
-	 	MixedLRNN2 = round(1e6*mean(sub_df.MixedLRNN2), digits = 1), 
 	 	ObjectAtom = round(1e6*mean(sub_df.ObjectAtom), digits = 1), 
 	 	AtomBinary = round(1e6*mean(sub_df.AtomBinary), digits = 1),
-	 	ObjectPair = round(1e6*mean(sub_df.ObjectPair), digits = 1),
 	 )
 end
 
 # f0a267e17a8bce06bd0f88233902279471f6f605
-# EdgeBuilderComp on M3 in μs with a HMGNNnetwork with config (graph_layers = 2, dense_dim = 16, dense_layers = 2, residual = "none")
+# EdgeBuilder on M3 in μs with a HMGNNnetwork with config (graph_layers = 2, dense_dim = 16, dense_layers = 2, residual = "none")
 #  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary  ObjectPair
 #      │ String             Float64       Float64     Float64     Float64     Float64
 # ─────┼─────────────────────────────────────────────────────────────────────────────────
@@ -107,7 +106,7 @@ end
 
 
 # f0a267e17a8bce06bd0f88233902279471f6f605
-# EdgeBuilderComp on M3 in μs
+# EdgeBuilder on M3 in μs
 #  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary  ObjectPair
 #      │ String             Float64       Float64     Float64     Float64     Float64
 # ─────┼─────────────────────────────────────────────────────────────────────────────────
@@ -124,7 +123,7 @@ end
 
 
 # f0a267e17a8bce06bd0f88233902279471f6f605
-# EdgeBuilderCompMat on M3 in μs
+# EdgeBuilderMat on M3 in μs
 #  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary
 #      │ String             Float64       Float64     Float64     Float64
 # ─────┼─────────────────────────────────────────────────────────────────────
