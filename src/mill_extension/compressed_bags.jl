@@ -57,9 +57,9 @@ CompressedBags{Int64}(Int64[], UnitRange{Int64}[], 0)
 """
 CompressedBags() = CompressedBags(Vector{Int}(), Vector{UnitRange{Int}}(), 0)
 
-function CompressedBags(ks::Matrix{T}, num_vertices::Int, num_observations::Int, ar::Int) where {T<:Integer}
+function CompressedBags(ks::SubArray{T}, num_vertices::Int, num_observations::Int, ar::Int) where {T<:Integer}
     counts = zeros(Int, num_vertices)
-    foreach(i -> counts[i] += 1, @view ks[:, 1:num_observations])
+    foreach(i -> counts[i] += 1, ks)
 
     ends = cumsum(counts)
     start = ends .- (counts .- 1)

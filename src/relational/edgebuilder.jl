@@ -60,7 +60,7 @@ function Base.push!(eb::EdgeBuilder, vertices::NTuple{N,I}) where {N,I<:Integer}
 end
 
 function construct(eb::EdgeBuilder, input_sym::Symbol)
-    indices = view(eb.indices, :, 1:eb.offset)
+    indices = view(eb.indices, :, 1:eb.num_edges)
     xs = Tuple([ArrayNode(KBEntry(input_sym, indices[i, :])) for i in 1:eb.arity])
     CompressedBagNode(ProductNode(xs), CompressedBags(indices, eb.num_vertices, eb.num_edges, eb.arity))
 end
