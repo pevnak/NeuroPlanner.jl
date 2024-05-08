@@ -98,20 +98,18 @@ function construct(feb::FeaturedEdgeBuilder, input_sym::Symbol)
     indices = @view feb.eb.indices[:, 1:feb.eb.offset]
 
     # let's deduplicate edges and aggregate information on edges
-    mask, ii = NeuroPlanner.find_duplicates(indices)
-    for (src, dst) in enumerate(ii)
-        mask[src] && continue # jump over the first sample
-        for k in 1:size(x, 1)
-            x[k, dst] = feb.agg(x[k, dst], x[k, src])
-        end
-    end
-    x = x[:, mask]
-
+    mask, ii = find_duplicates(indices)
+    gather(indices, ii)
+    # for (src, dst) in enumerate(ii)
+    #     mask[src] && continue # jump over the first sample
+    #     for k in 1:size(x,1)
+    #         x[k, dst] = feb.agg(x[k,dst], x[k,src])
+    #     end
+    # end
+    # x = x[:,mask]
     # Finally, we need to redo the 
     xs = Tuple([ArrayNode(KBEntry(input_sym, indices[i, mask])) for i in 1:feb.eb.arity])
     xs = tuple(xs..., x)
-
-    # we need to correctly remap
 end
 
 
