@@ -57,7 +57,7 @@ CompressedBags{Int64}(Int64[], UnitRange{Int64}[], 0)
 """
 CompressedBags() = CompressedBags(Vector{Int}(), Vector{UnitRange{Int}}(), 0)
 
-function CompressedBags(ks::SubArray{T}, num_vertices::Int, num_observations::Int, ar::Int) where {T<:Integer}
+function CompressedBags(ks::AbstractMatrix{T}, num_vertices::Int, num_observations::Int, ar::Int) where {T<:Integer}
     counts = zeros(Int, num_vertices)
     foreach(i -> counts[i] += 1, ks)
 
@@ -66,7 +66,7 @@ function CompressedBags(ks::SubArray{T}, num_vertices::Int, num_observations::In
     bags = map((x, y) -> x:y, start, ends)
 
     indices = Vector{Int}(undef, ar * num_observations)
-    max_size = size(ks)[2]
+    max_size = size(ks, 2)
 
     for i in 1:ar
         for j in 1:num_observations

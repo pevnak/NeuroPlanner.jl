@@ -35,8 +35,8 @@ struct AtomBinary{DO,MP,D,S,G}
     actionmap::Dict{Symbol,Int}
     model_params::MP
     obj2id::D
-    init_atoms::S
-    goal_atoms::G
+    init_state::S           # contains atoms of the init state
+    goal_state::G           # contains atoms of the goal state
     function AtomBinary(domain::DO, max_arity, constmap, actionmap, model_params::MP, obj2id::D, init::S, goal::G) where {DO,D,MP<:NamedTuple,S,G}
         @assert issubset((:message_passes, :residual), keys(model_params)) "Parameters of the model are not fully specified"
         @assert (init === nothing || goal === nothing) "Fixing init and goal state is bizzaare, as the extractor would always create a constant"
@@ -46,7 +46,7 @@ end
 
 AtomBinaryNoGoal{DO,MP,D} = AtomBinary{DO,MP,D,Nothing,Nothing} where {DO,MP,D}
 AtomBinaryStart{DO,MP,D,S} = AtomBinary{DO,MP,D,S,Nothing} where {DO,MP,D,S<:AbstractVector{<:Julog.Term}}
-AtomBinaryGoal{DO,MP,D,S} = AtomBinary{DO,MP,D,Nothing,S} where {DO,MP,D,S<:AbstractVector{<:Julog.Term}}
+AtomBinaryGoal{DO,MP,D,G} = AtomBinary{DO,MP,D,Nothing,G} where {DO,MP,D,G<:AbstractVector{<:Julog.Term}}
 
 function AtomBinary(domain; message_passes=2, residual=:linear, kwargs...)
     dictmap(x) = Dict(reverse.(enumerate(sort(x))))
@@ -58,7 +58,7 @@ function AtomBinary(domain; message_passes=2, residual=:linear, kwargs...)
 end
 
 isspecialized(ex::AtomBinary) = ex.obj2id !== nothing
-hasgoal(ex::AtomBinary) = ex.init_atoms !== nothing || ex.goal_atoms !== nothing
+hasgoal(ex::AtomBinary) = ex.init_state !== nothing || ex.goal_state !== nothing
 
 
 function AtomBinary(domain, problem; embed_goal=true, kwargs...)
@@ -84,7 +84,6 @@ from objects to id of vertices. Goals are not changed added to the
 extractor.
 """
 function specialize(ex::AtomBinary, problem)
-    # T = BitSet
     N = ceil(Int, (length(problem.objects) + length(ex.constmap))/8)
     T = SBitSet{N, UInt8}
 
@@ -268,12 +267,12 @@ end
 
 function add_goalstate(ex::AtomBinary, problem, goal=goalstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
-    @set ex.goal_atoms = collect(get_facts(goal))
+    @set ex.goal_state = collect(get_facts(goal))
 end
 
 function add_initstate(ex::AtomBinary, problem, start=initstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
-    @set ex.init_atoms = collect(get_facts(start))
+    @set ex.init_state = collect(get_facts(start))
 end
 
 """
@@ -284,11 +283,16 @@ end
 """
 function add_goalatoms(ex::AtomBinaryStart, atoms)
     gid = 1:length(atoms)
-    vcat(atoms, ex.init_atoms), gid
+    vcat(atoms, ex.init_state), gid
 end
 
 function add_goalatoms(ex::AtomBinaryGoal, atoms)
-    gid = 1:length(ex.goal_atoms)
-    vcat(ex.goal_atoms, atoms), gid
+    gid = 1:length(ex.goal_state)
+    vcat(ex.goal_state, atoms), gid
+end
+
+function add_goalatoms(ex::AtomBinaryNoGoal, atoms)
+    gid = 0:-1
+    atoms, gid
 end
 

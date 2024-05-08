@@ -166,3 +166,106 @@ v = MaskedNode(n, BitVector([1, 0, 1]))
         @test !isequal(j, q)
     end
 end
+
+@testset "constructor assertions" begin
+    for (x, y) in [(g, i), (f, g), (k, m)]
+        @test_throws AssertionError MaskedNode(x, BitVector(ones(Bool, numobs(y))))
+        @test_throws AssertionError MaskedNode(y, BitVector(ones(Bool, numobs(x))))
+    end
+end
+
+@testset "numobs" begin
+    @test numobs(o) == numobs(f)
+    @test numobs(p) == numobs(g)
+    @test numobs(q) == numobs(h)
+end
+
+
+@testset "hierarchical catobs on MaskedNodes" begin
+    @test catobs(o, q).data.data[1].data.data == reduce(catobs, [o, q]).data.data[1].data.data ==
+          catobs(f, h).data[1].data.data
+
+    @test catobs(o, q).data.data[2].data.data == reduce(catobs, [o, q]).data.data[2].data.data ==
+          catobs(f, h).data[2].data.data
+
+    @test catobs(o, q).mask == reduce(catobs, [o, q]).mask
+
+
+    @test catobs(o, q, o).data.data[1].data.data == reduce(catobs, [o, q, o]).data.data[1].data.data ==
+          catobs(f, h, f).data[1].data.data
+
+    @test catobs(o, q, o).mask == reduce(catobs, [o, q, o]).mask
+
+    @test numobs(catobs(o, q)) == numobs(o) + numobs(q)
+
+
+    @test catobs(p, p).data.data[1].data.data == reduce(catobs, [p, p]).data.data[1].data.data ==
+          catobs(g, g).data[1].data.data
+
+    @test catobs(p, p).data.data[2].data.data == reduce(catobs, [p, p]).data.data[2].data.data ==
+          catobs(g, g).data[2].data.data
+
+    @test catobs(p, p).mask == reduce(catobs, [p, p]).mask
+    @test numobs(catobs(p, p)) == 2numobs(p)
+    @test catobs(p, p).mask == vcat(p.mask, p.mask)
+
+
+    @test catobs(p, p, p).data.data[1].data.data == reduce(catobs, [p, p, p]).data.data[1].data.data ==
+          catobs(g, g, g).data[1].data.data
+
+    @test catobs(p, p, p).mask == reduce(catobs, [p, p, p]).mask
+
+
+    @test catobs(s, t).data.data[1].data.data == hcat(wb.data.data, wc.data.data)
+    @test catobs(s, t).data.data[2].data.data == hcat(b.data.data, c.data.data)
+    @test numobs(catobs(s, t)) == numobs(s) + numobs(t)
+    @test catobs(s, t).mask == vcat(s.mask, t.mask)
+
+
+    # correct length/keyset but different subtrees
+    @test_throws MethodError catobs(o, r)
+    @test_throws MethodError reduce(catobs, [f, i])
+    @test_throws MethodError catobs(u, v)
+    @test_throws MethodError reduce(catobs, [u, v])
+
+    # different tuple length or keyset
+    @test_throws ArgumentError catobs(p, r)
+    @test_throws ArgumentError reduce(catobs, [p, r])
+    @test_throws ArgumentError catobs(o, p)
+    @test_throws ArgumentError reduce(catobs, [o, p])
+    @test_throws ArgumentError catobs(s, u)
+    @test_throws ArgumentError reduce(catobs, [s, u])
+    @test_throws ArgumentError catobs(t, u)
+    @test_throws ArgumentError reduce(catobs, [t, u])
+end
+
+@testset "catobs stability" begin
+    for n in [r, s, u]
+        @inferred catobs(n, n)
+        @inferred reduce(catobs, [n, n])
+        @inferred catobs([n, n])
+    end
+end
+
+@testset "equals and hash" begin
+    o2 = deepcopy(o)
+    q2 = deepcopy(q)
+
+    @test o ≠ q
+    @test o ≠ q2
+    @test o == o2
+    @test q == q2
+
+    @test hash(q) ≡ hash(q2)
+    @test hash(o) ≡ hash(o2)
+    @test hash(o) ≢ hash(q)
+end
+
+@testset "equals with missings" begin
+    j = MaskedNode(f)
+    q = MaskedNode(g)
+    @test_broken j ≠ j
+    @test j ≠ q
+    @test isequal(j, j)
+    @test !isequal(j, q)
+end

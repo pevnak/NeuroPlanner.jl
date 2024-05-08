@@ -66,11 +66,13 @@ function submit_missing(;dry_run = true, domain_name, arch_name, loss_name, max_
 	end
 	if isfile(filename*"_model.jls") && isfile(filename*"_stats_tmp.jls")
 		println(@cyan "finished model with temporary stats "*filename)
+		dry_run || run(`sbatch -D /home/pevnytom/julia/Pkg/NeuroPlanner.jl/selflearning slurm.sh $domain_name $dense_dim $graph_layers $residual $loss_name $arch_name $seed`)
 	 	return(:partial)
 	end
 
 	if isfile(filename*"_model.jls")
 		println(@yellow "finished model "*filename)
+		dry_run || run(`sbatch -D /home/pevnytom/julia/Pkg/NeuroPlanner.jl/selflearning slurm.sh $domain_name $dense_dim $graph_layers $residual $loss_name $arch_name $seed`)
 	 	return(:model)
 	end
 	println(@red "submit "*filename)

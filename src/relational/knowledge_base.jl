@@ -220,6 +220,9 @@ end
     chs = map(KM) do k
         :(m.ms.$k(kb, x.data.$k))
     end
+    if length(KM) == 1 # in case of singleton, skip the construction of the LazyVCatMatrix
+        return :(m.m($(chs[1])))
+    end
     quote
         m.m(LazyVCatMatrix($(chs...)))
     end
@@ -231,6 +234,9 @@ end
     @assert l1 ≤ l2 "Applied ProductModel{<:Tuple} has more children than ProductNode"
     chs = map(1:l1) do i
         :(m.ms[$i](kb, x.data[$i]))
+    end
+    if l1 == 1 # in case of singleton, skip the construction of the LazyVCatMatrix
+        return :(m.m($(chs[1])))
     end
     quote
         m.m(LazyVCatMatrix($(chs...)))

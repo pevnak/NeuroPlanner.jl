@@ -59,7 +59,6 @@ function *(A::Matrix{T}, B::LazyVCatMatrix{T, N, Matrix{T}}) where {T,N}
 	o
 end
 
-
 function *(A::Matrix{T}, B::LinearAlgebra.Adjoint{T, LazyVCatMatrix{T, N, Matrix{T}}}) where {T,N}
 	o = similar(A, size(A,1), size(B,2))
 	offset = 0
