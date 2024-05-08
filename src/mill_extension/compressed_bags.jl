@@ -57,74 +57,26 @@ CompressedBags{Int64}(Int64[], UnitRange{Int64}[], 0)
 """
 CompressedBags() = CompressedBags(Vector{Int}(), Vector{UnitRange{Int}}(), 0)
 
-"""
-    CompressedBags(k::Vector{<:Integer})
+function CompressedBags(ks::SubArray{T}, num_vertices::Int, num_observations::Int, ar::Int) where {T<:Integer}
+    counts = zeros(Int, num_vertices)
+    foreach(i -> counts[i] += 1, ks)
 
-Construct a new [`CompressedBags`](@ref) struct from `Vector` `k` specifying the index of the bag each instance belongs to.
-
-
-# Examples
-```jldoctest
-julia> CompressedBags([1, 1, 5, 2, 3, 4, 2, 3], [2, 2, 2, 1, 1], 4)
-CompressedBags{Int64}([1, 2, 4, 3, 1, 4, 2, 3], UnitRange{Int64}[1:2, 3:4, 5:6, 7:7, 8:8], 4)
-```
-"""
-
-
-"""
-    CompressedBags(k::Vector{T}, counts::Vector{Int}, n::Int) where {T<:Integer}
-
-Create a vector `vals` representing compressed bags based on the input vectors `k` and `counts`.
-
-# Arguments
-- `k::Vector{T}`: Vector of integers representing the ids of objects in bags.
-- `counts::Vector{Int}`: Vector of integers representing the counts of elements in each bag.
-- `n::Int`: Total number of observations.
-
-# Returns
-- `vals::Vector{Int}`: Vector representing the compressed bags.
-
-# Description
-This function takes two input vectors `k` and `counts`, where `k` represents the distinct elements in the bags and `counts` represents the counts of elements in each bag. It creates a vector `vals` representing the compressed bags, where each element of `vals` corresponds to the count of elements from `k` in the bags.
-
-The function calculates the starting points of each bag based on the cumulative sum of `counts` and then creates bags for each bag using `map`. Finally, it initializes `vals` as a vector of uninitialized integers of length `n`.
-"""
-function CompressedBags(ks::Vector{T}, counts::Vector{T}, num_observations::T, offset::T) where {T<:Integer}
     ends = cumsum(counts)
     start = ends .- (counts .- 1)
     bags = map((x, y) -> x:y, start, ends)
 
-    ar = length(ks) == 0 ? 0 : Int(length(ks) / num_observations)
-    indices = Vector{Int}(undef, ar * offset)
+    indices = Vector{Int}(undef, ar * num_observations)
+    max_size = size(ks)[2]
 
     for i in 1:ar
-        for j in 1:offset
-            k = ks[(i-1)*num_observations+j]
-            indices[start[k]] = (j - 1) % num_observations + 1
-            start[k] += 1
-        end
-    end
-
-    CompressedBags(indices, bags, offset)
-end
-
-function CompressedBags(ks::Matrix{T}, counts::Vector{T}, num_observations::T, offset::T) where {T<:Integer}
-    ends = cumsum(counts)
-    start = ends .- (counts .- 1)
-    bags = map((x, y) -> x:y, start, ends)
-
-    ar = length(ks) == 0 ? 0 : Int(length(ks) / num_observations)
-    indices = Vector{Int}(undef, ar * offset)
-
-    for i in 1:ar
-        for j in 1:offset
+        for j in 1:num_observations
             k = ks[i, j]
-            indices[start[k]] = (j - 1) % num_observations + 1
+            indices[start[k]] = (j - 1) % max_size + 1
             start[k] += 1
         end
     end
 
-    CompressedBags(indices, bags, offset)
+    CompressedBags(indices, bags, num_observations)
 end
 
 """
@@ -191,6 +143,7 @@ end
 
 
 function _catbags(bs::Vector{CompressedBags{T}}) where {T<:Integer}
+
     indices = Vector{T}(undef, sum([length(b.indices) for b in bs]))
     bags = Vector{UnitRange{Int64}}(undef, sum(length.(bs)))
 
