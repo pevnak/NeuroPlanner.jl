@@ -94,9 +94,9 @@ function Base.push!(feb::FeaturedEdgeBuilder, vertices::NTuple{N,I}, x) where {N
 end
 
 function construct(feb::FeaturedEdgeBuilder, input_sym::Symbol)
-    x = @view feb.xe[:, 1:feb.eb.offset]
-    indices = @view feb.eb.indices[:, 1:feb.eb.offset]
-
+    x = @view feb.xe[:,1:feb.eb.offset]
+    indices = @view feb.eb.indices[:,1:feb.eb.offset]
+    
     # let's deduplicate edges and aggregate information on edges
     mask, ii = find_duplicates(indices)
     gather(indices, ii)
