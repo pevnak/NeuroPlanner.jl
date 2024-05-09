@@ -112,12 +112,20 @@ end
 			pddle = NeuroPlanner.specialize(arch(domain), problem)
 			m = reflectinmodel(pddle(state), d -> Dense(d,10), SegmentedMean;fsm = Dict("" =>  d -> Dense(d,1)))
 
+			xx = [pddle(state) for state in trajectory];
+			yy = collect(length(trajectory):-1:1);
+			@test reduce(hcat, map(m, xx)) ≈  m(Flux.batch(xx))
+			ii = randperm(length(xx))
+			bxx = Flux.batch(xx[ii])
+			ob = m(bxx)
+
 			@testset "forward path" begin 
-				xx = [pddle(state) for state in trajectory];
-				yy = collect(length(trajectory):-1:1);
-				@test reduce(hcat, map(m, xx)) ≈  m(Flux.batch(xx))
-				ii = randperm(length(xx))
-				@test reduce(hcat, map(m, xx[ii])) ≈  m(Flux.batch(xx[ii]))
+				@test reduce(hcat, map(m, xx[ii])) ≈  ob
+			end
+
+			@testset "forward path deduplication" begin 
+				od = m(deduplicate(bxx))
+				@test od ≈  ob
 			end
 
 			@testset "init-goal invariant" begin
@@ -154,37 +162,49 @@ end
 end
 
 
-@testset "Integration test with deduplication" begin 
-	fminibatch = NeuroPlanner.minibatchconstructor("lstar")
-	@testset "Domain: $domain_name" for domain_name in DOMAINS
-		domain, problem = load_problem_domain(domain_name) 
-		plan = load_plan(domain_name)
-		state = initstate(domain, problem)
-		trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
+######
+#	Super-expensive integration test
+######
 
-		for arch in ENCODINGS
-			#create model from some problem instance
-			pddld = arch(domain)
-			model = let 
-				pddle, state = initproblem(pddld, problem)
-				h₀ = pddle(state)
-				reflectinmodel(h₀, d -> Dense(d, 8), SegmentedMean;fsm = Dict("" =>  d -> Dense(d, 1)))
-			end
+# @testset "Integration test with deduplication" begin 
+# 	@testset "Domain: $domain_name" for domain_name in DOMAINS
+# 		domain, problem = load_problem_domain(domain_name) 
+# 		plan = load_plan(domain_name)
+# 		state = initstate(domain, problem)
+# 		trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
 
-			ds = fminibatch(pddld, domain, problem, plan);			
-			ds1 = deepcopy(ds)
-			ds2 =  @set ds.x = deduplicate(ds.x)
-			fval1 = NeuroPlanner.loss(m, ds1)
-			fval2 = NeuroPlanner.loss(m, ds2)
-			@test fval1 ≈ fval2
+# 		for arch in ENCODINGS
+# 			#create model from some problem instance
+# 			pddld = arch(domain)
+# 			model = let 
+# 				pddle, state = initproblem(pddld, problem)
+# 				h₀ = pddle(state)
+# 				reflectinmodel(h₀, d -> Dense(d, 8), SegmentedMean;fsm = Dict("" =>  d -> Dense(d, 1)))
+# 			end
 
-			# fval1, gs1 = Flux.withgradient(m -> NeuroPlanner.loss(m, ds1), model)
-			# fval2, gs2 = Flux.withgradient(m -> NeuroPlanner.loss(m, ds2), model)
-			# @test fval1 ≈ fval2
-			# @test _isapprox(gs1, gs2; atol = 1e-3) # the error is quite tragic, likely caused by Float32s
-		end
-	end
-end
+# 			@testset "Loss: $(loss)" for loss in ["lstar","l2","lrt","lbfs","bellman"]
+# 				fminibatch = NeuroPlanner.minibatchconstructor("lstar")
+
+# 				ds = fminibatch(pddld, domain, problem, plan);			
+# 				ds1 = deepcopy(ds)
+# 				ds2 =  @set ds.x = deduplicate(ds.x)
+
+# 				fval1 = model(ds1.x)
+# 				fval2 = model(ds2.x)
+# 				@test fval1 ≈ fval2
+
+# 				fval1 = NeuroPlanner.loss(model, ds1)
+# 				fval2 = NeuroPlanner.loss(model, ds2)
+# 				@test fval1 ≈ fval2
+# 				# fval1, gs1 = Flux.withgradient(m -> NeuroPlanner.loss(m, ds1), model)
+# 				# fval2, gs2 = Flux.withgradient(m -> NeuroPlanner.loss(m, ds2), model)
+# 				# @test fval1 ≈ fval2
+# 				# @test _isapprox(gs1, gs2; atol = 1e-3) # the error is quite tragic, likely caused by Float32s
+# 			end
+# 		end
+# 	end
+# end
+
 
 # @testset "Integration test with deduplication" begin 
 # 	domain_name = "barman-sequential-satisficing"

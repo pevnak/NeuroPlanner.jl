@@ -9,6 +9,7 @@ function DeduplicatedMatrix(x::Matrix)
 end
 
 DeduplicatedMatrix(x::DeduplicatedMatrix) = DeduplicatedMatrix(x.x, x.ii)
+DeduplicatedMatrix(x::DeduplicatedMatrix, outer_ii::Vector{<:Integer}) = DeduplicatedMatrix(x.x, x.ii[outer_ii])
 
 Base.size(x::DeduplicatedMatrix) = (size(x.x, 1), length(x.ii))
 Base.getindex(x::DeduplicatedMatrix, i::Int, j::Int) = x.x[i, x.ii[j]]

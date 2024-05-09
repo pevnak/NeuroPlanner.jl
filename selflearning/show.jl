@@ -145,6 +145,31 @@ function finished(df; max_time = 30)
 	da
 end
 
+function find_smallest_solutions(df)
+	# first, go over all files and identify shortes trajectories
+	stat_files = map(walkdir("super_amd_fast")) do (root, dirs, files)
+		stat_files = filter(file -> endswith(file, "_stats.jls"), files)
+		map(s -> joinpath(root, s), stat_files)
+	end
+	stat_files = reduce(vcat, stat_files)
+	df = map(stat_files) do f
+		stats = deserialize(f)
+		stats = filter(s -> s.solved, stats)
+		stats = stats[:,[:problem_file, :trajectory, :sol_length]]
+		stats[:,:stat_file] .= f
+		stats
+	end
+
+	gdf = DataFrames.groupby(dff, [:problem_file])
+	combine(gdf) do sub_df 
+		i = argmin(sub_df.sol_length)
+		sub_df[i,:]
+	end
+
+	# then we need to extract plan from the trajectory
+
+end
+
 function show_vitek()
 	max_steps = 10_000
 	max_time = 30
