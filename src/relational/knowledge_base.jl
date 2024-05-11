@@ -98,7 +98,7 @@ _getindex(x::KBEntry{T}, i::Integer) where {T} = KBEntry{T}(x.e, x.ii[i:i])
 MLUtils.numobs(a::KBEntry) = length(a.ii)
 HierarchicalUtils.NodeType(::Type{KBEntry}) = HierarchicalUtils.LeafNode()
 
-ChainRulesCore.ProjectTo(x::KBEntry{T}) where {T} = ProjectTo{KBEntry}(; E, T, ii=x.ii)
+ChainRulesCore.ProjectTo(x::KBEntry{T}) where {T} = ProjectTo{KBEntry}(;  E = x.e, T, ii=x.ii)
 
 ########
 #   We do not do reduce, as it is potentially very dangerous as it might be dissinchronized with the knowledge base

@@ -187,7 +187,7 @@ function show_vitek()
 	problems = ["blocks","ferry","npuzzle","spanner","elevators_00"]
 
 	# IPC_PROBLEMS = setdiff(IPC_PROBLEMS, ["ipc23_rovers", "ipc23_sokoban"])
-	cases = vec(collect(Iterators.product(("atombinary","objectatom", "objectbinary"), ("lstar", "l2"), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), (:none, :linear), (1, 2, 3))))
+	cases = vec(collect(Iterators.product(("atombinary2","objectatom", "objectbinary"), ("lstar", "l2"), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), (:none, :linear), (1, 2, 3))))
 
 	# map(shuffle(cases)) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
 	# 	submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_fast")
