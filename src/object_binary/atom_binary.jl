@@ -1,14 +1,14 @@
 using PDDL: get_facts, get_args
 """
 struct AtomBinary{DO,D,N,G}
-	domain::DO
-	multiarg_predicates::NTuple{N,Symbol}
-	nunanary_predicates::Dict{Symbol,Int64}
-	objtype2id::Dict{Symbol,Int64}
-	constmap::Dict{Symbol, Int64}
-	model_params::NamedTuple{(:message_passes, :residual), Tuple{Int64, Symbol}}
-	obj2id::D
-	goal::G
+    domain::DO
+    multiarg_predicates::NTuple{N,Symbol}
+    nunanary_predicates::Dict{Symbol,Int64}
+    objtype2id::Dict{Symbol,Int64}
+    constmap::Dict{Symbol, Int64}
+    model_params::NamedTuple{(:message_passes, :residual), Tuple{Int64, Symbol}}
+    obj2id::D
+    goal::G
 end
 
 Represents a PDDL state as a hypergraph, whre 
@@ -146,13 +146,11 @@ function encode_edges(ex::AtomBinary, atoms::Vector{Julog.Term}, kid::Symbol)
     l = length(set_atoms)
     capacity = l * (l + 1) ÷ 2
     ebs = tuple([EdgeBuilder(2, capacity, l) for _ in 1:ex.max_arity^2]...)
-    sbs = tuple([EdgeBuilder(2, ex.max_arity*capacity, l) for _ in 1:length(ex.actionmap)]...)
-    encode_edges(ebs, sbs, ex, kid, set_atoms, id2atoms)
+    encode_edges(ebs, ex, kid, set_atoms, id2atoms)
 end
 
-function encode_edges(ebs, sbs, ex::AtomBinary, kid::Symbol, set_atoms, id2atoms)
+function encode_edges(ebs, ex::AtomBinary, kid::Symbol, set_atoms, id2atoms)
     l = length(set_atoms)
-    inserted = falses(length(sbs))
     @inbounds for i in 1:l # Can be replaced with Combinatorics.atoms
         sa = set_atoms[i]
         for j in 2:l
@@ -166,24 +164,9 @@ function encode_edges(ebs, sbs, ex::AtomBinary, kid::Symbol, set_atoms, id2atoms
                    push!(ebs[ti], (i,j))
                 end
             end
-
-            # encoding symdiff
-            sd = symdiff(sa.set,sb.set)
-            if !isempty(sd)
-                subsets2 = getindex_reduce(id2atoms, sd)
-                if !isempty(subsets2)
-                    fill!(inserted, false)
-                    for k in subsets2
-                        id = ex.actionmap[set_atoms[k].name] 
-                        inserted[id] && continue
-                        push!(sbs[id], (i,j))
-                        inserted[id] = true
-                    end
-                end
-            end
         end
     end
-    ProductNode(map(Base.Fix2(construct, kid), tuple(ebs..., sbs...)))
+    ProductNode(map(Base.Fix2(construct, kid), ebs))
 end
 
 
@@ -254,9 +237,9 @@ function getindex_reduce(id2atoms, sd)
     i, state = iterate(sd)
     v = id2atoms[i]
     next = iterate(sd, state)
-    while(next !== nothing)
+    @inbounds while(next !== nothing)
         i, state = next
-        @inbounds v = intersect(v, id2atoms[i])
+        v = intersect(v, id2atoms[i])
         next = iterate(sd, state)
     end
     return(v)
