@@ -17,11 +17,6 @@ using Accessors
 using Logging
 using TensorBoardLogger
 
-#include("solution_tracking.jl")
-#include("problems.jl")
-#include("training.jl")
-#include("utils.jl")
-
 function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch;max_steps = 10000, max_time = 30, graph_layers = 2, residual = true, dense_layers = 2, dense_dim = 32, settings = nothing)
 	!isdir(dirname(filename)) && mkpath(dirname(filename))
 	domain = load_domain(domain_pddl)
@@ -40,36 +35,52 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			h₀ = pddle(state)
 			#model = reflectinmodel(h₀, d -> ffnn(d, dense_dim, dense_dim, dense_layers);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
 			#reflectinmodel(h₀, d -> Chain(Dense(d, dense_dim, relu), BatchNorm(dense_dim));fsm = Dict("" =>  d -> Chain(ffnn(d, dense_dim, 2, dense_layers)..., BatchNorm(2))))
-			reflectinmodel(h₀, d -> Chain(Dense(d, dense_dim, relu));fsm = Dict("" =>  d -> Chain(ffnn(d, dense_dim, 2, dense_layers)..., BatchNorm(2))))
+			reflectinmodel(h₀, d -> Chain(Dense(d, dense_dim, relu));fsm = Dict("" =>  d -> Chain(ffnn(d, dense_dim, 2, dense_layers)..., BatchNorm(2), Dense(2,2))))
 			#reflectinmodel(h₀, d -> Dense(d, dense_dim, relu);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 2, dense_layers)))
 		end
 		model = setOutputToPolicy(model)
 		#logger=tblogger(filename*"_events.pb")
 		
-		
+		d=Dict()
+
 		t = @elapsed minibatches = map(train_files) do problem_file
 			@show problem_file
 			println("creating sample from problem: ",problem_file)
 			plan = load_plan(problem_file)
+            @show plan
 			problem = load_problem(problem_file)
-			ds = fminibatch(pddld, domain, problem, plan)
-			@show ds.x
-			dedu = @set ds.x = deduplicate(ds.x)
-			size_o, size_d =  Base.summarysize(ds), Base.summarysize(dedu)
+			ds = fminibatch(pddld, domain, problem, plan; plot_dict=d)
+
+			#@show ds.x
+			if !isnothing(ds)
+				return dedu = @set ds.x = deduplicate(ds.x)
+			else
+				return ds
+			end
+			#@show (length(dedu.x[:o].ii) - length(unique(dedu.x[:o].ii)))/length(dedu.x[:o].ii)
+			#size_o, size_d =  Base.summarysize(ds), Base.summarysize(dedu)
 			#println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size(d), digits =2),"%)")
-			dedu
+			#dedu
 		end
-		#log_value(logger, "time_minibatch", t; step=0)
+		#filter out timed out minibatches
+		minibatches = filter(x -> !isnothing(x), minibatches)
+		#filters out minibatches with indistinguishable states
+		minibatches = filter(x -> (length(x.x[:o].ii) - length(unique(x.x[:o].ii)))/length(x.x[:o].ii) == 0, minibatches)
+		#dedu = minibatches[1]
+		#@show (length(dedu.x[:o].ii) - length(unique(dedu.x[:o].ii)))/length(dedu.x[:o].ii)
+
+
 		opt = AdaBelief();
 		ps = Flux.params(model);
 		Flux.trainmode!(model)
 		t = @elapsed train!(NeuroPlanner.loss, model, ps, opt, () -> rand(minibatches), 10000; trn_data = minibatches, reset_fval =100)
 		Flux.testmode!(model)
+		model = roundPolicyOutput(model)
 		#log_value(logger, "time_train", t; step=0)
 		serialize(filename*"_modelADS2.jls", model)	
 		model
 	end
-	planners = model isa NeuroPlanner.LevinModel ? [BFSPlanner] : [AStarPlanner, GreedyPlanner, W15AStarPlanner, W20AStarPlanner]
+	planners = [AStarPlanner]
 
 	stats = map(Iterators.product(planners, problem_files)) do (planner, problem_file)
 		used_in_train = problem_file ∈ train_files
@@ -82,33 +93,6 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 	mean(df.solved[.!df.used_in_train])
 	serialize(filename*"_stats.jls", stats)
 	settings !== nothing && serialize(filename*"_settings.jls",settings)
-
-	model_exp = 0
-	lm_exp = 0
-	model_solved = 0
-	lm_solved = 0
-	m = []
-	l = []
-	for p in problem_files
-		!(p in train_files) && continue
-		sol,_ = solve_problem(pddld, p, model, AStarPlanner; return_unsolved=true)
-		@show sol.expanded
-		@show sol.status
-		model_exp+=sol.expanded
-		model_solved += sol.status == :success
-		push!(m, (sol.status, sol.expanded))
-		lm = LM_CutHeuristic()
-		astar = AStarPlanner(lm; max_time=30, save_search=true)
-		problem = load_problem(p)
-		sol = astar(domain, problem)
-		#@show sol
-		@show sol.expanded
-		@show sol.status
-		push!(l, (sol.status, sol.expanded))
-		lm_exp+=sol.expanded
-		lm_solved += sol.status == :success
-		println("---")
-	end
 end
 
 """
@@ -130,9 +114,10 @@ ArgParse example implemented in Comonicon.
 - `--residual <String>`:  residual connections between graph convolutions (none / dense / linear)
 
 max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
-domain_name = "ferry"
-loss_name = "lstar"
+domain_name = "blocks"
+
 arch_name = "pddl"
+loss_name = "newlstar"
 """
 
 function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 

@@ -22,6 +22,7 @@ KnowledgeBase() = KnowledgeBase(NamedTuple())
 Base.getindex(kb::KnowledgeBase, k::Symbol) = kb.kb[k]
 Base.keys(kb::KnowledgeBase) = keys(kb.kb)
 append(kb::KnowledgeBase, k::Symbol, x) = KnowledgeBase(merge(kb.kb,NamedTuple{(k,)}((x,))))
+prepend(kb::KnowledgeBase, k::Symbol, x) = KnowledgeBase(merge(NamedTuple{(k,)}((x,)), kb.kb))
 function Base.replace(kb::KnowledgeBase, k::Symbol, v)
     l = Accessors.PropertyLens{k}() ∘ Accessors.PropertyLens{:kb}()
     set(kb, l, v)
@@ -137,6 +138,10 @@ function _catobs_kbs(as::AbstractVector{<:KnowledgeBase{KS,VS}}) where {KS,VS}
         _catobs_kbs(offsets, [a[k] for a in as])
     end
     KnowledgeBase(NamedTuple{KS}(vs))
+end
+
+function _catobs_kbs(offsets, as::AbstractVector{<:AbstractVector})
+    reduce(hcat, as)
 end
 
 function _catobs_kbs(offsets, as::AbstractVector{<:AbstractMatrix})

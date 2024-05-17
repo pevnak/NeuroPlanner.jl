@@ -30,7 +30,7 @@ export initproblem
 
 include("relational/knowledge_base.jl")
 include("relational/knowledge_model.jl")
-export KBEntry, KnowledgeBase, append
+export KBEntry, KnowledgeBase, append, atoms
 include("hyper/extractor.jl")
 include("hyper/deduplication.jl")
 include("hyper/dedu_matrix.jl")
@@ -48,6 +48,14 @@ export LevinASNet, BFSPlanner
 
 include("hgnn/extractor.jl")
 export HGNNLite, HGNN
+
+include("admissible_planner/cheating_heuristic.jl")
+
+include("admissible_planner/extractor.jl")
+export AdmissibleExtractor
+
+include("admissible_planner/apply_policy.jl")
+export ApplyPolicy, setOutputToPolicy, roundPolicyOutput
 
 include("potential/extractor.jl")
 export LinearExtractor

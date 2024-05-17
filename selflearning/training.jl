@@ -57,7 +57,7 @@ function train!(loss, model, ps::Params, opt::AbstractOptimiser, prepare_minibat
 		d = prepare_minibatch()
 		l, gs = withgradient(() -> loss(model, d), ps)
 		if debug 
-			@show l
+			#@show l
 			global debug_data
 			debug_data = deepcopy((model, d))
 			isinvalid(gs) && error("gradient is isinvalid")
