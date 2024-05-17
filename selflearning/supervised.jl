@@ -2,6 +2,7 @@ using NeuroPlanner
 using PDDL
 using Flux
 using JSON
+using CSV
 using SymbolicPlanners
 using PDDL: GenericProblem
 using SymbolicPlanners: PathSearchSolution
@@ -16,11 +17,12 @@ using Functors
 using Accessors
 using Logging
 using TensorBoardLogger
+using Comonicon
 
-#include("solution_tracking.jl")
-#include("problems.jl")
-#include("training.jl")
-#include("utils.jl")
+include("solution_tracking.jl")
+include("problems.jl")
+include("training.jl")
+include("utils.jl")
 
 function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch;max_steps = 10000, max_time = 30, graph_layers = 2, residual = true, dense_layers = 2, dense_dim = 32, settings = nothing)
 	!isdir(dirname(filename)) && mkpath(dirname(filename))
@@ -30,23 +32,18 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 	#create model from some problem instance
 
 	# we can check that the model can learn the training data if the dedup_model can differentiate all input states, which is interesting by no means
-
-	model = if isfile(filename*"_model.jls")
-		deserialize(filename*"_model.jls")
+	# A special hook to rerun the faster mixed lrnn2
+	modelfile = filename*"_model.jls"
+	model = if isfile(modelfile)
+		deserialize(modelfile)
 	else
 		model = let 
 			problem = load_problem(first(train_files))
 			pddle, state = initproblem(pddld, problem)
 			h₀ = pddle(state)
-			#model = reflectinmodel(h₀, d -> ffnn(d, dense_dim, dense_dim, dense_layers);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
-			#reflectinmodel(h₀, d -> Chain(Dense(d, dense_dim, relu), BatchNorm(dense_dim));fsm = Dict("" =>  d -> Chain(ffnn(d, dense_dim, 2, dense_layers)..., BatchNorm(2))))
-			reflectinmodel(h₀, d -> Chain(Dense(d, dense_dim, relu));fsm = Dict("" =>  d -> Chain(ffnn(d, dense_dim, 2, dense_layers)..., BatchNorm(2))))
-			#reflectinmodel(h₀, d -> Dense(d, dense_dim, relu);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 2, dense_layers)))
+			reflectinmodel(h₀, d -> Dense(d, dense_dim, relu);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
 		end
-		model = setOutputToPolicy(model)
-		#logger=tblogger(filename*"_events.pb")
-		
-		
+
 		t = @elapsed minibatches = map(train_files) do problem_file
 			@show problem_file
 			println("creating sample from problem: ",problem_file)
@@ -56,31 +53,46 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			@show ds.x
 			dedu = @set ds.x = deduplicate(ds.x)
 			size_o, size_d =  Base.summarysize(ds), Base.summarysize(dedu)
-			#println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size(d), digits =2),"%)")
+			println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size_o, digits =2),"%)")
+			GC.gc();GC.gc();GC.gc();GC.gc();GC.gc();GC.gc();
+			println(read(run(pipeline(`cat /proc/meminfo`,`grep MemFree`)), String))
+
 			dedu
 		end
-		#log_value(logger, "time_minibatch", t; step=0)
+		logger=TBLogger(filename*"_events")
+		log_value(logger, "time_minibatch", t; step=0)
 		opt = AdaBelief();
 		ps = Flux.params(model);
-		Flux.trainmode!(model)
-		t = @elapsed train!(NeuroPlanner.loss, model, ps, opt, () -> rand(minibatches), 10000; trn_data = minibatches, reset_fval =100)
-		Flux.testmode!(model)
-		#log_value(logger, "time_train", t; step=0)
-		serialize(filename*"_modelADS2.jls", model)	
+		t = @elapsed train!(NeuroPlanner.loss, model, ps, opt, () -> rand(minibatches), max_steps; logger, trn_data = minibatches, reset_fval=1000)
+		log_value(logger, "time_train", t; step=0)
+		serialize(modelfile, model)	
 		model
 	end
-	planners = model isa NeuroPlanner.LevinModel ? [BFSPlanner] : [AStarPlanner, GreedyPlanner, W15AStarPlanner, W20AStarPlanner]
+	planners = model isa NeuroPlanner.LevinModel ? [BFSPlanner] : [AStarPlanner, GreedyPlanner]
 
-	stats = map(Iterators.product(planners, problem_files)) do (planner, problem_file)
+	stats = DataFrame()
+	#precompilation
+	solve_problem(pddld, first(problem_files), model, first(planners); return_unsolved = true, max_time)
+	t₀ = time()
+	for (planner, problem_file) in Iterators.product(planners, problem_files)
 		used_in_train = problem_file ∈ train_files
 		@show problem_file
-		sol = solve_problem(pddld, problem_file, model, planner; return_unsolved = true)
+		GC.gc();GC.gc();GC.gc();GC.gc();GC.gc();GC.gc();
+		println(read(run(pipeline(`cat /proc/meminfo`,`grep MemFree`)), String))
+		t = @elapsed sol = solve_problem(pddld, problem_file, model, planner; return_unsolved = true, max_time)
+		println("time in the solver: ", t)
 		trajectory = sol.sol.status == :max_time ? nothing : sol.sol.trajectory
-		merge(sol.stats, (;used_in_train, planner = "$(planner)", trajectory, problem_file))
+		s = merge(sol.stats, (;used_in_train, planner = "$(planner)", trajectory, problem_file))
+		push!(stats, s, cols=:union, promote=true)
+		if time()-t₀ > 3600	# serialize stats evert hour
+			serialize(filename*"_stats_tmp.jls", stats)
+			t₀ = time()
+		end
 	end
-	df = DataFrame(vec(stats))
-	mean(df.solved[.!df.used_in_train])
+	println("evaluation finished")
 	serialize(filename*"_stats.jls", stats)
+	CSV.write(filename*"_stats.csv", stats; transform = (col, val) -> something(val, missing))
+	rm(filename*"_stats_tmp.jls")
 	settings !== nothing && serialize(filename*"_settings.jls",settings)
 
 	model_exp = 0
@@ -129,10 +141,11 @@ ArgParse example implemented in Comonicon.
 - `--dense_layers <Int>`:  number of layers of dense network after pooling vertices (default 32)
 - `--residual <String>`:  residual connections between graph convolutions (none / dense / linear)
 
+max_steps = 10_000; max_time = 30; graph_layers = 3; dense_dim = 16; dense_layers = 3; residual = "none"; seed = 1
 max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
-domain_name = "ferry"
+domain_name = "ipc23_floortile"
 loss_name = "lstar"
-arch_name = "pddl"
+arch_name = "atombinary"
 """
 
 function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
@@ -140,16 +153,17 @@ function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_ti
 	Random.seed!(seed)
 	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, dense_dim, dense_layers, residual, seed)
 	@show settings
-	archs = Dict("asnet" => ASNet, "pddl" => HyperExtractor, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
+	archs = Dict("objectbinary" => ObjectBinary, "atombinary" => AtomBinary, "atombinary2" => AtomBinary2, "objectpair" => ObjectPair, "asnet" => ASNet, "lrnn" => LRNN, "objectatom" => ObjectAtom, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
 	residual = Symbol(residual)
 	domain_pddl, problem_files = getproblem(domain_name, false)
 	# problem_files = filter(s -> isfile(plan_file(domain_name, s)), problem_files)
 	train_files = filter(s -> isfile(plan_file(s)), problem_files)
-	train_files = sample(train_files, min(div(length(problem_files), 2), length(train_files)), replace = false)
+	train_files = domain_name ∉ IPC_PROBLEMS ? sample(train_files, min(div(length(problem_files), 2), length(train_files)), replace = false) : train_files
 	fminibatch = NeuroPlanner.minibatchconstructor(loss_name)
 	hnet = archs[arch_name]
 
-	filename = joinpath("super", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+	filename = joinpath("super_amd_fast", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+	@show filename
 	experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch; max_steps, max_time, graph_layers, residual, dense_layers, dense_dim, settings)
 end
 

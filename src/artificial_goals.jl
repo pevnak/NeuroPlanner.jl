@@ -1,4 +1,48 @@
 using PDDL: get_facts
+
+"""
+	subgoals(problem)
+	
+	create all problems with goals containing a subset of predicates of the original goal.
+
+"""
+function subgoals(problem::GenericProblem)
+	goal = problem.goal
+	map(combinations(goal.args)) do args 
+		@set problem.goal.args = args
+	end
+end
+
+"""
+	subset(args, i, n)
+
+	create at most `n` subset goals of length `i`
+"""
+function subgoals(args::AbstractVector{<:Term}, i::Integer, n::Integer)
+	gs = combinations(args, i)
+	l = length(gs)
+	if l > 100 * n 
+		return([sample(args, i, replace = false) for _ in 1:n])
+	elseif l > n
+		goals = collect(gs)
+		return(sample(goals, n, replace  = false))
+	else 
+		collect(gs)
+	end
+end
+
+function subgoals(problem::GenericProblem, i::Integer, n::Integer)
+	args = problem.goal.args
+	map(subgoals(args, i, n)) do args 
+		@set problem.goal.args = args
+	end	
+end
+
+function subgoals(problem::GenericProblem, max_per_length::Integer)
+	n = length(problem.goal.args)
+	reduce(vcat, [subgoals(problem, i, max_per_length) for i in 1:n-1])
+end
+
 """
 leafs(search_tree)
 

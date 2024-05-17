@@ -51,23 +51,18 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			problem = load_problem(problem_file)
 			ds = fminibatch(pddld, domain, problem, plan; plot_dict=d)
 
-			#@show ds.x
 			if !isnothing(ds)
 				return dedu = @set ds.x = deduplicate(ds.x)
 			else
 				return ds
 			end
-			#@show (length(dedu.x[:o].ii) - length(unique(dedu.x[:o].ii)))/length(dedu.x[:o].ii)
-			#size_o, size_d =  Base.summarysize(ds), Base.summarysize(dedu)
-			#println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size(d), digits =2),"%)")
-			#dedu
 		end
 		#filter out timed out minibatches
 		minibatches = filter(x -> !isnothing(x), minibatches)
 		#filters out minibatches with indistinguishable states
 		minibatches = filter(x -> (length(x.x[:o].ii) - length(unique(x.x[:o].ii)))/length(x.x[:o].ii) == 0, minibatches)
-		#dedu = minibatches[1]
-		#@show (length(dedu.x[:o].ii) - length(unique(dedu.x[:o].ii)))/length(dedu.x[:o].ii)
+		dedu = minibatches[1]
+		@show (length(dedu.x[:o].ii) - length(unique(dedu.x[:o].ii)))/length(dedu.x[:o].ii)
 
 
 		opt = AdaBelief();
@@ -116,7 +111,7 @@ ArgParse example implemented in Comonicon.
 max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
 domain_name = "blocks"
 
-arch_name = "pddl"
+arch_name = "atombinary"
 loss_name = "newlstar"
 """
 
@@ -125,7 +120,7 @@ function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_ti
 	Random.seed!(seed)
 	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, dense_dim, dense_layers, residual, seed)
 	@show settings
-	archs = Dict("asnet" => ASNet, "pddl" => HyperExtractor, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
+	archs = Dict("objectbinary" => ObjectBinary, "atombinary" => AtomBinary, "atombinary2" => AtomBinary2, "objectpair" => ObjectPair, "asnet" => ASNet, "lrnn" => LRNN, "objectatom" => ObjectAtom, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
 	residual = Symbol(residual)
 	domain_pddl, problem_files = getproblem(domain_name, false)
 	# problem_files = filter(s -> isfile(plan_file(domain_name, s)), problem_files)

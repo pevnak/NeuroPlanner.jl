@@ -1,0 +1,6 @@
+(movedown sokoban1 l10 l14)
+(movedown sokoban1 l14 l18)
+(pushleft sokoban2 l16 l15 l14 crate2)
+(pushup sokoban1 l18 l14 l10 crate2)
+(pushup sokoban1 l14 l10 l6 crate2)
+(pushup sokoban1 l10 l6 l2 crate2)

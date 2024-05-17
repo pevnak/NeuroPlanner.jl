@@ -41,7 +41,7 @@ function specialize(ex::ASNet, problem)
 		allgrounding(problem, p, type2obs)
 	end
 	predicate2id = Dict(reverse.(enumerate(predicates)))
-ex = ASNet(ex.domain, type2obs, ex.model_params, predicate2id, nothing, nothing, nothing)
+	ex = ASNet(ex.domain, type2obs, ex.model_params, predicate2id, nothing, nothing, nothing)
 
 	# just add fake input for a se to have something, it does not really matter what
 	n = length(predicate2id)
@@ -107,16 +107,24 @@ Dict{Symbol, Vector{Const}} with 6 entries:
 """
 function type2objects(domain, problem)
 	#first create a direct descendants
-	type2obs = map(unique(values(problem.objtypes))) do k 
-		k => [n for (n,v) in problem.objtypes if v == k]
-	end |> Dict
+	type2obs = Dict{Symbol, Set{PDDL.Const}}()
+	group_by_value!(type2obs, problem.objtypes)
+	group_by_value!(type2obs, domain.constypes)
 
 	kv = sort(collect(domain.typetree), lt = (i,j) -> i[1] ∈ j[2])
 	for (k, v) in kv
+		v = filter(Base.Fix1(haskey, type2obs), v)
 		isempty(v) && continue
 		type2obs[k] = reduce(union, [type2obs[i] for i in v])
 	end
-	type2obs
+	Dict(k => collect(v) for (k,v) in type2obs)
+end
+
+function group_by_value!(o::Dict{K,Set{V}}, d::Dict{V,K}) where {V,K}
+	for (k,v) in d
+		push!(get!(o,v,Set{V}()), k)
+	end
+	o
 end
 
 function add_goalstate(ex::ASNet, problem, state = goalstate(ex.domain, problem))
@@ -228,9 +236,10 @@ end
 ground(p, assignement)
 
 ground variables in predicate `p` with assignment 
+If the keys is missing in assignement, it might be constant and it is left as key
 """
 function ground(p::Compound, assignment::Dict)
-	Compound(p.name, [assignment[k] for k in p.args])
+	Compound(p.name, [get(assignment, k, k) for k in p.args])
 end
 
 function ground(p::Const, assignment::Dict)
