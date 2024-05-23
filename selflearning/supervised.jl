@@ -24,7 +24,7 @@ include("problems.jl")
 include("training.jl")
 include("utils.jl")
 
-function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch;max_steps = 10000, max_time = 30, graph_layers = 2, residual = true, dense_layers = 2, dense_dim = 32, settings = nothing)
+function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch;max_steps = 10000, max_time = 30, graph_layers = 2, residual = true, dense_layers = 2, dense_dim = 32, settings = nothing, aggregation = SegmentedSumMax)
 	!isdir(dirname(filename)) && mkpath(dirname(filename))
 	domain = load_domain(domain_pddl)
 	pddld = hnet(domain; message_passes = graph_layers, residual)
@@ -41,7 +41,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			problem = load_problem(first(train_files))
 			pddle, state = initproblem(pddld, problem)
 			h₀ = pddle(state)
-			reflectinmodel(h₀, d -> Dense(d, dense_dim, relu);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
+			reflectinmodel(h₀, d -> Dense(d, dense_dim, relu), aggregation;fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
 		end
 
 		t = @elapsed minibatches = map(train_files) do problem_file
@@ -54,9 +54,6 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			dedu = @set ds.x = deduplicate(ds.x)
 			size_o, size_d =  Base.summarysize(ds), Base.summarysize(dedu)
 			println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size_o, digits =2),"%)")
-			GC.gc();GC.gc();GC.gc();GC.gc();GC.gc();GC.gc();
-			println(read(run(pipeline(`cat /proc/meminfo`,`grep MemFree`)), String))
-
 			dedu
 		end
 		logger=TBLogger(filename*"_events")
@@ -77,8 +74,6 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 	for (planner, problem_file) in Iterators.product(planners, problem_files)
 		used_in_train = problem_file ∈ train_files
 		@show problem_file
-		GC.gc();GC.gc();GC.gc();GC.gc();GC.gc();GC.gc();
-		println(read(run(pipeline(`cat /proc/meminfo`,`grep MemFree`)), String))
 		t = @elapsed sol = solve_problem(pddld, problem_file, model, planner; return_unsolved = true, max_time)
 		println("time in the solver: ", t)
 		trajectory = sol.sol.status == :max_time ? nothing : sol.sol.trajectory
@@ -140,20 +135,24 @@ ArgParse example implemented in Comonicon.
 - `--dense_dim <Int>`:  dimension of all hidden layers, even those realizing graph convolutions (default  32)
 - `--dense_layers <Int>`:  number of layers of dense network after pooling vertices (default 32)
 - `--residual <String>`:  residual connections between graph convolutions (none / dense / linear)
+- `--aggregation <String>`:  type of aggregation of the neighborhood ("meanmax / "maxsum")
 
-max_steps = 10_000; max_time = 30; graph_layers = 3; dense_dim = 16; dense_layers = 3; residual = "none"; seed = 1
-max_steps = 10_000; max_time = 30; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
+max_steps = 10_000; max_time = 30; aggregation = "meanmax"; graph_layers = 3; dense_dim = 16; dense_layers = 3; residual = "none"; seed = 1
+max_steps = 10_000; max_time = 30; aggregation = "meanmax"; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
 domain_name = "ipc23_floortile"
 loss_name = "lstar"
-arch_name = "atombinary"
+arch_name = "objectbinary"
 """
-
-function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
-		dense_dim::Int = 32, dense_layers::Int = 2, residual::String = "none", seed::Int = 1)
+@main function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
+		dense_dim::Int = 32, aggregation = "summax", dense_layers::Int = 2, residual::String = "none", seed::Int = 1)
 	Random.seed!(seed)
-	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, dense_dim, dense_layers, residual, seed)
+	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, aggregation, dense_dim, dense_layers, residual, seed)
 	@show settings
+	filename = joinpath("super_amd_fast", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed], "_"))
+	@show filename
+
 	archs = Dict("objectbinary" => ObjectBinary, "atombinary" => AtomBinary, "atombinary2" => AtomBinary2, "objectpair" => ObjectPair, "asnet" => ASNet, "lrnn" => LRNN, "objectatom" => ObjectAtom, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
+	aggregations = Dict("meanmax" => SegmentedMeanMax, "summax" => SegmentedSumMax)
 	residual = Symbol(residual)
 	domain_pddl, problem_files = getproblem(domain_name, false)
 	# problem_files = filter(s -> isfile(plan_file(domain_name, s)), problem_files)
@@ -161,9 +160,8 @@ function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_ti
 	train_files = domain_name ∉ IPC_PROBLEMS ? sample(train_files, min(div(length(problem_files), 2), length(train_files)), replace = false) : train_files
 	fminibatch = NeuroPlanner.minibatchconstructor(loss_name)
 	hnet = archs[arch_name]
+	aggregation = aggregations[aggregation]
 
-	filename = joinpath("super_amd_fast", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
-	@show filename
-	experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch; max_steps, max_time, graph_layers, residual, dense_layers, dense_dim, settings)
+	experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch; max_steps, max_time, graph_layers, aggregation, residual, dense_layers, dense_dim,  settings)
 end
 

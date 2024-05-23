@@ -58,8 +58,16 @@ function compute_stats(df; max_time = 30)
 	end
 end
 
-function submit_missing(;dry_run = true, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super")
-	filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+function rename_maxsum(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed, result_dir = "super")
+	old_filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+	new_filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed], "_"))
+	isfile(old_filename*"_stats.jls") && mv(old_filename*"_stats.jls", new_filename*"_stats.jls")
+	isfile(old_filename*"_stats_tmp.jls") && mv(old_filename*"_stats_tmp.jls", new_filename*"_stats_tmp.jls")
+	isfile(old_filename*"_model.jls") && mv(old_filename*"_model.jls", new_filename*"_model.jls")
+end
+
+function submit_missing(;dry_run = true, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed, result_dir = "super")
+	filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed], "_"))
 	if isfile(filename*"_stats.jls")
 		println(@green "finished stats "*filename)
 	 	return(:finished)
@@ -80,9 +88,13 @@ function submit_missing(;dry_run = true, domain_name, arch_name, loss_name, max_
 	return(:nothing)
 end
 
-function read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir="super")
-	# filename = joinpath("super", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
-	filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+function read_data(;domain_name, arch_name, loss_name, max_steps, aggregation,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir="super")
+	filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed], "_"))
+	old_filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+	if aggregation == "maxsum" && isfile(old_filename*"_stats.jls")
+		println("moving ", old_filename*"_stats.jls")
+		mv(old_filename*"_stats.jls", filename*"_stats.jls")
+	end
 	filename = filename*"_stats.jls"
 	!isfile(filename) && return(DataFrame())
 	stats = deserialize(filename)
@@ -93,6 +105,7 @@ function read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, gra
 	df[:,:loss_name] .= loss_name
 	df[:,:graph_layers] .= graph_layers
 	df[:,:dense_dim] .= dense_dim
+	df[:,:aggregation] .= aggregation
 	df[:,:dense_layers] .= dense_layers
 	df[:,:residual] .= residual
 	df[:,:seed] .= seed
@@ -145,6 +158,10 @@ function finished(df; max_time = 30)
 	da
 end
 
+# function fixstats()
+	# filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
+# end
+
 function find_smallest_solutions(df)
 	# first, go over all files and identify shortes trajectories
 	stat_files = map(walkdir("super_amd_fast")) do (root, dirs, files)
@@ -187,21 +204,22 @@ function show_vitek()
 	problems = ["blocks","ferry","npuzzle","spanner","elevators_00"]
 
 	# IPC_PROBLEMS = setdiff(IPC_PROBLEMS, ["ipc23_rovers", "ipc23_sokoban"])
-	cases = vec(collect(Iterators.product(("atombinary2","objectatom", "objectbinary"), ("lstar", "l2"), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), (:none, :linear), (1, 2, 3))))
+	cases = vec(collect(Iterators.product(("atombinary2", "atombinary","objectatom", "objectbinary"), ("lstar", "l2"), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), ("meanmax", "maxsum"), (:none, :linear), (1, 2, 3))))
+	# cases = vec(collect(Iterators.product(("atombinary2",), ("lstar", "l2"), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), (:none, :linear), (1, 2, 3))))
 
-	# map(shuffle(cases)) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
-	# 	submit_missing(;dry_run, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_fast")
+	# map(shuffle(cases)) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, aggregation,  residual, seed)
+	# 	submit_missing(;dry_run, domain_name, arch_name, aggregation, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_fast")
 	# end |> vec |> countmap
 
-	df = isfile("super_amd_fast/results.csv") ? CSV.read("super_amd_fast/results.csv", DataFrame) :  DataFrame()
+	df = isfile("super_amd_fast/results.csv") ? CSV.read("super_amd_fast/results.csv", DataFrame) :  DataFrame();
 
 	if !isempty(df)
-		done = Set([(r.arch_name, r.loss_name, r.domain_name, r.dense_dim, r.graph_layers, Symbol(r.residual), r.seed,) for r in eachrow(df)])
+		done = Set([(r.arch_name, r.loss_name, r.domain_name, r.dense_dim, r.graph_layers, r.aggregation, Symbol(r.residual), r.seed,) for r in eachrow(df)])
 		cases = filter(e -> e ∉ done, collect(cases))
 	end;
 
-	amd_stats = map(cases) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, residual, seed)
-		read_data(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir="super_amd_fast")
+	amd_stats = map(cases) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, aggregation, residual, seed)
+		read_data(;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed, result_dir="super_amd_fast")
 	end |> vec;
 	amd_stats = filter(!isempty, amd_stats)
 	if !isempty(amd_stats)
@@ -211,8 +229,14 @@ function show_vitek()
 		df = isempty(df) ? dff : vcat(df, dff);
 		CSV.write("super_amd_fast/results.csv", df)
 	end
+	println("aggregation = meanmax")
+	dff = filter(r -> r.aggregation == "meanmax", df)
+	finished(dff);
+	vitek_table(dff, :tst_solved, highlight_max);
 
-	finished(df);
-	vitek_table(df, :tst_solved, highlight_max);
+	println("aggregation = maxsum")
+	dff = filter(r -> r.aggregation == "maxsum", df)
+	finished(dff);
+	vitek_table(dff, :tst_solved, highlight_max);
 end
 show_vitek();

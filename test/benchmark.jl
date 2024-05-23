@@ -29,7 +29,13 @@ include("problems.jl")
 include("training.jl")
 include("utils.jl")
 
-function benchmark_domain_arch(archs, domain_name)
+function graph_stats(kb::KnowledgeBase)
+	nv = size(kb[:x1],2)
+	ne = mapreduce(ds -> length(ds.data.data[1].data.ii), +, kb[:gnn_2].data)
+	[nv, ne]
+end
+
+function benchmark_domain_arch(archs, domain_name; difficulty="train")
 	graph_layers = 2
 	dense_dim = 16
 	dense_layers = 2
@@ -37,8 +43,14 @@ function benchmark_domain_arch(archs, domain_name)
 
 	residual = Symbol(residual)
 	domain_pddl, problem_files = getproblem(domain_name, false)
-	train_files = filter(s -> isfile(plan_file(s)), problem_files)
-	train_files = domain_name ∉ IPC_PROBLEMS ? sample(train_files, min(div(length(problem_files), 2), length(train_files)), replace = false) : train_files
+	if difficulty == "train"
+		train_files = filter(s -> isfile(plan_file(s)), problem_files)
+		train_files = domain_name ∉ IPC_PROBLEMS ? sample(train_files, min(div(length(problem_files), 2), length(train_files)), replace = false) : train_files
+		problem_files = train_files
+	else
+		problem_files = sort(filter(s -> contains(s, difficulty), problem_files))
+	end
+
 	domain = load_domain(domain_pddl)
 
 	# function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch;max_steps = 10000, max_time = 30, graph_layers = 2, residual = true, dense_layers = 2, dense_dim = 32, settings = nothing)
@@ -50,25 +62,42 @@ function benchmark_domain_arch(archs, domain_name)
 		reflectinmodel(h₀, d -> Dense(d, dense_dim, relu);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
 	end
 
-	map(train_files[end-5:end]) do problem_file
+	map(problem_files[end-5:end]) do problem_file
 		problem = load_problem(problem_file)
-		plan = load_plan(problem_file)
 		state = initstate(domain, problem)
-		states = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
+		if difficulty == "train"
+			plan = load_plan(problem_file)
+			states = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
+		else
 
+			sol = SymbolicPlanners.solve(AStarPlanner(NullHeuristic(); max_nodes = 10), domain, state, PDDL.get_goal(problem))
+		end
+
+		# timing of extraction
+		ts = map(archs) do hnet
+			pddld = hnet(domain; message_passes = graph_layers, residual)
+			pddle, state = initproblem(pddld, problem)
+			map(pddle, states)
+			mean(@elapsed map(pddle, states) for _ in 1:100) / length(states)
+		end
+
+
+		# timing of extraction + model
+		# ts = map(models, archs) do model, hnet
+		# 	pddld = hnet(domain; message_passes = graph_layers, residual)
+		# 	pddle, state = initproblem(pddld, problem)
+		# 	map(model ∘ deduplicate  ∘ pddle, states)
+		# 	mean(@elapsed map(model ∘ deduplicate ∘ pddle, states) for _ in 1:100) / length(states)
+		# end
+
+		# number of vertices and edges
 		# ts = map(archs) do hnet
 		# 	pddld = hnet(domain; message_passes = graph_layers, residual)
 		# 	pddle, state = initproblem(pddld, problem)
-		# 	map(pddle, states)
-		# 	mean(@elapsed map(pddle, states) for _ in 1:100) / length(states)
+		# 	mean(map(graph_stats ∘ pddle, states))
 		# end
 
-		ts = map(models, archs) do model, hnet
-			pddld = hnet(domain; message_passes = graph_layers, residual)
-			pddle, state = initproblem(pddld, problem)
-			map(model ∘ deduplicate ∘ pddle, states)
-			mean(@elapsed map(model ∘ deduplicate ∘ pddle, states) for _ in 1:100) / length(states)
-		end
+		
 		ns = tuple([Symbol("$(a)") for a in archs]...)
 		stats = merge((;domain_name, problem_file), NamedTuple{ns}(ts))
 		@show stats
@@ -77,78 +106,90 @@ function benchmark_domain_arch(archs, domain_name)
 end
 
 # archs = [ObjectBinary,ObjectAtom, AtomBinary, ObjectPair]
-archs = [ObjectBinary,ObjectAtom, AtomBinary]
+archs = [ObjectBinary,ObjectAtom, AtomBinary, AtomBinary2]
 data = map(problem -> benchmark_domain_arch(archs, problem), setdiff(IPC_PROBLEMS,["ipc23_sokoban"]))
 df = DataFrame(reduce(vcat, data))
-gdf = DataFrames.groupby(df, ["domain_name"])
+gdf = DataFrames.groupby(df, ["domain_name"]);
 combine(gdf) do sub_df 
 	 (;ObjectBinary = round(1e6*mean(sub_df.ObjectBinary), digits = 1),
 	 	ObjectAtom = round(1e6*mean(sub_df.ObjectAtom), digits = 1), 
 	 	AtomBinary = round(1e6*mean(sub_df.AtomBinary), digits = 1),
+	 	AtomBinary2 = round(1e6*mean(sub_df.AtomBinary2), digits = 1),
 	 )
 end
 
-# f0a267e17a8bce06bd0f88233902279471f6f605
+
+# combine(gdf) do sub_df 
+# 	 (;ObjectBinary = tuple(round.(mean(sub_df.ObjectBinary), digits = 1)...),
+# 	 	ObjectAtom = tuple(round.(mean(sub_df.ObjectAtom), digits = 1)...),
+# 	 	AtomBinary = tuple(round.(mean(sub_df.AtomBinary), digits = 1)...),
+# 	 	AtomBinary2 = tuple(round.(mean(sub_df.AtomBinary2), digits = 1)...),
+# 	 )
+# end
+
+
+#######
+#	Average number of vertices and edges per problem
+#######
+ Row │ domain_name        ObjectBinary   ObjectAtom     AtomBinary        AtomBinary2
+     │ String             Tuple…         Tuple…         Tuple…            Tuple…
+─────┼─────────────────────────────────────────────────────────────────────────────────────
+   1 │ ipc23_ferry        (23.8, 24.4)   (23.8, 24.4)   (26.4, 128.7)     (26.4, 83.4)
+   2 │ ipc23_rovers       (35.0, 459.2)  (35.0, 238.7)  (261.1, 22204.2)  (261.1, 21620.9)
+   3 │ ipc23_blocksworld  (17.7, 25.3)   (17.7, 25.3)   (45.4, 272.6)     (45.4, 209.1)
+   4 │ ipc23_floortile    (34.0, 139.0)  (34.0, 139.0)  (156.7, 3032.1)   (156.7, 2764.5)
+   5 │ ipc23_satellite    (42.0, 102.5)  (42.0, 102.5)  (112.9, 1627.6)   (112.9, 1425.3)
+   6 │ ipc23_spanner      (28.0, 27.0)   (28.0, 27.0)   (46.3, 225.5)     (46.3, 155.2)
+   7 │ ipc23_childsnack   (26.5, 8.4)    (26.5, 8.4)    (28.1, 90.2)      (28.1, 56.9)
+   8 │ ipc23_miconic      (29.8, 200.9)  (29.8, 200.9)  (217.8, 7726.0)   (217.8, 7310.2)
+   9 │ ipc23_transport    (25.2, 73.0)   (25.2, 73.0)   (73.0, 1522.2)    (73.0, 1391.6)
+
+
+
+
 # EdgeBuilder on M3 in μs with a HMGNNnetwork with config (graph_layers = 2, dense_dim = 16, dense_layers = 2, residual = "none")
-#  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary  ObjectPair
-#      │ String             Float64       Float64     Float64     Float64     Float64
-# ─────┼─────────────────────────────────────────────────────────────────────────────────
-#    1 │ ipc23_ferry                44.1        33.3        31.6       141.8  16597.2
-#    2 │ ipc23_rovers              582.8       596.8       501.4     55014.8      1.04e5
-#    3 │ ipc23_blocksworld          53.5        35.7        34.4       360.4   6713.5
-#    4 │ ipc23_floortile           257.1       276.2       240.8      5212.1  45793.2
-#    5 │ ipc23_satellite           215.5       241.5       212.8      2280.9  74582.5
-#    6 │ ipc23_spanner             111.9        96.9        86.1       336.2  20747.5
-#    7 │ ipc23_childsnack           92.1        85.0        78.0       268.0  21443.0
-#    8 │ ipc23_miconic             175.3       199.8       162.0     16673.5  31035.6
-#    9 │ ipc23_transport           158.5       164.3       145.0      1322.4  18914.3
+# without state deduplication
+#  Row │ domain_name        ObjectBinary  ObjectAtom  AtomBinary  AtomBinary2
+#      │ String             Float64       Float64     Float64     Float64
+# ─────┼──────────────────────────────────────────────────────────────────────
+#    1 │ ipc23_ferry                97.5        56.0       135.1        119.8
+#    2 │ ipc23_rovers             3759.7      3876.5      4725.7       3987.5
+#    3 │ ipc23_blocksworld          79.9        67.3       210.1        195.0
+#    4 │ ipc23_floortile           363.1       305.5      1046.1        798.1
+#    5 │ ipc23_satellite           528.1       262.6       619.1        497.6
+#    6 │ ipc23_spanner             172.2       108.7       175.4        164.5
+#    7 │ ipc23_childsnack          169.0       105.9       123.3        102.0
+#    8 │ ipc23_miconic             188.8       149.4      1928.4       1514.2
+#    9 │ ipc23_transport           283.9       194.8       500.4        451.2
+
+# EdgeBuilder on M3 in μs with a HMGNNnetwork with config (graph_layers = 2, dense_dim = 16, dense_layers = 2, residual = "none")
+   # with state deduplication
+ Row │ domain_name        ObjectBinary  ObjectAtom  AtomBinary  AtomBinary2
+     │ String             Float64       Float64     Float64     Float64
+─────┼──────────────────────────────────────────────────────────────────────
+   1 │ ipc23_ferry                58.0        55.9       119.2        111.3
+   2 │ ipc23_rovers              596.8       614.6      4695.1       3941.8
+   3 │ ipc23_blocksworld          69.6        66.4       212.0        202.5
+   4 │ ipc23_floortile           308.6       299.6       997.6        764.8
+   5 │ ipc23_satellite           224.4       232.2       590.9        471.2
+   6 │ ipc23_spanner             109.4        97.3       176.5        167.7
+   7 │ ipc23_childsnack          102.5        93.3       124.8        103.5
+   8 │ ipc23_miconic             149.2       146.9      1884.5       1486.6
+   9 │ ipc23_transport           185.0       181.5       507.1        447.3
 
 
 
 # f0a267e17a8bce06bd0f88233902279471f6f605
 # EdgeBuilder on M3 in μs
-#  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary  ObjectPair
-#      │ String             Float64       Float64     Float64     Float64     Float64
-
-#    1 │ ipc23_ferry                 9.7         9.7         9.2        45.1       305.8
-#    2 │ ipc23_rovers              107.8       252.6       114.6      5197.7     11985.7
-#    3 │ ipc23_blocksworld          13.7         9.6         8.8        82.9       133.2
-#    4 │ ipc23_floortile            55.0        84.7        45.9       822.0      4835.6
-#    5 │ ipc23_satellite            39.5        66.7        39.1       502.0      7333.0
-#    6 │ ipc23_spanner              22.7        20.6        17.1        90.2       820.3
-#    7 │ ipc23_childsnack           19.9        14.5        13.6        75.9       352.8
-#    8 │ ipc23_miconic              49.7        84.3        49.4      1680.4      5590.2
-#    9 │ ipc23_sokoban             119.8       105.0        76.4     10670.8       ---
-#   10 │ ipc23_transport            28.8        46.9        27.3       219.0      1216.3
-
-
-# f0a267e17a8bce06bd0f88233902279471f6f605
-# EdgeBuilderMat on M3 in μs
-#  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary
+#  Row │ domain_name        ObjectBinary  ObjectAtom  AtomBinary  AtomBinary2
 #      │ String             Float64       Float64     Float64     Float64
-# ─────┼─────────────────────────────────────────────────────────────────────
-#    1 │ ipc23_ferry                10.6         9.4         8.6        53.8
-#    2 │ ipc23_rovers              108.7       270.8       116.8      4812.0
-#    3 │ ipc23_blocksworld          14.5         9.8         9.7        89.8
-#    4 │ ipc23_floortile            52.7        84.8        45.8       806.6
-#    5 │ ipc23_satellite            38.6        54.8        34.3       496.4
-#    6 │ ipc23_spanner              24.4        22.4        17.1        93.3
-#    7 │ ipc23_childsnack           20.2        14.8        14.3        74.9
-#    8 │ ipc23_miconic              50.4        83.7        46.3      1679.7
-#    9 │ ipc23_sokoban             116.3       109.6        75.7     10611.4
-#   10 │ ipc23_transport            28.7        46.0        29.6       213.0
-
-# [vitek ce6a7bf] ScatteredBags on M3 in μs
-#  Row │ domain_name        ObjectBinary  MixedLRNN2  ObjectAtom  AtomBinary
-#      │ String             Float64       Float64     Float64     Float64
-# ─────┼─────────────────────────────────────────────────────────────────────
-#    1 │ ipc23_ferry                18.0        14.2        13.0        94.4
-#    2 │ ipc23_rovers              207.8       335.2       196.5      8110.4
-#    3 │ ipc23_blocksworld          22.9        14.0        13.1       179.2
-#    4 │ ipc23_floortile            96.6       122.4        85.6      1344.5
-#    5 │ ipc23_satellite            72.8        83.5        72.0       770.5
-#    6 │ ipc23_spanner              38.2        35.1        30.6       190.8
-#    7 │ ipc23_childsnack           33.4        27.1        25.9       154.2
-#    8 │ ipc23_miconic              81.3       112.4        73.1      2725.0
-#    9 │ ipc23_sokoban             223.3       176.4       135.9     12285.1
-#   10 │ ipc23_transport            54.7        68.8        48.9       445.7
+# ─────┼──────────────────────────────────────────────────────────────────────
+#    1 │ ipc23_ferry                 9.7         6.4        26.8         21.4
+#    2 │ ipc23_rovers               89.8        97.6       996.5        447.7
+#    3 │ ipc23_blocksworld          12.7         6.6        37.2         29.1
+#    4 │ ipc23_floortile            42.6        35.3       298.8        116.4
+#    5 │ ipc23_satellite            32.6        29.5       201.7         81.6
+#    6 │ ipc23_spanner              21.6        13.3        39.5         29.8
+#    7 │ ipc23_childsnack           19.1        10.6        22.2         20.4
+#    8 │ ipc23_miconic              43.8        39.1       511.1        193.3
+#    9 │ ipc23_transport            25.1        22.1        95.3         64.0
