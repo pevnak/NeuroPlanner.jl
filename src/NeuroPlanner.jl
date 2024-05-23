@@ -39,7 +39,12 @@ include("utils.jl")
 include("mill_extension/mill_extension.jl")
 include("relational/knowledge_base.jl")
 include("relational/knowledge_model.jl")
-export KBEntry, KnowledgeBase, append
+export KBEntry, KnowledgeBase, append, atoms
+3#include("hyper/extractor.jl")
+#include("hyper/deduplication.jl")
+#include("hyper/dedu_matrix.jl")
+#export HyperExtractor, deduplicate
+#include("hyper/mha.jl")
 include("relational/deduplication.jl")
 include("relational/coloring.jl")
 export deduplicate, color
@@ -65,17 +70,26 @@ export ObjectBinary, AtomBinary, AtomBinary2, ObjectAtom, ObjectPair
 # ASNet and HGNN by Silvia
 include("asnets/extractor.jl")
 export ASNet
-include("hgnn/extractor.jl")
-export HGNNLite, HGNN
 
-include("graphkernel/graphkernel.jl")
-export GraphKernel
+#include("graphkernel/graphkernel.jl")
+#export GraphKernel
 
 # ASNet is a pain in ...
 include("levin_asnet/extractor.jl")
 include("levin_asnet/loss.jl")
 include("levin_asnet/bfs_planner.jl")
 export LevinASNet, BFSPlanner
+
+include("hgnn/extractor.jl")
+export HGNNLite, HGNN
+
+include("admissible_planner/cheating_heuristic.jl")
+
+include("admissible_planner/extractor.jl")
+export AdmissibleExtractor
+
+include("admissible_planner/apply_policy.jl")
+export ApplyPolicy, setOutputToPolicy, roundPolicyOutput
 
 # Potential heuristic is useless
 include("potential/extractor.jl")
@@ -97,4 +111,15 @@ export NeuroHeuristic
 export add_goalstate, add_initstate, specialize
 
 MLUtils.batch(xs::AbstractVector{<:AbstractMillNode}) = reduce(catobs, xs)
+
+include("utils/utils.jl")
+export ffnn, tblogger, W15AStarPlanner, W20AStarPlanner, dedup_fmb
+
+include("utils/training.jl")
+export train!, sample_minibatch, prepare_minibatch, isvalid, isinvalid
+
+include("utils/solution_tracking.jl")
+export solve_problem, update_solutions!, update_solution, issolved, show_stats, _show_stats
+include("utils/problems.jl")
+export load_plan, save_plan, plan_file, setup_problem, setup_classic, getproblem, accomodate_leah_plans, merge_ferber_problems, hashfile, _parse_plan, systematize, similarity_of_problems
 end

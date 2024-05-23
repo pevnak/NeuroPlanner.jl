@@ -31,6 +31,7 @@ Base.tail(kb::KnowledgeBase) = KnowledgeBase(Base.tail(kb.kb))
 Base.isempty(kb::KnowledgeBase) = isempty(kb.kb)
 Base.lastindex(kb::KnowledgeBase) = length(kb.kb)
 append(kb::KnowledgeBase, k::Symbol, x) = KnowledgeBase(merge(kb.kb, NamedTuple{(k,)}((x,))))
+prepend(kb::KnowledgeBase, k::Symbol, x) = KnowledgeBase(merge(NamedTuple{(k,)}((x,)), kb.kb))
 function Base.replace(kb::KnowledgeBase, k::Symbol, v)
     l = Accessors.PropertyLens{k}() ∘ Accessors.PropertyLens{:kb}()
     set(kb, l, v)
@@ -116,7 +117,7 @@ function reduce(::typeof(Mill.catobs), As::Vector{<:KBEntry{T}}) where {T}
 end
 
 ########
-#   THe dangerousness of getindex is questionably and will be removed on first trouble
+#   The dangerousness of getindex is questionably and will be removed on first trouble
 ########
 function Base.getindex(X::KBEntry{T}, idcs...) where {T}
     D = length(X.ii)
@@ -138,7 +139,7 @@ end
 # Concatenation of knowledge base is difficult, since KBEntries are essentially
 # views into the knowledgebase and therefore we need to ensure that when
 # we concatenate two knowledge bases for batching purposes, we correctly 
-# indexes into the original arrays. An example of a possible  problem 
+# index into the original arrays. An example of a possible problem 
 # occurs when the knowledge base contains longer array then is the 
 # maximum index in the KBEntry. In this case, problem might happen.
 # The implementation would a very nice user-case for contextual dispatch, 
@@ -153,6 +154,10 @@ function _catobs_kbs(as::AbstractVector{<:KnowledgeBase{KS,VS}}) where {KS,VS}
         _catobs_kbs(offsets, [a[k] for a in as])
     end
     KnowledgeBase(NamedTuple{KS}(vs))
+end
+
+function _catobs_kbs(offsets, as::AbstractVector{<:AbstractVector})
+    reduce(hcat, as)
 end
 
 function _catobs_kbs(offsets, as::AbstractVector{<:AbstractMatrix})

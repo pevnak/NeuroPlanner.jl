@@ -28,7 +28,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 	!isdir(dirname(filename)) && mkpath(dirname(filename))
 	domain = load_domain(domain_pddl)
 	pddld = hnet(domain; message_passes = graph_layers, residual)
-
+	pddld = AdmissibleExtractor(pddld)
 	#create model from some problem instance
 
 	# we can check that the model can learn the training data if the dedup_model can differentiate all input states, which is interesting by no means
@@ -50,6 +50,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 			plan = load_plan(problem_file)
 			problem = load_problem(problem_file)
 			ds = fminibatch(pddld, domain, problem, plan)
+			@show ds.x
 			dedu = @set ds.x = deduplicate(ds.x)
 			size_o, size_d =  Base.summarysize(ds), Base.summarysize(dedu)
 			println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size_o, digits =2),"%)")
@@ -93,6 +94,33 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 	CSV.write(filename*"_stats.csv", stats; transform = (col, val) -> something(val, missing))
 	rm(filename*"_stats_tmp.jls")
 	settings !== nothing && serialize(filename*"_settings.jls",settings)
+
+	model_exp = 0
+	lm_exp = 0
+	model_solved = 0
+	lm_solved = 0
+	m = []
+	l = []
+	for p in problem_files
+		!(p in train_files) && continue
+		sol,_ = solve_problem(pddld, p, model, AStarPlanner; return_unsolved=true)
+		@show sol.expanded
+		@show sol.status
+		model_exp+=sol.expanded
+		model_solved += sol.status == :success
+		push!(m, (sol.status, sol.expanded))
+		lm = LM_CutHeuristic()
+		astar = AStarPlanner(lm; max_time=30, save_search=true)
+		problem = load_problem(p)
+		sol = astar(domain, problem)
+		#@show sol
+		@show sol.expanded
+		@show sol.status
+		push!(l, (sol.status, sol.expanded))
+		lm_exp+=sol.expanded
+		lm_solved += sol.status == :success
+		println("---")
+	end
 end
 
 """
@@ -120,7 +148,7 @@ loss_name = "lstar"
 arch_name = "atombinary"
 """
 
-@main function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
+function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
 		dense_dim::Int = 32, dense_layers::Int = 2, residual::String = "none", seed::Int = 1)
 	Random.seed!(seed)
 	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, dense_dim, dense_layers, residual, seed)
