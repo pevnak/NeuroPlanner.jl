@@ -82,7 +82,7 @@ struct FeaturedEdgeBuilder{EB<:EdgeBuilder,M,F}
     agg::F
 end
 
-function FeaturedEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features; agg=+)
+function FeaturedEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int; agg=+)
     xe = zeros(num_features, max_edges)
     eb = EdgeBuilder(arity, max_edges, num_vertices)
     FeaturedEdgeBuilder(eb, xe, agg)
@@ -90,28 +90,48 @@ end
 
 function Base.push!(feb::FeaturedEdgeBuilder, vertices::NTuple{N,I}, x) where {N,I<:Integer}
     push!(feb.eb, vertices)
-    feb.xe[:, feb.eb.offset] .= x
+    feb.xe[:, feb.eb.num_edges] .= x
 end
 
+function Base.push!(feb::FeaturedEdgeBuilder, vertices::NTuple{N,I}, edge_type::Integer) where {N,I<:Integer}
+    push!(feb.eb, vertices)
+    feb.xe[edge_type, feb.eb.num_edges] = 1
+end
+
+
 function construct(feb::FeaturedEdgeBuilder, input_sym::Symbol)
-    x = @view feb.xe[:, 1:feb.eb.offset]
-    indices = @view feb.eb.indices[:, 1:feb.eb.offset]
+    x = @view feb.xe[:, 1:feb.eb.num_edges]
+    indices = @view feb.eb.indices[:, 1:feb.eb.num_edges]
 
     # let's deduplicate edges and aggregate information on edges
     mask, ii = find_duplicates(indices)
-    gather(indices, ii)
-    # for (src, dst) in enumerate(ii)
-    #     mask[src] && continue # jump over the first sample
-    #     for k in 1:size(x,1)
-    #         x[k, dst] = feb.agg(x[k,dst], x[k,src])
-    #     end
-    # end
-    # x = x[:,mask]
-    # Finally, we need to redo the 
+    new_x = NNlib.scatter(feb.agg, x, ii)
     xs = Tuple([ArrayNode(KBEntry(input_sym, indices[i, mask])) for i in 1:feb.eb.arity])
-    xs = tuple(xs..., x)
+    xs = tuple(xs..., new_x)
+    CompressedBagNode(ProductNode(xs), CompressedBags(indices, feb.eb.num_vertices, feb.eb.num_edges, feb.eb.arity))
 end
 
 
+"""
+    struct MultiEdgeBuilder{EB<:EdgeBuilder,T}
+        eb::EB
+        xe::Matrix{T}
+    end
 
+    Wraps `EdgeBuilder` and adds features on edges. When edges are constructed
+    edges are duplicated and their feaures are summed. The `Matrix` for features
+    one edges are duplicated. 
+"""
+struct MultiEdgeBuilder{N, EBS<:NTuple{N,<:EdgeBuilder}}
+    ebs::EBS
+end
 
+function MultiEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features; agg=+)
+    xe = zeros(num_features, max_edges)
+    eb = EdgeBuilder(arity, max_edges, num_vertices)
+    MultiEdgeBuilder(eb, xe, agg)
+end
+
+function Base.push!(feb::MultiEdgeBuilder, vertices::NTuple{N,I}, edge_type::Integer) where {N,I<:Integer}
+    push!(feb.ebs[edge_type], vertices)
+end

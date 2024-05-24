@@ -59,13 +59,17 @@ export EdgeBuilder
 include("lrnn/pure_extractor.jl")
 export LRNN
 
-# Object Binary structures by Sira and Horcik
+# Object Binary structures by Sir and Horcik
+include("object_binary/groupfacts.jl")
 include("object_binary/object_binary.jl")
+include("object_binary/object_binary_2.jl")
+export ObjectBinary2
 include("object_binary/atom_binary.jl")
 include("object_binary/atom_binary_2.jl")
+export AtomBinary2
 include("object_binary/object_pair.jl")
 include("object_binary/object_atom.jl")
-export ObjectBinary, AtomBinary, AtomBinary2, ObjectAtom, ObjectPair
+export ObjectBinary, AtomBinary, ObjectAtom, ObjectPair
 
 # ASNet and HGNN by Silvia
 include("asnets/extractor.jl")
@@ -82,8 +86,6 @@ export LevinASNet, BFSPlanner
 
 include("hgnn/extractor.jl")
 export HGNNLite, HGNN
-
-include("admissible_planner/cheating_heuristic.jl")
 
 include("admissible_planner/extractor.jl")
 export AdmissibleExtractor
