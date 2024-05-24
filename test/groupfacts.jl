@@ -3,7 +3,7 @@ using NeuroPlanner
 using NeuroPlanner: group_facts
 
 
-# domain_name = ipc23_ferry"
+# domain_name = "ipc23_ferry"
 # domain_name = "ipc23_childsnack"
 # state = initstate(domain, problem)
 
@@ -24,8 +24,12 @@ using NeuroPlanner: group_facts
 	    nullary = collect(filter(k -> isempty(domain.predicates[k].args), keys(domain.predicates)))
 		for f in facts
 			ids = tuple([obj2id[a.name] for a in f.args]...)
-			if length(ids) > 1 
-				ref_ids = only(filter(kv -> kv[1] == f.name,ref.nary))[2]
+			length(ids) > 3 && error("$(length(ids))-ary predicate exists")
+			if length(ids) == 3
+				ref_ids = only(filter(kv -> kv[1] == f.name,ref.ternary))[2]
+				@test ids ∈ ref_ids
+			elseif length(ids) == 2
+				ref_ids = only(filter(kv -> kv[1] == f.name,ref.binary))[2]
 				@test ids ∈ ref_ids
 			elseif length(ids) == 1 
 				ref_ids = only(filter(kv -> kv[1] == f.name, ref.unary))[2]

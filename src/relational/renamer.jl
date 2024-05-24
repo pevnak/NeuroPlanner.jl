@@ -30,6 +30,7 @@ function Base.replace(kb::KnowledgeBase, k::Symbol, v::Symbol)
 end
 
 (kb::KBEntryRenamer)(ds::BagNode) = BagNode(kb(ds.data), ds.bags, ds.metadata)
+(kb::KBEntryRenamer)(x::Matrix) = x
 (kb::KBEntryRenamer)(ds::ArrayNode) = ArrayNode(kb(ds.data), ds.metadata)
 @generated function (kb::KBEntryRenamer)(x::ProductNode{<:NamedTuple{KM}}) where {KM}
     chs = map(KM) do k

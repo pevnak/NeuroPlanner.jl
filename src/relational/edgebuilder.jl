@@ -83,7 +83,7 @@ struct FeaturedEdgeBuilder{EB<:EdgeBuilder,M,F}
 end
 
 function FeaturedEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int; agg=+)
-    xe = zeros(num_features, max_edges)
+    xe = zeros(Float32, num_features, max_edges)
     eb = EdgeBuilder(arity, max_edges, num_vertices)
     FeaturedEdgeBuilder(eb, xe, agg)
 end
@@ -107,7 +107,7 @@ function construct(feb::FeaturedEdgeBuilder, input_sym::Symbol)
     mask, ii = find_duplicates(indices)
     new_x = NNlib.scatter(feb.agg, x, ii)
     xs = Tuple([ArrayNode(KBEntry(input_sym, indices[i, mask])) for i in 1:feb.eb.arity])
-    xs = tuple(xs..., new_x)
+    xs = tuple(xs..., ArrayNode(new_x))
     CompressedBagNode(ProductNode(xs), CompressedBags(indices, feb.eb.num_vertices, feb.eb.num_edges, feb.eb.arity))
 end
 
@@ -127,7 +127,7 @@ struct MultiEdgeBuilder{N, EBS<:NTuple{N,<:EdgeBuilder}}
 end
 
 function MultiEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features; agg=+)
-    xe = zeros(num_features, max_edges)
+    xe = zeros(Float32, num_features, max_edges)
     eb = EdgeBuilder(arity, max_edges, num_vertices)
     MultiEdgeBuilder(eb, xe, agg)
 end

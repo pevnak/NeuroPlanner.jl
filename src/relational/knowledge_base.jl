@@ -86,6 +86,7 @@ Base.show(io::IO, ::MIME"text/plain", @nospecialize(n::ArrayNode{<:KBEntry})) = 
 Base.size(A::KBEntry{T}) where {T} = ((:), length(A.ii))
 Base.size(A::KBEntry{T}, d) where {T} = (d == 1) ? (:) : length(A.ii)
 Base.Matrix(kb::KnowledgeBase, x::KBEntry{T}) where {T} = kb[x.e][:, x.ii]
+Base.Matrix(kb::KnowledgeBase, x::Matrix) = x
 Base.Matrix(X::KBEntry) = error("cannot instantiate Matrix from KBEntry without a KnowledgeBase, use Matrix(kb::KnowledgeBase, A::KBEntry)")
 Base.getindex(X::KBEntry, idcs) = _getindex(X, idcs)
 Base.axes(X::KBEntry, d) = d == 1 ? (:) : (1:length(X.ii))
@@ -209,7 +210,7 @@ end
 ###########
 #   Plumbing to Mill --- propagation with Knowledge base
 ###########
-function (m::Mill.ArrayModel)(kb::KnowledgeBase, x::ArrayNode{<:KBEntry})
+function (m::Mill.ArrayModel)(kb::KnowledgeBase, x::ArrayNode)
     xx = Matrix(kb, x.data)
     m.m(xx)
 end
@@ -294,7 +295,7 @@ function _reflectinmodel(kb::KnowledgeBase, x::ArrayNode, fm, fa, fsm, fsa, s, s
         fm(r)
     end |> ArrayModel
     m = Mill._make_imputing(xx, m, ai)
-    m, size(m(kb, x), 1)
+    m, size(m(ArrayNode(xx)), 1)
 end
 
 
