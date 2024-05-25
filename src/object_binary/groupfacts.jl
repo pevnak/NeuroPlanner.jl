@@ -81,11 +81,22 @@ function intstates(obj2id::Dict{Symbol,I}, pifo::PredicateInfo, facts::Vector{<:
     for i in 1:length(mask)
         mask[i] || continue
         f = facts[i]
-        o[index] = IntState(id2fid[pids[i]], _map_tuple(j -> obj2id[f.args[j].name], arity))
+        # o[index] = IntState(id2fid[pids[i]], _map_tuple(j -> obj2id[f.args[j].name], arity))
+        o[index] = IntState(id2fid[pids[i]], args2ids(obj2id, f, arity))
         index += 1
     end
     o
 end
+
+@generated function args2ids(obj2id, f, arrity::Val{N}) where {N}
+    chs = map(1:N) do j
+        :(obj2id[f.args[$(j)].name])
+    end
+    quote
+        tuple($(chs...))
+    end
+end
+
 
 function merge_states(s1, s2)
     map(vcat, s1, s2)
