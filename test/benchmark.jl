@@ -106,30 +106,19 @@ function benchmark_domain_arch(archs, domain_name; difficulty="train")
 end
 
 # archs = [ObjectBinary,ObjectAtom, AtomBinary, ObjectPair]
-archs = [ObjectBinary, ObjectBinary2FE, ObjectBinary2FENA, ObjectBinary2ME, ObjectAtom, AtomBinary, AtomBinary2]
+archs = [ObjectBinaryFE, ObjectBinaryFENA, ObjectBinaryME, ObjectAtom, AtomBinary, AtomBinary2]
 data = map(problem -> benchmark_domain_arch(archs, problem), setdiff(IPC_PROBLEMS,["ipc23_sokoban"]))
 df = DataFrame(reduce(vcat, data))
 gdf = DataFrames.groupby(df, ["domain_name"]);
 combine(gdf) do sub_df 
-	 (;ObjectBinary = round(1e6*mean(sub_df.ObjectBinary), digits = 1),
-	 ObjectBinary2FE = round(1e6*mean(sub_df.ObjectBinary2FE), digits = 1),
-	 	ObjectBinary2FENA = round(1e6*mean(sub_df.ObjectBinary2FENA), digits = 1),
-	 	ObjectBinary2ME = round(1e6*mean(sub_df.ObjectBinary2ME), digits = 1),
+	 (ObjectBinaryFE = round(1e6*mean(sub_df.ObjectBinaryFE), digits = 1),
+	 	ObjectBinaryFENA = round(1e6*mean(sub_df.ObjectBinaryFENA), digits = 1),
+	 	ObjectBinaryME = round(1e6*mean(sub_df.ObjectBinaryME), digits = 1),
 	 	ObjectAtom = round(1e6*mean(sub_df.ObjectAtom), digits = 1), 
 	 	AtomBinary = round(1e6*mean(sub_df.AtomBinary), digits = 1),
 	 	AtomBinary2 = round(1e6*mean(sub_df.AtomBinary2), digits = 1),
 	 )
 end
-
-
-# combine(gdf) do sub_df 
-# 	 (;ObjectBinary = tuple(round.(mean(sub_df.ObjectBinary), digits = 1)...),
-# 	 	ObjectAtom = tuple(round.(mean(sub_df.ObjectAtom), digits = 1)...),
-# 	 	AtomBinary = tuple(round.(mean(sub_df.AtomBinary), digits = 1)...),
-# 	 	AtomBinary2 = tuple(round.(mean(sub_df.AtomBinary2), digits = 1)...),
-# 	 )
-# end
-
 
 #######
 #	Average number of vertices and edges per problem
@@ -184,15 +173,16 @@ end
 
 # f0a267e17a8bce06bd0f88233902279471f6f605
 # EdgeBuilder on M3 in μs
-#  Row │ domain_name        ObjectBinary  ObjectBinary2  ObjectAtom  AtomBinary  AtomBinary2
-#      │ String             Float64       with agg.         Float64     Float64     Float64
-# ─────┼─────────────────────────────────────────────────────────────────────────────────────
-#    1 │ ipc23_ferry                 8.7            9.4         6.6        23.2         21.2
-#    2 │ ipc23_rovers               86.0           59.3        87.8       990.0        402.0
-#    3 │ ipc23_blocksworld          11.2           11.3         6.9        33.6         28.5
-#    4 │ ipc23_floortile            41.5           28.5        34.9       300.3        123.9
-#    5 │ ipc23_satellite            32.4           22.9        29.8       196.1         82.4
-#    6 │ ipc23_spanner              19.6           13.7        13.7        37.5         31.0
-#    7 │ ipc23_childsnack           18.0           11.3        12.6        23.2         19.0
-#    8 │ ipc23_miconic              41.1           37.4        38.5       520.2        210.5
-#    9 │ ipc23_transport            23.5           18.2        22.0        90.5         60.6
+# The adventage of FE over ME depends on number of predicates types with higher arities
+#  Row │ domain_name        ObjectBinaryFE  ObjectBinaryFENA  ObjectBinaryME  ObjectAtom  AtomBinary  AtomBinary2
+#      │ String             Float64         Float64           Float64         Float64     Float64     Float64
+# ─────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────
+#    1 │ ipc23_ferry                  10.0               7.5             8.7         6.7        23.0         21.2
+#    2 │ ipc23_rovers                 56.2              51.3            81.8        87.1       942.9        354.9
+#    3 │ ipc23_blocksworld            11.5              10.0            11.6         7.2        35.3         29.8
+#    4 │ ipc23_floortile              29.6              24.6            39.2        36.5       295.4        109.7
+#    5 │ ipc23_satellite              24.5              22.2            29.6        29.4       200.1         81.3
+#    6 │ ipc23_spanner                14.0              13.1            18.2        15.6        38.5         33.4
+#    7 │ ipc23_childsnack             12.1              13.4            14.9        12.5        24.9         21.2
+#    8 │ ipc23_miconic                38.3              30.4            36.2        40.3       530.1        201.0
+#    9 │ ipc23_transport              17.2              14.3            22.7        24.4        92.1         61.7
