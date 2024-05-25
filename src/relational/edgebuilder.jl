@@ -67,14 +67,20 @@ end
 
 
 """
-    struct FeaturedEdgeBuilder{EB<:EdgeBuilder,T}
+    struct FeaturedEdgeBuilder{EB<:EdgeBuilder,M,F}
         eb::EB
-        xe::Matrix{T}
+        xe::M
+        agg::F
     end
 
-    Wraps `EdgeBuilder` and adds features on edges. When edges are constructed
-    edges are duplicated and their feaures are summed. The `Matrix` for features
-    one edges are duplicated. 
+
+    Wraps `EdgeBuilder` and adds features on edges. The features on edges are mainly
+    used to identify type of edge, as we want to compare between edges with features
+    and multi-edges. When building the featured edges, there is also an option to 
+    duplicate and deduplicate edges. When `agg = nothing,` edges are not deduplicated,
+    which is faster during construction but it might be slower during inference. Conrary,
+    when `agg=Function` (`+` is the default), the same edges are deduplicated and their 
+    features are aggregated by `add`.
 """
 struct FeaturedEdgeBuilder{EB<:EdgeBuilder,M,F}
     eb::EB
@@ -98,16 +104,35 @@ function Base.push!(feb::FeaturedEdgeBuilder, vertices::NTuple{N,I}, edge_type::
     feb.xe[edge_type, feb.eb.num_edges] = 1
 end
 
+"""
+    construct(feb::FeaturedEdgeBuilder, input_sym::Symbol)
 
+    A version of FeaturedEdgeBuilder, where edges are deduplicated and their features are
+    aggregated by `feb.agg`
+"""
 function construct(feb::FeaturedEdgeBuilder, input_sym::Symbol)
     x = @view feb.xe[:, 1:feb.eb.num_edges]
     indices = @view feb.eb.indices[:, 1:feb.eb.num_edges]
 
-    # let's deduplicate edges and aggregate information on edges
     mask, ii = find_duplicates(indices)
     new_x = NNlib.scatter(feb.agg, x, ii)
     xs = Tuple([ArrayNode(KBEntry(input_sym, indices[i, mask])) for i in 1:feb.eb.arity])
     xs = tuple(xs..., ArrayNode(new_x))
+
+    CompressedBagNode(ProductNode(xs), CompressedBags(indices[:, mask], feb.eb.num_vertices, sum(mask), feb.eb.arity))
+end
+
+"""
+    construct(feb::FeaturedEdgeBuilder{<:Any,<:Any,Nothing}, input_sym::Symbol)
+
+    if `agg` is nothing, then edges are not deduplicated
+"""
+function construct(feb::FeaturedEdgeBuilder{<:Any,<:Any,Nothing}, input_sym::Symbol)
+    x = feb.xe[:, 1:feb.eb.num_edges]
+    indices = @view feb.eb.indices[:, 1:feb.eb.num_edges]
+
+    xs = Tuple([ArrayNode(KBEntry(input_sym, indices[i, :])) for i in 1:feb.eb.arity])
+    xs = tuple(xs..., ArrayNode(x))
     CompressedBagNode(ProductNode(xs), CompressedBags(indices, feb.eb.num_vertices, feb.eb.num_edges, feb.eb.arity))
 end
 

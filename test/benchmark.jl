@@ -106,10 +106,16 @@ function benchmark_domain_arch(archs, domain_name; difficulty="train")
 end
 
 # archs = [ObjectBinary,ObjectAtom, AtomBinary, ObjectPair]
-archs = [ObjectBinary,ObjectAtom, AtomBinary, AtomBinary2]
+archs = [ObjectBinary, ObjectBinary2, ObjectAtom, AtomBinary, AtomBinary2]
 data = map(problem -> benchmark_domain_arch(archs, problem), setdiff(IPC_PROBLEMS,["ipc23_sokoban"]))
 df = DataFrame(reduce(vcat, data))
 gdf = DataFrames.groupby(df, ["domain_name"]);
+combine(gdf) do sub_df 
+	 (;ObjectBinary = round(1e6*mean(sub_df.ObjectBinary), digits = 3),
+	 	ObjectBinary2 = round(1e6*mean(sub_df.ObjectBinary2), digits = 3),
+	 )
+end
+
 combine(gdf) do sub_df 
 	 (;ObjectBinary = round(1e6*mean(sub_df.ObjectBinary), digits = 1),
 	 	ObjectAtom = round(1e6*mean(sub_df.ObjectAtom), digits = 1), 

@@ -7,6 +7,32 @@ using NeuroPlanner: group_facts
 # domain_name = "ipc23_childsnack"
 # state = initstate(domain, problem)
 
+@testset "Conversion of states to intstates" begin
+	@testset "Domain: $domain_name" for domain_name in DOMAINS
+		domain, problem = load_problem_domain(domain_name) 
+		state = initstate(domain, problem)
+		objs = sort([k.name for k in collect(keys(problem.objtypes))])
+		for k in keys(domain.constypes)
+			push!(objs, k.name)
+		end
+		obj2id = Dict([k => i for (i, k) in enumerate(objs)])
+		pifo = NeuroPlanner.PredicateInfo(domain)
+		facts = collect(PDDL.get_facts(state))
+
+		# we verify that all facts are in groupped facts, which means 
+		# that we effectively write anothe slow parser
+		ref = NeuroPlanner.intstates(domain, obj2id, facts)
+	    nullary = collect(filter(k -> isempty(domain.predicates[k].args), keys(domain.predicates)))
+		for f in facts
+			ids = tuple([obj2id[a.name] for a in f.args]...)
+			pid = findfirst(f.name .==  pifo.predicates)
+			s = NeuroPlanner.IntState(pid, ids)
+			@test s ∈ ref[length(ids) + 1]
+		end
+	end
+end
+
+
 @testset "group_facts" begin
 	@testset "Domain: $domain_name" for domain_name in DOMAINS
 		domain, problem = load_problem_domain(domain_name) 

@@ -37,7 +37,6 @@ function load_plan(domain_name)
 end
 
 
-
 _isapprox(a::Nothing, b::Nothing; kwargs...) = true
 _isapprox(a::ZeroTangent, b::Nothing; kwargs...) = true
 _isapprox(a::Number, b::Number; kwargs...) = isapprox(a,b;kwargs...)
