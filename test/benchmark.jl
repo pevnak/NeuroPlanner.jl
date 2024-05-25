@@ -106,18 +106,15 @@ function benchmark_domain_arch(archs, domain_name; difficulty="train")
 end
 
 # archs = [ObjectBinary,ObjectAtom, AtomBinary, ObjectPair]
-archs = [ObjectBinary, ObjectBinary2, ObjectAtom, AtomBinary, AtomBinary2]
+archs = [ObjectBinary, ObjectBinary2FE, ObjectBinary2FENA, ObjectBinary2ME, ObjectAtom, AtomBinary, AtomBinary2]
 data = map(problem -> benchmark_domain_arch(archs, problem), setdiff(IPC_PROBLEMS,["ipc23_sokoban"]))
 df = DataFrame(reduce(vcat, data))
 gdf = DataFrames.groupby(df, ["domain_name"]);
 combine(gdf) do sub_df 
-	 (;ObjectBinary = round(1e6*mean(sub_df.ObjectBinary), digits = 3),
-	 	ObjectBinary2 = round(1e6*mean(sub_df.ObjectBinary2), digits = 3),
-	 )
-end
-
-combine(gdf) do sub_df 
 	 (;ObjectBinary = round(1e6*mean(sub_df.ObjectBinary), digits = 1),
+	 ObjectBinary2FE = round(1e6*mean(sub_df.ObjectBinary2FE), digits = 1),
+	 	ObjectBinary2FENA = round(1e6*mean(sub_df.ObjectBinary2FENA), digits = 1),
+	 	ObjectBinary2ME = round(1e6*mean(sub_df.ObjectBinary2ME), digits = 1),
 	 	ObjectAtom = round(1e6*mean(sub_df.ObjectAtom), digits = 1), 
 	 	AtomBinary = round(1e6*mean(sub_df.AtomBinary), digits = 1),
 	 	AtomBinary2 = round(1e6*mean(sub_df.AtomBinary2), digits = 1),
@@ -187,15 +184,15 @@ end
 
 # f0a267e17a8bce06bd0f88233902279471f6f605
 # EdgeBuilder on M3 in μs
-#  Row │ domain_name        ObjectBinary  ObjectAtom  AtomBinary  AtomBinary2
-#      │ String             Float64       Float64     Float64     Float64
-# ─────┼──────────────────────────────────────────────────────────────────────
-#    1 │ ipc23_ferry                 9.7         6.4        26.8         21.4
-#    2 │ ipc23_rovers               89.8        97.6       996.5        447.7
-#    3 │ ipc23_blocksworld          12.7         6.6        37.2         29.1
-#    4 │ ipc23_floortile            42.6        35.3       298.8        116.4
-#    5 │ ipc23_satellite            32.6        29.5       201.7         81.6
-#    6 │ ipc23_spanner              21.6        13.3        39.5         29.8
-#    7 │ ipc23_childsnack           19.1        10.6        22.2         20.4
-#    8 │ ipc23_miconic              43.8        39.1       511.1        193.3
-#    9 │ ipc23_transport            25.1        22.1        95.3         64.0
+#  Row │ domain_name        ObjectBinary  ObjectBinary2  ObjectAtom  AtomBinary  AtomBinary2
+#      │ String             Float64       with agg.         Float64     Float64     Float64
+# ─────┼─────────────────────────────────────────────────────────────────────────────────────
+#    1 │ ipc23_ferry                 8.7            9.4         6.6        23.2         21.2
+#    2 │ ipc23_rovers               86.0           59.3        87.8       990.0        402.0
+#    3 │ ipc23_blocksworld          11.2           11.3         6.9        33.6         28.5
+#    4 │ ipc23_floortile            41.5           28.5        34.9       300.3        123.9
+#    5 │ ipc23_satellite            32.4           22.9        29.8       196.1         82.4
+#    6 │ ipc23_spanner              19.6           13.7        13.7        37.5         31.0
+#    7 │ ipc23_childsnack           18.0           11.3        12.6        23.2         19.0
+#    8 │ ipc23_miconic              41.1           37.4        38.5       520.2        210.5
+#    9 │ ipc23_transport            23.5           18.2        22.0        90.5         60.6

@@ -63,7 +63,7 @@ export LRNN
 include("object_binary/groupfacts.jl")
 include("object_binary/object_binary.jl")
 include("object_binary/object_binary_2.jl")
-export ObjectBinary2
+export ObjectBinary2, ObjectBinary2FE, ObjectBinary2FENA, ObjectBinary2ME
 include("object_binary/atom_binary.jl")
 include("object_binary/atom_binary_2.jl")
 export AtomBinary2

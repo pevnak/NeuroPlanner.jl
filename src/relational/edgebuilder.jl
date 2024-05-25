@@ -94,6 +94,15 @@ function FeaturedEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_
     FeaturedEdgeBuilder(eb, xe, agg)
 end
 
+"""
+    FeaturedEdgeBuilderNA(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int)
+
+    construct a `FeaturedEdgeBuilder` without aggregation
+"""
+function FeaturedEdgeBuilderNA(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int)
+    FeaturedEdgeBuilder(arity, max_edges, num_vertices, num_features;agg=nothing)    
+end
+
 function Base.push!(feb::FeaturedEdgeBuilder, vertices::NTuple{N,I}, x) where {N,I<:Integer}
     push!(feb.eb, vertices)
     feb.xe[:, feb.eb.num_edges] .= x
@@ -110,7 +119,7 @@ end
     A version of FeaturedEdgeBuilder, where edges are deduplicated and their features are
     aggregated by `feb.agg`
 """
-function construct(feb::FeaturedEdgeBuilder, input_sym::Symbol)
+function construct(feb::FeaturedEdgeBuilder{<:Any,<:Any,<:Function}, input_sym::Symbol)
     x = @view feb.xe[:, 1:feb.eb.num_edges]
     indices = @view feb.eb.indices[:, 1:feb.eb.num_edges]
 
@@ -151,12 +160,15 @@ struct MultiEdgeBuilder{N, EBS<:NTuple{N,<:EdgeBuilder}}
     ebs::EBS
 end
 
-function MultiEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features; agg=+)
-    xe = zeros(Float32, num_features, max_edges)
-    eb = EdgeBuilder(arity, max_edges, num_vertices)
-    MultiEdgeBuilder(eb, xe, agg)
+function MultiEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features)
+    ebs = tuple([EdgeBuilder(arity, max_edges, num_vertices) for _ in 1:num_features]...)
+    MultiEdgeBuilder(ebs)
 end
 
 function Base.push!(feb::MultiEdgeBuilder, vertices::NTuple{N,I}, edge_type::Integer) where {N,I<:Integer}
     push!(feb.ebs[edge_type], vertices)
+end
+
+function construct(feb::MultiEdgeBuilder, input_sym::Symbol)
+    ProductNode(map(Base.Fix2(construct, input_sym), feb.ebs))
 end
