@@ -64,11 +64,10 @@ include("object_binary/groupfacts.jl")
 include("object_binary/object_binary.jl")
 export ObjectBinary, ObjectBinaryFE, ObjectBinaryFENA, ObjectBinaryME
 include("object_binary/atom_binary.jl")
-include("object_binary/atom_binary_2.jl")
-export AtomBinary2
+export AtomBinary
 include("object_binary/object_pair.jl")
 include("object_binary/object_atom.jl")
-export ObjectBinary, AtomBinary, ObjectAtom, ObjectPair
+export ObjectBinary, ObjectAtom, ObjectPair
 
 # ASNet and HGNN by Silvia
 include("asnets/extractor.jl")

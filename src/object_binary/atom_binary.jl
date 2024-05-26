@@ -84,13 +84,9 @@ from objects to id of vertices. Goals are not changed added to the
 extractor.
 """
 function specialize(ex::AtomBinary, problem)
-    N = ceil(Int, (length(problem.objects) + length(ex.constmap))/8)
-    T = SBitSet{N, UInt8}
-
-    obj2id = Dict(v.name => (;id = i, set = T(i)) for (i, v) in enumerate(problem.objects))
+    obj2id = Dict(v.name => i for (i, v) in enumerate(problem.objects))
     for k in keys(ex.constmap)
-        i = length(obj2id) + 1
-        obj2id[k] = (;id = i, set = T(i))
+        obj2id[k] = length(obj2id) + 1
     end
     AtomBinary(ex.domain, ex.max_arity, ex.constmap, ex.actionmap, ex.model_params, obj2id, nothing, nothing)
 end
@@ -139,113 +135,42 @@ function unary_predicates(ex::AtomBinary, atoms, gii)
     x
 end
 
-
-function encode_edges(ex::AtomBinary, atoms::Vector{Julog.Term}, kid::Symbol)
-    set_atoms = map(Base.Fix1(parse_atoms, ex), atoms) 
-    id2atoms = _id2atoms(ex, set_atoms)
-    l = length(set_atoms)
-    capacity = l * (l + 1) ÷ 2
-    ebs = tuple([EdgeBuilder(2, capacity, l) for _ in 1:ex.max_arity^2]...)
-    encode_edges(ebs, ex, kid, set_atoms, id2atoms)
+function group_facts(ex::AtomBinary, atoms::Vector{Julog.Term})
+    NT = @NamedTuple{position::Int64, atom_id::Int64}
+    ids_in_atoms = [NT[] for _ in 1:length(ex.obj2id)]
+    for (i, a) in enumerate(atoms)
+        for (j,o) in enumerate(a.args)
+            oid = ex.obj2id[o.name]
+            push!(ids_in_atoms[oid], (;position = j, atom_id = i))
+        end
+    end
+    ids_in_atoms
 end
 
-function encode_edges(ebs, ex::AtomBinary, kid::Symbol, set_atoms, id2atoms)
-    l = length(set_atoms)
-    @inbounds for i in 1:l # Can be replaced with Combinatorics.atoms
-        sa = set_atoms[i]
-        for j in 2:l
-            sb = set_atoms[j]
 
-            # encoding intersection
-            is = intersect(sa.set, sb.set)
-            if !isempty(is)
-                for k in is
-                   ti = _type_of_edge(ex, k, sa, sb)
-                   push!(ebs[ti], (i,j))
-                end
+function encode_edges(ex::AtomBinary, atoms::Vector{Julog.Term}, kid::Symbol)
+    ids_in_atoms = group_facts(ex, atoms)
+    l = length(atoms)
+    capacity = l * (l + 1) ÷ 2
+    eb = tuple([EdgeBuilder(2, capacity, l) for _ in 1:ex.max_arity^2]...)
+    encode_edges(ex, eb, ids_in_atoms, kid)
+end
+
+function encode_edges(ex, eb, ids_in_atoms, kid)
+    for as in ids_in_atoms
+        for i in 1:length(as)
+            for j in 2:length(as)
+               k = _type_of_edge(ex, as[i].position, as[j].position)
+               push!(eb[k], (as[i].atom_id, as[j].atom_id))
             end
         end
     end
-    ProductNode(map(Base.Fix2(construct, kid), ebs))
+    ProductNode(map(Base.Fix2(construct, kid), eb))
 end
 
-
-"""
-    parse_atom(ex::AtomBinary, atom::Julog.Term)
-
-    convert arguments of an atom to ids `ex.obj2id`
-    and return them as a tuple of maximum size of predicates 
-    (filled by 0) and their bitset.
-
-"""
-function parse_atoms(ex::AtomBinary, atom::Julog.Term)
-    T = typeof(first(values(ex.obj2id)).set)
-    ids = zeros(Int, ex.max_arity)
-    set = T()
-    name = atom.name
-    for (i, k) in enumerate(atom.args)
-        e = ex.obj2id[k.name]
-        ids[i] = e.id
-        set = union(set, e.set)
-    end
-    return((;name, set, ids = tuple(ids...)))
-end
-
-"""
-    _type_of_edge(ex::AtomBinary, i::Int, sa, sb)
-
-    Index of type of an edge. Type of an edge is defined by the index of the object in the predicates `sa` and `sb`.
-"""
-function _type_of_edge(ex::AtomBinary, k::Int, sa, sb)
-    i, j = _inlined_search(k, sa.ids), _inlined_search(k, sb.ids)
+@inline function _type_of_edge(ex::AtomBinary, i, j)
     ex.max_arity*(i-1) + j
 end
-
-"""
-
-    _id2atoms(ex::AtomBinary, set_atoms)
-
-    Create a map of objectids to atom_ids, such that we can quickly check
-    in which atoms the object id occurs in
-"""
-function _id2atoms(ex::AtomBinary, set_atoms)
-    N = ceil(Int, (length(set_atoms))/8)
-    T = SBitSet{N,UInt8}    
-    _id2atoms(T, ex, set_atoms)
-end
-
-function _id2atoms(T, ex::AtomBinary, set_atoms)
-    id2atoms = [T() for _ in 1:length(ex.obj2id)]
-    for (i,sa) in enumerate(set_atoms)
-        for id in sa.ids 
-            id == 0 && continue
-            id2atoms[id] = union(id2atoms[id], T(i))
-        end 
-    end
-    id2atoms
-end
-
-
-"""
-    getindex_reduce(id2atoms, sd)
-
-    compute `reduce(intersect, [id2atoms[k] for k in sd])` while knowing
-    that there is at least one element and avoding to allocate the 
-    intermediate array
-"""
-function getindex_reduce(id2atoms, sd)
-    i, state = iterate(sd)
-    v = id2atoms[i]
-    next = iterate(sd, state)
-    @inbounds while(next !== nothing)
-        i, state = next
-        v = intersect(v, id2atoms[i])
-        next = iterate(sd, state)
-    end
-    return(v)
-end
-
-
 
 
 function add_goalstate(ex::AtomBinary, problem, goal=goalstate(ex.domain, problem))
