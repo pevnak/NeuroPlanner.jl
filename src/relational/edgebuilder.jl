@@ -24,46 +24,84 @@ BagNode  # 7 obs, 304 bytes
         ╰── ArrayNode(Colon()×2 KBEntry with Float32 elements)  # 2 obs, 88 bytes
 ```    
 """
-mutable struct EdgeBuilder{T<:Integer}
-    indices::Matrix{T}
+mutable struct EdgeBuilder{N, T<:Integer}
+    indices::NTuple{N,Vector{T}}
     num_vertices::Int
-    arity::Int
     max_edges::Int
     num_edges::Int
-    function EdgeBuilder(indices::Matrix{T}, num_vertices::Int, arity::Int, max_edges::Int) where {T}
-        arity > 0 || error("Can create only edge of positive arity.")
-        length(indices) == arity * max_edges || error("Length of indices must be equal to `arity * max_edges`.")
+    function EdgeBuilder(indices::NTuple{N,Vector{T}}, num_vertices::Int, max_edges::Int) where {N,T}
         num_edges = 0
-        new{T}(indices, num_vertices, arity, max_edges, num_edges)
+        new{N,T}(indices, num_vertices, max_edges, num_edges)
     end
 end
 
-function EdgeBuilder(::Val{arity}, max_edges::Int, num_vertices::Int) where {arity}
-    indices = Matrix{Int}(undef, arity, max_edges)
-    EdgeBuilder(indices, num_vertices, arity, max_edges)
+function EdgeBuilder(ar::Val{arity}, max_edges::Int, num_vertices::Int) where {arity}
+    indices = _map_tuple(_ -> Vector{Int}(undef, max_edges), ar)
+    EdgeBuilder(indices, num_vertices, max_edges)
 end
 
 
 function EdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int)
-    indices = Matrix{Int}(undef, arity, max_edges)
-    EdgeBuilder(indices, num_vertices, arity, max_edges)
+    indices = _map_tuple(_ -> Vector{Int}(undef, max_edges), Val(arity))
+    EdgeBuilder(indices, num_vertices, max_edges)
 end
 
 function Base.push!(eb::EdgeBuilder, vertices::NTuple{N,I}) where {N,I<:Integer}
     @assert all(v <= eb.num_vertices for v in vertices) "Cannot push edge connected to non-existant vertex!"
-    @assert eb.arity == N "Cannot push edge of different arity to fixed size arity edge builder!"
-
     eb.num_edges += 1
     _mapenumerate_tuple(vertices) do i, vᵢ
-        eb.indices[i, eb.num_edges] = vᵢ
+        eb.indices[i][eb.num_edges] = vᵢ
     end
 end
 
 function construct(eb::EdgeBuilder, input_sym::Symbol)
-    indices = view(eb.indices, :, 1:eb.num_edges)
-    xs = Tuple([ArrayNode(KBEntry(input_sym, indices[i, :])) for i in 1:eb.arity])
-    CompressedBagNode(ProductNode(xs), CompressedBags(indices, eb.num_vertices, eb.num_edges, eb.arity))
+    indices = map(ii -> ii[1:eb.num_edges], eb.indices)
+    xs = map(ii -> ArrayNode(KBEntry(input_sym, ii)), indices)
+    # indices = view(eb.indices, :, 1:eb.num_edges)
+    # xs = Tuple([ArrayNode(KBEntry(input_sym, indices[i, :])) for i in 1:eb.arity])
+    CompressedBagNode(ProductNode(xs), CompressedBags(indices, eb.num_vertices, eb.num_edges))
 end
+
+# mutable struct EdgeBuilder{T<:Integer}
+#     indices::Matrix{T}
+#     num_vertices::Int
+#     arity::Int
+#     max_edges::Int
+#     num_edges::Int
+#     function EdgeBuilder(indices::Matrix{T}, num_vertices::Int, arity::Int, max_edges::Int) where {T}
+#         arity > 0 || error("Can create only edge of positive arity.")
+#         length(indices) == arity * max_edges || error("Length of indices must be equal to `arity * max_edges`.")
+#         num_edges = 0
+#         new{T}(indices, num_vertices, arity, max_edges, num_edges)
+#     end
+# end
+
+# function EdgeBuilder(::Val{arity}, max_edges::Int, num_vertices::Int) where {arity}
+#     indices = Matrix{Int}(undef, arity, max_edges)
+#     EdgeBuilder(indices, num_vertices, arity, max_edges)
+# end
+
+
+# function EdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int)
+#     indices = Matrix{Int}(undef, arity, max_edges)
+#     EdgeBuilder(indices, num_vertices, arity, max_edges)
+# end
+
+# function Base.push!(eb::EdgeBuilder, vertices::NTuple{N,I}) where {N,I<:Integer}
+#     @assert all(v <= eb.num_vertices for v in vertices) "Cannot push edge connected to non-existant vertex!"
+#     @assert eb.arity == N "Cannot push edge of different arity to fixed size arity edge builder!"
+
+#     eb.num_edges += 1
+#     _mapenumerate_tuple(vertices) do i, vᵢ
+#         eb.indices[i, eb.num_edges] = vᵢ
+#     end
+# end
+
+# function construct(eb::EdgeBuilder, input_sym::Symbol)
+#     indices = view(eb.indices, :, 1:eb.num_edges)
+#     xs = Tuple([ArrayNode(KBEntry(input_sym, indices[i, :])) for i in 1:eb.arity])
+#     CompressedBagNode(ProductNode(xs), CompressedBags(indices, eb.num_vertices, eb.num_edges, eb.arity))
+# end
 
 
 """
@@ -121,14 +159,15 @@ end
 """
 function construct(feb::FeaturedEdgeBuilder{<:Any,<:Any,<:Function}, input_sym::Symbol)
     x = @view feb.xe[:, 1:feb.eb.num_edges]
-    indices = @view feb.eb.indices[:, 1:feb.eb.num_edges]
+    indices = map(ii -> (@view ii[1:feb.eb.num_edges]), feb.eb.indices)
 
-    mask, ii = find_duplicates(indices)
+    mask, ii = find_duplicates(indices...)
     new_x = NNlib.scatter(feb.agg, x, ii)
-    xs = Tuple([ArrayNode(KBEntry(input_sym, indices[i, mask])) for i in 1:feb.eb.arity])
+    indices = map(ii -> ii[mask], indices)
+    xs = map(Base.Fix1(KBEntry, input_sym), indices)
     xs = tuple(xs..., ArrayNode(new_x))
 
-    CompressedBagNode(ProductNode(xs), CompressedBags(indices[:, mask], feb.eb.num_vertices, sum(mask), feb.eb.arity))
+    CompressedBagNode(ProductNode(xs), CompressedBags(indices, feb.eb.num_vertices, sum(mask)))
 end
 
 """
@@ -138,11 +177,11 @@ end
 """
 function construct(feb::FeaturedEdgeBuilder{<:Any,<:Any,Nothing}, input_sym::Symbol)
     x = feb.xe[:, 1:feb.eb.num_edges]
-    indices = @view feb.eb.indices[:, 1:feb.eb.num_edges]
+    indices = map(ii -> ii[1:feb.eb.num_edges], feb.eb.indices)
 
-    xs = Tuple([ArrayNode(KBEntry(input_sym, indices[i, :])) for i in 1:feb.eb.arity])
+    xs = map(Base.Fix1(KBEntry, input_sym), indices)
     xs = tuple(xs..., ArrayNode(x))
-    CompressedBagNode(ProductNode(xs), CompressedBags(indices, feb.eb.num_vertices, feb.eb.num_edges, feb.eb.arity))
+    CompressedBagNode(ProductNode(xs), CompressedBags(indices, feb.eb.num_vertices, feb.eb.num_edges))
 end
 
 

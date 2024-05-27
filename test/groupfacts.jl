@@ -67,7 +67,6 @@ end
 	end
 end
 
-
 @testset "Group facts for AtomBinary extractor" begin
 	function group_facts_ref(ex::AtomBinary, facts)
 	    NT = @NamedTuple{position::Int64, atom_id::Int64}

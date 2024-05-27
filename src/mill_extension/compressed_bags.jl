@@ -63,7 +63,7 @@ function CompressedBags(ks::AbstractMatrix{T}, num_vertices::Int, num_observatio
 
     ends = cumsum(counts)
     start = ends .- (counts .- 1)
-    bags = map((x, y) -> x:y, start, ends)
+    bags = map(UnitRange, start, ends)
 
     indices = Vector{Int}(undef, ar * num_observations)
     max_size = size(ks, 2)
@@ -71,6 +71,36 @@ function CompressedBags(ks::AbstractMatrix{T}, num_vertices::Int, num_observatio
     for i in 1:ar
         for j in 1:num_observations
             k = ks[i, j]
+            indices[start[k]] = (j - 1) % max_size + 1
+            start[k] += 1
+        end
+    end
+    CompressedBags(indices, bags, num_observations)
+end
+
+function CompressedBags(ks::NTuple{N,<:AbstractVector{T}}, num_vertices::Int, num_observations::Int) where {N, T<:Integer}
+    N == 0  && error("Cannot construct CompressedBags from empty indices.")
+    max_size = length(ks[1])
+    all(max_size == length(k) for k in ks) || error("Cannot construct CompressedBags from empty indices")
+
+    counts = zeros(Int, num_vertices)
+    @inbounds for row in 1:N
+        row_ks = ks[row]
+        for i in row_ks
+            counts[i] += 1
+        end
+    end
+
+    ends = cumsum(counts)
+    start = ends .- (counts .- 1)
+    bags = map(UnitRange, start, ends)
+
+    indices = Vector{Int}(undef, N * num_observations)
+
+    for i in 1:N
+        kᵢ = ks[i]
+        for j in 1:num_observations
+            k = kᵢ[j]
             indices[start[k]] = (j - 1) % max_size + 1
             start[k] += 1
         end

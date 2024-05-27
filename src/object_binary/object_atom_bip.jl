@@ -106,7 +106,6 @@ function Base.show(io::IO, ex::ObjectAtomBip)
     end
 end
 
-
 """
 specialize(ex::ObjectAtomBip{<:Nothing,<:Nothing}, problem)
 
