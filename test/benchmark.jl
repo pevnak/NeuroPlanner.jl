@@ -106,7 +106,7 @@ function benchmark_domain_arch(archs, domain_name; difficulty="train")
 end
 
 # archs = [ObjectBinary,ObjectAtom, AtomBinary, ObjectPair]
-archs = [ObjectBinaryFE, ObjectBinaryFENA, ObjectBinaryME, ObjectAtom, AtomBinary, AtomBinary2]
+archs = [ObjectBinaryFE, ObjectBinaryFENA, ObjectBinaryME, ObjectAtom, ObjectAtomBipFE, ObjectAtomBipFENA, ObjectAtomBipME, AtomBinaryFE, AtomBinaryFENA, AtomBinaryME]
 data = map(problem -> benchmark_domain_arch(archs, problem), setdiff(IPC_PROBLEMS,["ipc23_sokoban"]))
 df = DataFrame(reduce(vcat, data))
 gdf = DataFrames.groupby(df, ["domain_name"]);
@@ -115,8 +115,12 @@ combine(gdf) do sub_df
 	 	ObjectBinaryFENA = round(1e6*mean(sub_df.ObjectBinaryFENA), digits = 1),
 	 	ObjectBinaryME = round(1e6*mean(sub_df.ObjectBinaryME), digits = 1),
 	 	ObjectAtom = round(1e6*mean(sub_df.ObjectAtom), digits = 1), 
-	 	AtomBinary = round(1e6*mean(sub_df.AtomBinary), digits = 1),
-	 	AtomBinary2 = round(1e6*mean(sub_df.AtomBinary2), digits = 1),
+	 	ObjectAtomBipFE = round(1e6*mean(sub_df.ObjectAtomBipFE), digits = 1), 
+	 	ObjectAtomBipFENA = round(1e6*mean(sub_df.ObjectAtomBipFENA), digits = 1), 
+	 	ObjectAtomBipME = round(1e6*mean(sub_df.ObjectAtomBipME), digits = 1), 
+	 	AtomBinaryFE = round(1e6*mean(sub_df.AtomBinaryFE), digits = 1), 
+	 	AtomBinaryFENA = round(1e6*mean(sub_df.AtomBinaryFENA), digits = 1), 
+	 	AtomBinaryME = round(1e6*mean(sub_df.AtomBinaryME), digits = 1), 
 	 )
 end
 
@@ -174,15 +178,15 @@ end
 # f0a267e17a8bce06bd0f88233902279471f6f605
 # EdgeBuilder on M3 in μs
 # The adventage of FE over ME depends on number of predicates types with higher arities
-#  Row │ domain_name        ObjectBinaryFE  ObjectBinaryFENA  ObjectBinaryME  ObjectAtom  AtomBinary  AtomBinary2
-#      │ String             Float64         Float64           Float64         Float64     Float64     Float64
-# ─────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────
-#    1 │ ipc23_ferry                  10.0               7.5             8.7         6.7        23.0         21.2
-#    2 │ ipc23_rovers                 56.2              51.3            81.8        87.1       942.9        354.9
-#    3 │ ipc23_blocksworld            11.5              10.0            11.6         7.2        35.3         29.8
-#    4 │ ipc23_floortile              29.6              24.6            39.2        36.5       295.4        109.7
-#    5 │ ipc23_satellite              24.5              22.2            29.6        29.4       200.1         81.3
-#    6 │ ipc23_spanner                14.0              13.1            18.2        15.6        38.5         33.4
-#    7 │ ipc23_childsnack             12.1              13.4            14.9        12.5        24.9         21.2
-#    8 │ ipc23_miconic                38.3              30.4            36.2        40.3       530.1        201.0
-#    9 │ ipc23_transport              17.2              14.3            22.7        24.4        92.1         61.7
+#  Row │ domain_name        ObjectBinaryFE  ObjectBinaryFENA  ObjectBinaryME  ObjectAtom  ObjectAtomBipFE  ObjectAtomBipFENA  ObjectAtomBipME  AtomBinaryFE  AtomBinaryFENA  AtomBinaryME
+#      │ String             Float64         Float64           Float64         Float64     Float64          Float64            Float64          Float64       Float64         Float64
+# ─────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+#    1 │ ipc23_ferry                   8.2               5.6             8.3         8.5              9.5                7.3              8.5          17.1            13.3          16.0
+#    2 │ ipc23_rovers                 56.4              58.4            88.5        99.7             75.0               49.9             57.8        1057.3           469.4         354.3
+#    3 │ ipc23_blocksworld            11.7               8.5            10.6         7.9             13.0               10.0             12.2          28.5            17.6          23.1
+#    4 │ ipc23_floortile              27.6              23.6            38.6        40.4             37.7               25.7             26.8         182.0            87.3          85.2
+#    5 │ ipc23_satellite              19.8              17.5            29.8        30.1             25.5               24.4             30.0          96.1            56.4          62.8
+#    6 │ ipc23_spanner                11.9              10.7            16.2        15.7             15.7               10.8             13.7          26.2            19.4          26.3
+#    7 │ ipc23_childsnack             10.1               8.6            15.2        11.5             13.1                9.1             12.5          17.7            14.4          17.9
+#    8 │ ipc23_miconic                36.2              27.8            32.7        41.6             46.2               34.7             37.3         379.4           161.7         138.2
+#    9 │ ipc23_transport              14.3              11.0            22.8        26.1             19.1               13.7             14.8          87.2            43.8          44.3

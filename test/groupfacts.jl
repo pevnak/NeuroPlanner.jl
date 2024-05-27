@@ -32,7 +32,6 @@ using NeuroPlanner: group_facts
 	end
 end
 
-
 @testset "group_facts" begin
 	@testset "Domain: $domain_name" for domain_name in DOMAINS
 		domain, problem = load_problem_domain(domain_name) 
@@ -66,4 +65,27 @@ end
 			end
 		end
 	end
+end
+
+
+@testset "Group facts for AtomBinary extractor" begin
+	function group_facts_ref(ex::AtomBinary, facts)
+	    NT = @NamedTuple{position::Int64, atom_id::Int64}
+	    ids_in_facts = [NT[] for _ in 1:length(ex.obj2id)]
+	    for (i, a) in enumerate(facts)
+	        for (j,o) in enumerate(a.args)
+	            oid = ex.obj2id[o.name]
+	            push!(ids_in_facts[oid], (;position = j, atom_id = i))
+	        end
+	    end
+	    ids_in_facts
+	end
+
+	@testset "Domain: $domain_name" for domain_name in DOMAINS
+		domain, problem = load_problem_domain(domain_name) 
+		pddld = AtomBinaryME(domain; message_passes = graph_layers, residual)
+		ex, state = initproblem(pddld, problem);
+		facts = collect(PDDL.get_facts(state))
+		@test sort.(NeuroPlanner.group_facts(ex, facts)) == sort.(group_facts_ref(ex, facts))
+	end 
 end

@@ -28,8 +28,9 @@ vertex corresponding to the hyper-edge and its vertices.
 --- `constmap` maps constants to an index in one-hot encoded vertex' properties 
 --- `model_params` some parameters of an algorithm constructing the message passing passes 
 """
-struct AtomBinary{DO,MP,D,S,G}
+struct AtomBinary{DO,EB,MP,D,S,G}
     domain::DO
+    edgebuilder::EB
     max_arity::Int
     constmap::Dict{Symbol,Int}
     actionmap::Dict{Symbol,Int}
@@ -37,29 +38,36 @@ struct AtomBinary{DO,MP,D,S,G}
     obj2id::D
     init_state::S           # contains atoms of the init state
     goal_state::G           # contains atoms of the goal state
-    function AtomBinary(domain::DO, max_arity, constmap, actionmap, model_params::MP, obj2id::D, init::S, goal::G) where {DO,D,MP<:NamedTuple,S,G}
+    function AtomBinary(domain::DO, edgebuilder::EB, max_arity, constmap, actionmap, model_params::MP, obj2id::D, init::S, goal::G) where {DO,EB,D,MP<:NamedTuple,S,G}
         @assert issubset((:message_passes, :residual), keys(model_params)) "Parameters of the model are not fully specified"
         @assert (init === nothing || goal === nothing) "Fixing init and goal state is bizzaare, as the extractor would always create a constant"
-        new{DO,MP,D,S,G}(domain, max_arity, constmap, actionmap, model_params, obj2id, init, goal)
+        new{DO,EB,MP,D,S,G}(domain, edgebuilder, max_arity, constmap, actionmap, model_params, obj2id, init, goal)
     end
 end
 
-AtomBinaryNoGoal{DO,MP,D} = AtomBinary{DO,MP,D,Nothing,Nothing} where {DO,MP,D}
-AtomBinaryStart{DO,MP,D,S} = AtomBinary{DO,MP,D,S,Nothing} where {DO,MP,D,S<:AbstractVector{<:Julog.Term}}
-AtomBinaryGoal{DO,MP,D,G} = AtomBinary{DO,MP,D,Nothing,G} where {DO,MP,D,G<:AbstractVector{<:Julog.Term}}
+AtomBinaryNoGoal{DO,EB,MP,D} = AtomBinary{DO,EB,MP,D,Nothing,Nothing} where {DO,EB,MP,D}
+AtomBinaryStart{DO,EB,MP,D,S} = AtomBinary{DO,EB,MP,D,S,Nothing} where {DO,EB,MP,D,S<:AbstractVector{<:Julog.Term}}
+AtomBinaryGoal{DO,EB,MP,D,G} = AtomBinary{DO,EB,MP,D,Nothing,G} where {DO,EB,MP,D,G<:AbstractVector{<:Julog.Term}}
 
-function AtomBinary(domain; message_passes=2, residual=:linear, kwargs...)
+function AtomBinary(domain; message_passes=2, residual=:linear, edgebuilder = FeaturedEdgeBuilder, kwargs...)
     dictmap(x) = Dict(reverse.(enumerate(sort(x))))
     model_params = (; message_passes, residual)
     max_arity =  maximum(length(a.args) for a in values(domain.predicates))     # maximum arity of a predicate
     constmap = Dict{Symbol,Int}(dictmap([x.name for x in domain.constants]))    # identification of constants
     actionmap = Dict{Symbol,Int}(dictmap(collect(keys(domain.predicates))))     # codes of actions
-    AtomBinary(domain, max_arity, constmap, actionmap, model_params, nothing, nothing, nothing)
+    AtomBinary(domain, edgebuilder, max_arity, constmap, actionmap, model_params, nothing, nothing, nothing)
 end
+
 
 isspecialized(ex::AtomBinary) = ex.obj2id !== nothing
 hasgoal(ex::AtomBinary) = ex.init_state !== nothing || ex.goal_state !== nothing
 
+AtomBinaryFE(domain; kwargs...) = AtomBinary(domain; edgebuilder = FeaturedEdgeBuilder, kwargs...)
+AtomBinaryFENA(domain; kwargs...) = AtomBinary(domain; edgebuilder = FeaturedEdgeBuilderNA, kwargs...)
+AtomBinaryME(domain; kwargs...) = AtomBinary(domain; edgebuilder = MultiEdgeBuilder, kwargs...)
+AtomBinaryFE(domain, problem; kwargs...) = AtomBinary(domain, problem; edgebuilder = FeaturedEdgeBuilder, kwargs...)
+AtomBinaryFENA(domain, problem; kwargs...) = AtomBinary(domain, problem; edgebuilder = FeaturedEdgeBuilderNA, kwargs...)
+AtomBinaryME(domain, problem; kwargs...) = AtomBinary(domain, problem; edgebuilder = MultiEdgeBuilder, kwargs...)
 
 function AtomBinary(domain, problem; embed_goal=true, kwargs...)
     ex = AtomBinary(domain; kwargs...)
@@ -88,7 +96,7 @@ function specialize(ex::AtomBinary, problem)
     for k in keys(ex.constmap)
         obj2id[k] = length(obj2id) + 1
     end
-    AtomBinary(ex.domain, ex.max_arity, ex.constmap, ex.actionmap, ex.model_params, obj2id, nothing, nothing)
+    AtomBinary(ex.domain, ex.edgebuilder, ex.max_arity, ex.constmap, ex.actionmap, ex.model_params, obj2id, nothing, nothing)
 end
 
 function (ex::AtomBinary)(state::GenericState)
@@ -135,16 +143,44 @@ function unary_predicates(ex::AtomBinary, atoms, gii)
     x
 end
 
-function group_facts(ex::AtomBinary, atoms::Vector{Julog.Term})
+"""
+    group_facts(ex::AtomBinary, facts::Vector{Julog.Term})
+
+    Create a list, where each object ID has a list of 
+    facts and position of the objects inside facts
+"""
+function group_facts(ex::AtomBinary, facts::Vector{Julog.Term})
+
+    # init info about predicates    
+    predicates = tuple(keys(ex.domain.predicates)...)
+    arrities = map(k -> length(ex.domain.predicates[k].args), predicates)
+    parr = map(f -> arrities[_inlined_search(f.name, predicates)], facts)
+    
+    # init structure for storing information about facts
     NT = @NamedTuple{position::Int64, atom_id::Int64}
-    ids_in_atoms = [NT[] for _ in 1:length(ex.obj2id)]
-    for (i, a) in enumerate(atoms)
-        for (j,o) in enumerate(a.args)
-            oid = ex.obj2id[o.name]
-            push!(ids_in_atoms[oid], (;position = j, atom_id = i))
+    ids_in_facts = [NT[] for _ in 1:length(ex.obj2id)]
+
+    for arrity in 1:maximum(arrities)
+        add_object_to_group!(ids_in_facts, facts, ex.obj2id, parr, Val(arrity))
+    end
+    ids_in_facts
+end
+   
+@generated function add_object_to_group!(ids_in_facts, facts, obj2id, parr,  arrity::Val{N}) where {N}
+    stmts = quote
+    end
+    for j in 1:N
+        push!(stmts.args, :(o = a.args[$(j)]))
+        push!(stmts.args, :(oid = obj2id[o.name]))
+        push!(stmts.args, :(push!(ids_in_facts[oid], (;position = $(j), atom_id = i))))
+    end
+    quote 
+        for i in 1:length(facts)
+            parr[i] != $(N) && continue
+            a = facts[i]
+            $(stmts)
         end
     end
-    ids_in_atoms
 end
 
 
@@ -152,7 +188,7 @@ function encode_edges(ex::AtomBinary, atoms::Vector{Julog.Term}, kid::Symbol)
     ids_in_atoms = group_facts(ex, atoms)
     l = length(atoms)
     capacity = l * (l + 1) ÷ 2
-    eb = tuple([EdgeBuilder(2, capacity, l) for _ in 1:ex.max_arity^2]...)
+    eb = ex.edgebuilder(2, capacity, l, ex.max_arity^2)
     encode_edges(ex, eb, ids_in_atoms, kid)
 end
 
@@ -161,11 +197,11 @@ function encode_edges(ex, eb, ids_in_atoms, kid)
         for i in 1:length(as)
             for j in 2:length(as)
                k = _type_of_edge(ex, as[i].position, as[j].position)
-               push!(eb[k], (as[i].atom_id, as[j].atom_id))
+               push!(eb, (as[i].atom_id, as[j].atom_id), k)
             end
         end
     end
-    ProductNode(map(Base.Fix2(construct, kid), eb))
+    construct(eb, kid)
 end
 
 @inline function _type_of_edge(ex::AtomBinary, i, j)

@@ -40,10 +40,7 @@ include("mill_extension/mill_extension.jl")
 include("relational/knowledge_base.jl")
 include("relational/knowledge_model.jl")
 export KBEntry, KnowledgeBase, append, atoms
-3#include("hyper/extractor.jl")
-#include("hyper/deduplication.jl")
-#include("hyper/dedu_matrix.jl")
-#export HyperExtractor, deduplicate
+
 #include("hyper/mha.jl")
 include("relational/deduplication.jl")
 include("relational/coloring.jl")
@@ -64,10 +61,13 @@ include("object_binary/groupfacts.jl")
 include("object_binary/object_binary.jl")
 export ObjectBinary, ObjectBinaryFE, ObjectBinaryFENA, ObjectBinaryME
 include("object_binary/atom_binary.jl")
-export AtomBinary
+export AtomBinary, AtomBinaryFE, AtomBinaryFENA, AtomBinaryME
 include("object_binary/object_pair.jl")
+export ObjectPair
 include("object_binary/object_atom.jl")
-export ObjectBinary, ObjectAtom, ObjectPair
+export ObjectAtom
+include("object_binary/object_atom_bip.jl")
+export ObjectAtomBip, ObjectAtomBipFE, ObjectAtomBipFENA, ObjectAtomBipME
 
 # ASNet and HGNN by Silvia
 include("asnets/extractor.jl")
