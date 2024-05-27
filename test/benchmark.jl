@@ -74,21 +74,28 @@ function benchmark_domain_arch(archs, domain_name; difficulty="train")
 		end
 
 		# timing of extraction
-		ts = map(archs) do hnet
-			pddld = hnet(domain; message_passes = graph_layers, residual)
-			pddle, state = initproblem(pddld, problem)
-			map(pddle, states)
-			mean(@elapsed map(pddle, states) for _ in 1:100) / length(states)
-		end
+		# ts = map(archs) do hnet
+		# 	pddld = hnet(domain; message_passes = graph_layers, residual)
+		# 	pddle, state = initproblem(pddld, problem)
+		# 	map(pddle, states)
+		# 	mean(@elapsed map(pddle, states) for _ in 1:100) / length(states)
+		# end
 
 
 		# timing of extraction + model
 		# ts = map(models, archs) do model, hnet
 		# 	pddld = hnet(domain; message_passes = graph_layers, residual)
 		# 	pddle, state = initproblem(pddld, problem)
-		# 	map(model ∘ deduplicate  ∘ pddle, states)
-		# 	mean(@elapsed map(model ∘ deduplicate ∘ pddle, states) for _ in 1:100) / length(states)
+		# 	map(model ∘ pddle, states)
+		# 	mean(@elapsed map(model ∘ pddle, states) for _ in 1:100) / length(states)
 		# end
+
+		ts = map(models, archs) do model, hnet
+			pddld = hnet(domain; message_passes = graph_layers, residual)
+			pddle, state = initproblem(pddld, problem)
+			map(model ∘ deduplicate  ∘ pddle, states)
+			mean(@elapsed map(model ∘ deduplicate ∘ pddle, states) for _ in 1:100) / length(states)
+		end
 
 		# number of vertices and edges
 		# ts = map(archs) do hnet
@@ -145,33 +152,34 @@ end
 
 # EdgeBuilder on M3 in μs with a HMGNNnetwork with config (graph_layers = 2, dense_dim = 16, dense_layers = 2, residual = "none")
 # without state deduplication
-#  Row │ domain_name        ObjectBinary  ObjectAtom  AtomBinary  AtomBinary2
-#      │ String             Float64       Float64     Float64     Float64
-# ─────┼──────────────────────────────────────────────────────────────────────
-#    1 │ ipc23_ferry                97.5        56.0       135.1        119.8
-#    2 │ ipc23_rovers             3759.7      3876.5      4725.7       3987.5
-#    3 │ ipc23_blocksworld          79.9        67.3       210.1        195.0
-#    4 │ ipc23_floortile           363.1       305.5      1046.1        798.1
-#    5 │ ipc23_satellite           528.1       262.6       619.1        497.6
-#    6 │ ipc23_spanner             172.2       108.7       175.4        164.5
-#    7 │ ipc23_childsnack          169.0       105.9       123.3        102.0
-#    8 │ ipc23_miconic             188.8       149.4      1928.4       1514.2
-#    9 │ ipc23_transport           283.9       194.8       500.4        451.2
+#  Row │ domain_name        ObjectBinaryFE  ObjectBinaryFENA  ObjectBinaryME  ObjectAtom  ObjectAtomBipFE  ObjectAtomBipFENA  ObjectAtomBipME  AtomBinaryFE  AtomBinaryFENA  AtomBinaryME
+#      │ String             Float64         Float64           Float64         Float64     Float64          Float64            Float64          Float64       Float64         Float64
+# ─────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+#    1 │ ipc23_ferry                  22.2              25.1            31.7        31.2             41.1               38.0             50.6          45.3            45.3          70.3
+#    2 │ ipc23_rovers                122.9             231.3           480.8       442.5            386.9              371.8            435.0        6225.4          6417.8        6743.3
+#    3 │ ipc23_blocksworld            26.5              25.5            34.3        32.0             45.7               41.5             57.8          90.3            94.0         129.6
+#    4 │ ipc23_floortile              78.4              74.8           211.1       218.5            158.4              147.3            174.4        1039.6          1007.4         916.2
+#    5 │ ipc23_satellite              63.6              62.4           173.0       171.6            121.6              115.8            135.5         598.5           580.9         503.7
+#    6 │ ipc23_spanner                31.0              32.3            74.4        78.4             50.4               49.3             62.2          78.4            75.0         120.1
+#    7 │ ipc23_childsnack             25.1              21.8            71.6        63.0             32.4               26.2             46.0          42.5            48.2          71.8
+#    8 │ ipc23_miconic               103.4              92.6           130.1       135.6            201.4              187.7            218.1        2292.2          2166.9        2316.5
+#    9 │ ipc23_transport              46.7              48.5           120.0       122.0             87.7               82.9            101.1         535.2           527.7         409.0
+
 
 # EdgeBuilder on M3 in μs with a HMGNNnetwork with config (graph_layers = 2, dense_dim = 16, dense_layers = 2, residual = "none")
    # with state deduplication
- Row │ domain_name        ObjectBinary  ObjectAtom  AtomBinary  AtomBinary2
-     │ String             Float64       Float64     Float64     Float64
-─────┼──────────────────────────────────────────────────────────────────────
-   1 │ ipc23_ferry                58.0        55.9       119.2        111.3
-   2 │ ipc23_rovers              596.8       614.6      4695.1       3941.8
-   3 │ ipc23_blocksworld          69.6        66.4       212.0        202.5
-   4 │ ipc23_floortile           308.6       299.6       997.6        764.8
-   5 │ ipc23_satellite           224.4       232.2       590.9        471.2
-   6 │ ipc23_spanner             109.4        97.3       176.5        167.7
-   7 │ ipc23_childsnack          102.5        93.3       124.8        103.5
-   8 │ ipc23_miconic             149.2       146.9      1884.5       1486.6
-   9 │ ipc23_transport           185.0       181.5       507.1        447.3
+#  Row │ domain_name        ObjectBinaryFE  ObjectBinaryFENA  ObjectBinaryME  ObjectAtom  ObjectAtomBipFE  ObjectAtomBipFENA  ObjectAtomBipME  AtomBinaryFE  AtomBinaryFENA  AtomBinaryME
+#      │ String             Float64         Float64           Float64         Float64     Float64          Float64            Float64          Float64       Float64         Float64
+# ─────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+#    1 │ ipc23_ferry                  46.4              43.1            60.0        59.3             56.7               53.9             71.0          67.4            63.8         100.0
+#    2 │ ipc23_rovers                158.2             235.1           529.9       642.5            334.5              325.3            468.9        4890.7          4854.8        3914.0
+#    3 │ ipc23_blocksworld            50.4              52.9            73.2        69.5             65.1               62.8             85.6         110.8           105.1         190.8
+#    4 │ ipc23_floortile              95.6              95.9           260.8       304.9            162.2              152.3            208.6         692.3           651.3         729.9
+#    5 │ ipc23_satellite              97.7              85.2           198.5       234.4            137.9              117.5            150.2         426.7           376.1         440.3
+#    6 │ ipc23_spanner                51.8              47.5            85.1       113.4             59.0               56.9             93.0          83.4           101.4         158.1
+#    7 │ ipc23_childsnack             47.5              46.6            83.7       100.8             53.5               56.5             62.5          71.4            60.8         101.1
+#    8 │ ipc23_miconic                97.7              95.0           131.6       147.6            204.4              194.9            225.0        1740.1          1541.6        1385.5
+#    9 │ ipc23_transport              74.6              61.9           158.9       183.8            100.9               95.6            124.2         401.2           377.9         436.4
 
 
 
@@ -181,12 +189,12 @@ end
 #  Row │ domain_name        ObjectBinaryFE  ObjectBinaryFENA  ObjectBinaryME  ObjectAtom  ObjectAtomBipFE  ObjectAtomBipFENA  ObjectAtomBipME  AtomBinaryFE  AtomBinaryFENA  AtomBinaryME
 #      │ String             Float64         Float64           Float64         Float64     Float64          Float64            Float64          Float64       Float64         Float64
 # ─────┼──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-#    1 │ ipc23_ferry                   8.2               5.6             8.3         8.5              9.5                7.3              8.5          17.1            13.3          16.0
-#    2 │ ipc23_rovers                 56.4              58.4            88.5        99.7             75.0               49.9             57.8        1057.3           469.4         354.3
-#    3 │ ipc23_blocksworld            11.7               8.5            10.6         7.9             13.0               10.0             12.2          28.5            17.6          23.1
-#    4 │ ipc23_floortile              27.6              23.6            38.6        40.4             37.7               25.7             26.8         182.0            87.3          85.2
-#    5 │ ipc23_satellite              19.8              17.5            29.8        30.1             25.5               24.4             30.0          96.1            56.4          62.8
-#    6 │ ipc23_spanner                11.9              10.7            16.2        15.7             15.7               10.8             13.7          26.2            19.4          26.3
-#    7 │ ipc23_childsnack             10.1               8.6            15.2        11.5             13.1                9.1             12.5          17.7            14.4          17.9
-#    8 │ ipc23_miconic                36.2              27.8            32.7        41.6             46.2               34.7             37.3         379.4           161.7         138.2
-#    9 │ ipc23_transport              14.3              11.0            22.8        26.1             19.1               13.7             14.8          87.2            43.8          44.3
+#    1 │ ipc23_ferry                   7.1               6.9             7.2         6.9              8.1                7.1              8.2          16.4            11.1          16.3
+#    2 │ ipc23_rovers                 51.8              50.3            84.0        88.8             64.1               49.1             52.2         872.2           414.4         333.9
+#    3 │ ipc23_blocksworld             9.4               7.9            10.2         7.2             11.0               10.1             10.3          23.5            17.4          21.8
+#    4 │ ipc23_floortile              24.7              21.2            35.0        35.1             33.0               24.5             26.0         152.7            79.6          80.5
+#    5 │ ipc23_satellite              17.4              17.2            27.5        26.5             24.4               19.0             21.4          93.4            52.5          61.8
+#    6 │ ipc23_spanner                11.7               9.2            14.9        13.0             12.2               10.2             13.1          22.9            19.5          23.1
+#    7 │ ipc23_childsnack              8.8              10.5            12.2        12.1             11.3                8.6             11.7          15.7            12.1          18.7
+#    8 │ ipc23_miconic                33.8              25.6            34.2        39.5             43.7               30.8             34.7         327.0           147.8         136.4
+#    9 │ ipc23_transport              14.5              10.6            19.4        22.3             17.9               12.9             13.0          75.5            40.7          46.4

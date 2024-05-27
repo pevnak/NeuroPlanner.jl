@@ -97,7 +97,7 @@ function CompressedBags(ks::NTuple{N,<:AbstractVector{T}}, num_vertices::Int, nu
 
     indices = Vector{Int}(undef, N * num_observations)
 
-    for i in 1:N
+    @inbounds for i in 1:N
         kᵢ = ks[i]
         for j in 1:num_observations
             k = kᵢ[j]
