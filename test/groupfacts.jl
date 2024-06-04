@@ -58,7 +58,7 @@ end
 				@test ids ∈ ref_ids
 			elseif length(ids) == 1 
 				ref_ids = only(filter(kv -> kv[1] == f.name, ref.unary))[2]
-				@test ids ∈ ref_ids
+				@test only(ids) ∈ ref_ids
 			else
 				i = only(findall(f.name .== nullary))
 				@test ref.nullary[i] == true

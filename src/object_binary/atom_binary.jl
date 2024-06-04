@@ -183,11 +183,10 @@ end
     end
 end
 
-
 function encode_edges(ex::AtomBinary, atoms::Vector{Julog.Term}, kid::Symbol)
     ids_in_atoms = group_facts(ex, atoms)
     l = length(atoms)
-    capacity = l * (l + 1) ÷ 2
+    capacity = ex.max_arity * l * (l + 1) ÷ 2
     eb = ex.edgebuilder(2, capacity, l, ex.max_arity^2)
     encode_edges(ex, eb, ids_in_atoms, kid)
 end
@@ -207,7 +206,6 @@ end
 @inline function _type_of_edge(ex::AtomBinary, i, j)
     ex.max_arity*(i-1) + j
 end
-
 
 function add_goalstate(ex::AtomBinary, problem, goal=goalstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)

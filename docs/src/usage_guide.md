@@ -38,7 +38,7 @@ Is also helpful to keep the string paths to the problem files we will be dealing
 ```julia
 problem_files = [joinpath("../domains/ferry/", f) for f in readdir("../domains/ferry") if endswith(f,".pddl") && f !== "domain.pddl"]
 ```
-Neuroplanner has a function for loading both the domain and the problem files, which works with the provided [zip files](../files/domains.zip).
+Neuroplanner has a function for loading both the domain and the problem files, which works with the provided (../files/domains.zip).
 
 ```julia
 domain_pddl, problem_files = getproblem(domain_name)

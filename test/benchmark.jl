@@ -83,19 +83,19 @@ function benchmark_domain_arch(archs, domain_name; difficulty="train")
 
 
 		# timing of extraction + model
-		# ts = map(models, archs) do model, hnet
-		# 	pddld = hnet(domain; message_passes = graph_layers, residual)
-		# 	pddle, state = initproblem(pddld, problem)
-		# 	map(model ∘ pddle, states)
-		# 	mean(@elapsed map(model ∘ pddle, states) for _ in 1:100) / length(states)
-		# end
-
 		ts = map(models, archs) do model, hnet
 			pddld = hnet(domain; message_passes = graph_layers, residual)
 			pddle, state = initproblem(pddld, problem)
-			map(model ∘ deduplicate  ∘ pddle, states)
-			mean(@elapsed map(model ∘ deduplicate ∘ pddle, states) for _ in 1:100) / length(states)
+			map(model ∘ pddle, states)
+			mean(@elapsed map(model ∘ pddle, states) for _ in 1:100) / length(states)
 		end
+
+		# ts = map(models, archs) do model, hnet
+		# 	pddld = hnet(domain; message_passes = graph_layers, residual)
+		# 	pddle, state = initproblem(pddld, problem)
+		# 	map(model ∘ deduplicate  ∘ pddle, states)
+		# 	mean(@elapsed map(model ∘ deduplicate ∘ pddle, states) for _ in 1:100) / length(states)
+		# end
 
 		# number of vertices and edges
 		# ts = map(archs) do hnet
@@ -113,10 +113,16 @@ function benchmark_domain_arch(archs, domain_name; difficulty="train")
 end
 
 # archs = [ObjectBinary,ObjectAtom, AtomBinary, ObjectPair]
-archs = [ObjectBinaryFE, ObjectBinaryFENA, ObjectBinaryME, ObjectAtom, ObjectAtomBipFE, ObjectAtomBipFENA, ObjectAtomBipME, AtomBinaryFE, AtomBinaryFENA, AtomBinaryME]
+# archs = [ObjectBinaryFE, ObjectBinaryFENA, ObjectBinaryME, ObjectAtom, ObjectAtomBipFE, ObjectAtomBipFENA, ObjectAtomBipME, AtomBinaryFE, AtomBinaryFENA, AtomBinaryME, ObjectPair, ASNet, HGNNLite, HGNN]
+archs = [ASNet, HGNN]
 data = map(problem -> benchmark_domain_arch(archs, problem), setdiff(IPC_PROBLEMS,["ipc23_sokoban"]))
 df = DataFrame(reduce(vcat, data))
 gdf = DataFrames.groupby(df, ["domain_name"]);
+combine(gdf) do sub_df 
+	(ASNet = round(1e6*mean(sub_df.ASNet), digits = 1),
+	 HGNN = round(1e6*mean(sub_df.HGNN), digits = 1),
+	)
+end
 combine(gdf) do sub_df 
 	 (ObjectBinaryFE = round(1e6*mean(sub_df.ObjectBinaryFE), digits = 1),
 	 	ObjectBinaryFENA = round(1e6*mean(sub_df.ObjectBinaryFENA), digits = 1),

@@ -59,9 +59,9 @@ struct ObjectAtomBip{DO,P,EB,MP,D,II,S,G}
 end
 
 
-ObjectAtomBipNoGoal{DO,P,edgebuilder,MP} = ObjectAtomBip{DO,P,edgebuilder,MP,D,Nothing,Nothing,Nothing} where {DO,P,edgebuilder,MP,D}
-ObjectAtomBipStart{DO,P,edgebuilder,MP,D,II,S} = ObjectAtomBip{DO,P,edgebuilder,MP,D,II,S,Nothing} where {DO,P,edgebuilder,MP,D,II<:Vector,S<:Vector}
-ObjectAtomBipGoal{DO,P,edgebuilder,MP,D,II,G} = ObjectAtomBip{DO,P,edgebuilder,MP,D,II,Nothing,G} where {DO,P,edgebuilder,MP,D,II<:Vector,G<:Vector}
+ObjectAtomBipNoGoal{DO,P,EB,MP} = ObjectAtomBip{DO,P,EB,MP,D,II,Nothing,Nothing} where {DO,P,EB,MP,D,II}
+ObjectAtomBipStart{DO,P,EB,MP,D,II,S} = ObjectAtomBip{DO,P,EB,MP,D,II,S,Nothing} where {DO,P,EB,MP,D,II,S<:Vector}
+ObjectAtomBipGoal{DO,P,EB,MP,D,II,G} = ObjectAtomBip{DO,P,EB,MP,D,II,Nothing,G} where {DO,P,EB,MP,D,II,G<:Vector}
 
 function ObjectAtomBip(domain; message_passes=2, residual=:linear, edgebuilder = FeaturedEdgeBuilder, kwargs...)
     any(length(p.args) > 3 for p in values(domain.predicates)) && error("Ternary predicate is rare and it is not supported at the moment")
@@ -203,7 +203,7 @@ function nunary_predicates(ex::ObjectAtomBip, state, grouped_facts)
 
     # unary predicates
     for s in grouped_facts[2] 
-        x[s.name, first(s.args)] = 1
+        x[s.name, s.args[1]] = 1
     end
 
     # nullary predicates
@@ -305,7 +305,7 @@ function add_initstate(ex::ObjectAtomBip, problem, start=initstate(ex.domain, pr
     new_ex = @set ex.init_state = intstates(ex, start)
 
     #change id2fid to point behind
-    new_ex = @set ex.predicates.id2fid = goal_id2fid(new_ex)
+    new_ex = @set new_ex.predicates.id2fid = goal_id2fid(new_ex)
 
     # change the number of predicates, which has doubled
     new_ex = @set new_ex.predicates.nunary = 2*new_ex.predicates.nunary

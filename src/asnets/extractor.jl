@@ -165,7 +165,7 @@ end
 function encode_actions(ex::ASNet, kid::Symbol)
 	actions = ex.domain.actions
 	ns = tuple(keys(actions)...)
-	xs = map(values(ex.domain.actions)) do action
+	xs = map(values(actions)) do action
 		encode_action(ex, action, kid)
 	end
 	length(xs) == 1 ? only(xs) : ProductNode(NamedTuple{ns}(tuple(xs...)))
@@ -173,6 +173,12 @@ end
 
 function encode_action(ex::ASNet, action::GenericAction, kid::Symbol)
 	preds = allgrounding(action, ex.type2obs)
+
+	# # This is filter to remove atoms with free variables
+	# preds = map(preds) do atoms 
+	# 	filter(Base.Fix1(haskey, ex.predicate2id), atoms)
+	# end
+	
 	encode_predicates(ex, preds, kid)
 end
 

@@ -28,7 +28,6 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 	!isdir(dirname(filename)) && mkpath(dirname(filename))
 	domain = load_domain(domain_pddl)
 	pddld = hnet(domain; message_passes = graph_layers, residual)
-	pddld = AdmissibleExtractor(pddld)
 	#create model from some problem instance
 
 	# we can check that the model can learn the training data if the dedup_model can differentiate all input states, which is interesting by no means
@@ -86,72 +85,58 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 	end
 	println("evaluation finished")
 	serialize(filename*"_stats.jls", stats)
-	CSV.write(filename*"_stats.csv", stats; transform = (col, val) -> something(val, missing))
 	rm(filename*"_stats_tmp.jls")
 	settings !== nothing && serialize(filename*"_settings.jls",settings)
-
-	model_exp = 0
-	lm_exp = 0
-	model_solved = 0
-	lm_solved = 0
-	m = []
-	l = []
-	for p in problem_files
-		!(p in train_files) && continue
-		sol,_ = solve_problem(pddld, p, model, AStarPlanner; return_unsolved=true)
-		@show sol.expanded
-		@show sol.status
-		model_exp+=sol.expanded
-		model_solved += sol.status == :success
-		push!(m, (sol.status, sol.expanded))
-		lm = LM_CutHeuristic()
-		astar = AStarPlanner(lm; max_time=30, save_search=true)
-		problem = load_problem(p)
-		sol = astar(domain, problem)
-		#@show sol
-		@show sol.expanded
-		@show sol.status
-		push!(l, (sol.status, sol.expanded))
-		lm_exp+=sol.expanded
-		lm_solved += sol.status == :success
-		println("---")
-	end
 end
 
 """
 ArgParse example implemented in Comonicon.
 
 # Arguments
-
 - `problem_name`: a name of the problem to solve ("ferry", "gripper", "blocks", "npuzzle", "elevator_00")
 - `arch_name`: an architecture of the neural network implementing heuristic("asnet", "pddl")
 - `loss_name`: 
 
 # Options
-
 - `--max_steps <Int>`: maximum number of steps of SGD algorithm (default 10_000)
 - `--max_time <Int>`:  maximum steps of the planner used for evaluation (default 30)
 - `--graph_layers <Int>`:  maximum number of layers of (H)GNN (default 1)
 - `--dense_dim <Int>`:  dimension of all hidden layers, even those realizing graph convolutions (default  32)
 - `--dense_layers <Int>`:  number of layers of dense network after pooling vertices (default 32)
 - `--residual <String>`:  residual connections between graph convolutions (none / dense / linear)
-- `--aggregation <String>`:  type of aggregation of the neighborhood ("meanmax / "maxsum")
+- `--aggregation <String>`:  type of aggregation of the neighborhood ("meanmax / "summax")
 
-max_steps = 10_000; max_time = 30; aggregation = "meanmax"; graph_layers = 3; dense_dim = 16; dense_layers = 3; residual = "none"; seed = 1
-max_steps = 10_000; max_time = 30; aggregation = "meanmax"; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
-domain_name = "ipc23_floortile"
-loss_name = "lstar"
-arch_name = "objectbinary"
+# max_steps = 10_000; max_time = 30; aggregation = "summax"; graph_layers = 3; dense_dim = 16; dense_layers = 3; residual = "none"; seed = 1
+# max_steps = 10_000; max_time = 30; aggregation = "summax"; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
+# domain_name = "ipc23_floortile"
+# loss_name = "lstar"
+# arch_name = "objectbinary"
 """
 @main function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
 		dense_dim::Int = 32, aggregation = "summax", dense_layers::Int = 2, residual::String = "none", seed::Int = 1)
 	Random.seed!(seed)
 	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, aggregation, dense_dim, dense_layers, residual, seed)
 	@show settings
-	filename = joinpath("super_amd_fast", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed], "_"))
+	filename = joinpath("super_amd_faster", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed], "_"))
 	@show filename
 
-	archs = Dict("objectbinary" => ObjectBinary, "atombinary" => AtomBinary, "atombinary2" => AtomBinary2, "objectpair" => ObjectPair, "asnet" => ASNet, "lrnn" => LRNN, "objectatom" => ObjectAtom, "hgnnlite" => HGNNLite, "hgnn" => HGNN, "levinasnet" => LevinASNet)
+	archs = Dict(
+		"objectpair" => ObjectPair,
+		"asnet" => ASNet,
+		"hgnnlite" => HGNNLite,
+		"hgnn" => HGNN,
+		"levinasnet" => LevinASNet,
+		"atombinaryfena"    => AtomBinaryFENA,
+		"objectbinaryme"    => ObjectBinaryME,
+		"objectatom"        => ObjectAtom,
+		"objectatombipfe"   => ObjectAtomBipFE,
+		"objectbinaryfena"  => ObjectBinaryFENA,
+		"atombinaryme"      => AtomBinaryME,
+		"objectatombipfena" => ObjectAtomBipFENA,
+		"atombinaryfe"      => AtomBinaryFE,
+		"objectbinaryfe"    => ObjectBinaryFE,
+		"objectatombipme"   => ObjectAtomBipME,
+		)
 	aggregations = Dict("meanmax" => SegmentedMeanMax, "summax" => SegmentedSumMax)
 	residual = Symbol(residual)
 	domain_pddl, problem_files = getproblem(domain_name, false)
@@ -161,7 +146,6 @@ arch_name = "objectbinary"
 	fminibatch = NeuroPlanner.minibatchconstructor(loss_name)
 	hnet = archs[arch_name]
 	aggregation = aggregations[aggregation]
-
 	experiment(domain_name, hnet, domain_pddl, train_files, problem_files, filename, fminibatch; max_steps, max_time, graph_layers, aggregation, residual, dense_layers, dense_dim,  settings)
 end
 

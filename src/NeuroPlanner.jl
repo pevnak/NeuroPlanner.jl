@@ -1,3 +1,4 @@
+
 module NeuroPlanner
 
 using PDDL
@@ -85,11 +86,12 @@ export LevinASNet, BFSPlanner
 include("hgnn/extractor.jl")
 export HGNNLite, HGNN
 
-include("admissible_planner/extractor.jl")
-export AdmissibleExtractor
+# wait until merged to official repository
+# include("admissible_planner/extractor.jl")
+# export AdmissibleExtractor
 
-include("admissible_planner/apply_policy.jl")
-export ApplyPolicy, setOutputToPolicy, roundPolicyOutput
+# include("admissible_planner/apply_policy.jl")
+# export ApplyPolicy, setOutputToPolicy, roundPolicyOutput
 
 # Potential heuristic is useless
 include("potential/extractor.jl")

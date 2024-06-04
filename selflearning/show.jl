@@ -90,11 +90,6 @@ end
 
 function read_data(;domain_name, arch_name, loss_name, max_steps, aggregation,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir="super")
 	filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed], "_"))
-	old_filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
-	if aggregation == "maxsum" && isfile(old_filename*"_stats.jls")
-		println("moving ", old_filename*"_stats.jls")
-		mv(old_filename*"_stats.jls", filename*"_stats.jls")
-	end
 	filename = filename*"_stats.jls"
 	!isfile(filename) && return(DataFrame())
 	stats = deserialize(filename)
@@ -125,7 +120,7 @@ function vitek_table(df, k, high; max_time = 30, backend = Val(:text))
 			i = subsub_df[argmax(collect(zip(subsub_df.tst_solved_fold1, -subsub_df.sol_length_fold1))), :tst_solved_fold2]
 			j = subsub_df[argmax(collect(zip(subsub_df.tst_solved_fold2, -subsub_df.sol_length_fold2))), :tst_solved_fold1]
 			(i + j) / 2
-		end |> mean
+		end |> skipmissing |> mean
 	end
 
 	# now, make table from the results
@@ -164,7 +159,7 @@ end
 
 function find_smallest_solutions(df)
 	# first, go over all files and identify shortes trajectories
-	stat_files = map(walkdir("super_amd_fast")) do (root, dirs, files)
+	stat_files = map(walkdir("super_amd_faster")) do (root, dirs, files)
 		stat_files = filter(file -> endswith(file, "_stats.jls"), files)
 		map(s -> joinpath(root, s), stat_files)
 	end
@@ -194,24 +189,23 @@ function show_vitek()
 	seed = 1
 	dry_run = true
 	domain_name = "ferry"
-	arch_name = "mixedlrnn2"
+	arch_name = "atombinaryfena"
 	loss_name = "lstar"
 	graph_layers = 3
 	residual = "none"
 	dense_layers = 2
 	dense_dim = 8
 	seed = 2
-	problems = ["blocks","ferry","npuzzle","spanner","elevators_00"]
+	all_archs = ["objectbinaryme", "objectbinaryfena", "atombinaryme", "atombinaryfena", "objectatom", "objectatombipfe",  "objectatombipfena", "atombinaryfe", "objectbinaryfe", "objectatombipme","asnet", "hgnn",]
 
-	# IPC_PROBLEMS = setdiff(IPC_PROBLEMS, ["ipc23_rovers", "ipc23_sokoban"])
-	cases = vec(collect(Iterators.product(("atombinary2", "atombinary","objectatom", "objectbinary"), ("lstar", "l2"), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), ("meanmax", "maxsum"), (:none, :linear), (1, 2, 3))))
-	# cases = vec(collect(Iterators.product(("atombinary2",), ("lstar", "l2"), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), (:none, :linear), (1, 2, 3))))
+	# cases = vec(collect(Iterators.product(("atombinary2", "atombinary","objectatom", "objectbinary"), ("lstar", "l2"), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), ("maxsum",), (:none, ), (1, 2, 3))))
+	cases = vec(collect(Iterators.product(all_archs, ("lstar", ), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), ("summax",), (:none, ), (1, 2, 3))))
 
 	# map(shuffle(cases)) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, aggregation,  residual, seed)
-	# 	submit_missing(;dry_run, domain_name, arch_name, aggregation, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_fast")
+	# 	submit_missing(;dry_run, domain_name, arch_name, aggregation, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_faster")
 	# end |> vec |> countmap
 
-	df = isfile("super_amd_fast/results.csv") ? CSV.read("super_amd_fast/results.csv", DataFrame) :  DataFrame();
+	df = isfile("super_amd_faster/results.csv") ? CSV.read("super_amd_faster/results.csv", DataFrame) :  DataFrame();
 
 	if !isempty(df)
 		done = Set([(r.arch_name, r.loss_name, r.domain_name, r.dense_dim, r.graph_layers, r.aggregation, Symbol(r.residual), r.seed,) for r in eachrow(df)])
@@ -219,7 +213,7 @@ function show_vitek()
 	end;
 
 	amd_stats = map(cases) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, aggregation, residual, seed)
-		read_data(;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed, result_dir="super_amd_fast")
+		read_data(;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed, result_dir="super_amd_faster")
 	end |> vec;
 	amd_stats = filter(!isempty, amd_stats)
 	if !isempty(amd_stats)
@@ -227,16 +221,16 @@ function show_vitek()
 		println("adding results from following architectures: ",unique(dff.arch_name))
 
 		df = isempty(df) ? dff : vcat(df, dff);
-		CSV.write("super_amd_fast/results.csv", df)
+		CSV.write("super_amd_faster/results.csv", df)
 	end
-	println("aggregation = meanmax")
-	dff = filter(r -> r.aggregation == "meanmax", df)
-	finished(dff);
-	vitek_table(dff, :tst_solved, highlight_max);
+	# println("aggregation = meanmax")
+	# dff = filter(r -> r.aggregation == "meanmax", df)
+	finished(df);
+	vitek_table(df, :tst_solved, highlight_max);
 
-	println("aggregation = maxsum")
-	dff = filter(r -> r.aggregation == "maxsum", df)
-	finished(dff);
-	vitek_table(dff, :tst_solved, highlight_max);
+	# println("aggregation = maxsum")
+	# dff = filter(r -> r.aggregation == "maxsum", df);
+	# finished(dff);
+	# vitek_table(dff, :tst_solved, highlight_max);
 end
 show_vitek();
