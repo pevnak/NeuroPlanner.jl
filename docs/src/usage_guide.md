@@ -8,57 +8,46 @@ To begin, necessarry libraries are imported.
 
 ```julia
 using NeuroPlanner
-using PDDL
-using Flux
-using JSON
-using SymbolicPlanners
+using NeuroPlanner.PDDL
+using NeuroPlanner.Flux
+using NeuroPlanner.SymbolicPlanners
 using PDDL: GenericProblem
-using SymbolicPlanners: PathSearchSolution
+using NeuroPlanner.SymbolicPlanners: PathSearchSolution
 using Statistics
-using IterTools
 using Random
-using StatsBase
-using Serialization
-using DataFrames
-using Mill
-using Functors
 using Accessors
-using Setfield
-using Logging
-using TensorBoardLogger
+using NeuroPlanner.Mill
 ```
 
 Then a representation of the domain we will be working with is needed. PDDL has a helper function load_domain() into which the string path locationof domain.pddl file to be loaded is passed. 
 
 ```julia
-domain = load_domain(domain_pddl)
+domain = load_domain("../domains/ferry/domain.pddl")
 ```
 Is also helpful to keep the string paths to the problem files we will be dealing with. They can be loaded for example as such:
 
 ```julia
 problem_files = [joinpath("../domains/ferry/", f) for f in readdir("../domains/ferry") if endswith(f,".pddl") && f !== "domain.pddl"]
 ```
-Neuroplanner has a function for loading both the domain and the problem files, which works with the provided (../files/domains.zip).
-
-```julia
-domain_pddl, problem_files = getproblem(domain_name)
-```
 
 ---
-
 
 Problems from the domain require an extractor (here called `pddld`) to be parsed in a standardised form. When creating an extractor we can choose from diferrent architectures (`ASNet`, `HyperExtractor`, `HGNNLite`, `HGNN`, `LevinASNet`), which fundamentally change how the problem, and as a result the model, are internally represented and will affect how the final heuristic behaves. Details here:
 [Extractors](extractors.md), [Theoretical background](theory.md).
 
 ```julia
 pddld = ASNet(domain)
-pddld = HyperExtractor(domain)
 pddld = HGNNLite(domain)
 pddld = HGNN(domain)
+pddld = ObjectBinary(domain)
+pddld = AtomBinary(domain)
+pddld = ObjectAtom(domain)
+pddld = ObjectAtomBip(domain)
 pddld = LevinASNet(domain)
 ```
+Note that the last `LevinASNet` is a version of `ASNet` adapted to be used with the `LevinLoss` and `LevinAStar` to implement the method from the paper
 
-Now the chosen extractor has to be specialized. First a problem is loaded with the `load_problem()` function (any problem from the set will do, we are choosing the first one for simplicity). Next `specialize()` is used to create the specialized extractor `pddle`, and create the initial state of the problem with `initstate(domain, problem)`
+Now the chosen extractor has to be specialized for a given problem instance. First a problem is loaded with the `load_problem()` function (any problem from the set will do, we are choosing the first one for simplicity). Next `specialize()` is used to create the specialized extractor `pddle`, and create the initial state of the problem with `initstate(domain, problem)`
 
 ```julia 
 problem = load_problem(first(problem_files))
@@ -89,7 +78,7 @@ With the extracted state the model is created with the Mill.jl `reflectinmodel()
 `fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers))` optional kwarg, overrides constructions of feed-forward models. Here `""` in fsm denotes the last (output) layer, so these are settings for the last layer. (The 1 is the output dimension)
 
 ```julia
-reflectinmodel(h₀, d -> Dense(d, dense_dim, relu);fsm = Dict("" =>  d -> ffnn(d, dense_dim, 1, dense_layers)))
+model = reflectinmodel(h₀, d -> Dense(d, 32, relu);fsm = Dict("" =>  d -> Chain(Dense(d,32,relu), Dense(32,1))))
 ```
 
 For more optional keyword arguments and info on this function see [Mill.jl documentation on the topic](https://ctuavastlab.github.io/Mill.jl/stable/manual/reflectin/).
@@ -113,7 +102,8 @@ fminibatch = NeuroPlanner.minibatchconstructor("levinloss")
 With the constructor made, the batches can be created with the code snippet below. Deduplicate is a Neuroplanner function which eliminates redudant data from the batches, cutting down the size dramatically.
 
 ```julia
-minibatches = map(problem_files) do problem_file
+train_files = filter(isfile ∘ NeuroPlanner.plan_file, problem_files)
+minibatches = map(train_files) do problem_file
 			  plan = load_plan(problem_file)
 		 	  problem = load_problem(problem_file)
 			  ds = fminibatch(pddld, domain, problem, plan)
@@ -124,8 +114,8 @@ minibatches = map(problem_files) do problem_file
 An [optimiser](https://fluxml.ai/Optimisers.jl/dev/api/#Optimisation-Rules) is chosen (any works, for brevity `AdaBelief()` is picked here) and model parameters are extracted.
 
 ```julia
-opt = AdaBelief();
-ps = Flux.params(model);
+using Flux.Optimisers
+opt_state = Optimisers.setup(Optimisers.AdaBelief(), model) 
 ```
 
 ---
@@ -133,16 +123,16 @@ ps = Flux.params(model);
 
 The model is trained with `train!()`. 
 
-NeuroPlanner.loss passes the generic NeuroPlanner loss, which will dispatch to the correct loss based on the minibatch passed to it.
+`NeuroPlanner.loss` passes the generic NeuroPlanner loss, which will dispatch to the correct loss based on the minibatch passed to it.
 
-Model,ps,opt are the pre-prepared structs.  
-
-() -> rand(minibatches) creates an anonymous function which returns a random minibatch (train! requires a function that returns batches).
-
-max_steps is the maximum amount of steps the training will take.
+`model,opt_state` are the pre-prepared structs.  
 
 ```julia
-train!(NeuroPlanner.loss, model, ps, opt, () -> rand(minibatches), max_steps)
+for i in 1:10_000
+	mb = rand(minibatches)
+	l, ∇model = Flux.withgradient(model -> NeuroPlanner.loss(model, mb), model)
+	state_tree, model = Optimisers.update(state_tree, model, ∇model[1]);
+end
 ```
 
 With this the model is trained and ready to be used.
