@@ -1,15 +1,18 @@
 using PDDL: get_facts, get_args
 """
-struct AtomBinary{DO,D,N,G}
+```julia
+struct AtomBinary{DO,EB,MP,D,S,G}
     domain::DO
-    multiarg_predicates::NTuple{N,Symbol}
-    nunanary_predicates::Dict{Symbol,Int64}
-    objtype2id::Dict{Symbol,Int64}
-    constmap::Dict{Symbol, Int64}
-    model_params::NamedTuple{(:message_passes, :residual), Tuple{Int64, Symbol}}
+    edgebuilder::EB
+    max_arity::Int
+    constmap::Dict{Symbol,Int}
+    actionmap::Dict{Symbol,Int}
+    model_params::MP
     obj2id::D
-    goal::G
+    init_state::S           # contains atoms of the init state
+    goal_state::G           # contains atoms of the goal state
 end
+```
 
 Represents a PDDL state as a hypergraph, whre 
 - Each node is either an object or a contant

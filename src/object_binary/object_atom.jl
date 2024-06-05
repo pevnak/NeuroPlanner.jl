@@ -1,32 +1,54 @@
 using PDDL: get_facts, get_args
 """
-struct ObjectAtom{DO,D,N,G}
+```julia
+struct ObjectAtom{DO,D,N,MP,S,G}
     domain::DO
     multiarg_predicates::NTuple{N,Symbol}
     nunanary_predicates::Dict{Symbol,Int64}
     objtype2id::Dict{Symbol,Int64}
-    constmap::Dict{Symbol, Int64}
-    model_params::NamedTuple{(:message_passes, :residual), Tuple{Int64, Symbol}}
+    constmap::Dict{Symbol,Int64}
+    model_params::MP
     obj2id::D
-    goal::G
+    init_state::S
+    goal_state::G
 end
+```
 
-Represents a PDDL state as a hypergraph, whre 
-- Each node is either an object or a contant
-- unary predicate is a property of an object
-- nullary predicate is a property of all objects
-- n-ary predicate is a hyper-edge
+Represents STRIPS state as a hypergraph, where 
+- vertices corresponds to object and constants (map is stored in `obj2id`)
+- unary atoms (predicates) are propeties of its arguments (map of type of the atom to the feature id is the position in `multiarg_predicates`)
+- nullary atoms (predicate) are properties of all objects
+- n-ary atoms (predicates) are represented as hyper-edges over its arguments (objects)
 
 The computational model is message-passing over hyper-graph, which is essentially 
 a message passing over a bipartite graph, where left vertices corresponds to vertices
 in hypergraph and right vertices corresponds to hyper-edges. There is an edge between
 vertex corresponding to the hyper-edge and its vertices.
 
---- `multiarg_predicates` is a list of all n-ary predicates
---- `nunary_predicates` maps unary predicates to an index in one-hot encoded vertex' properties 
---- `objtype2id` maps unary predicates to an index in one-hot encoded vertex' properties 
---- `constmap` maps constants to an index in one-hot encoded vertex' properties 
---- `model_params` some parameters of an algorithm constructing the message passing passes 
+Following parameters are initialized for domain when `ObjectAtom(domain)` is called
+
+* `multiarg_predicates` is a list of all n-ary predicates
+* `nunanary_predicates` maps unary predicates to an index in one-hot encoded vertex' properties 
+* `objtype2id` maps unary predicates to an index in one-hot encoded vertex' properties 
+* `constmap` maps constants to an index in one-hot encoded vertex' properties 
+* `model_params` some parameters of an algorithm constructing the message passing passes 
+
+Following parameters are initiliazed when extractor is specialized per problem instance
+
+* `obj2id` contains a map from object names to their ids. This is created when calling `specialize(ex::ObjectAtom, problem)`
+* `init_state` is information about initial state. If `nothing` it is added to the represenation of the state allowing a 
+    to measure heuristic distance between initial_state and given state
+* `init_state` is information about goal state. If `nothing` it is added to the represenation of the state allowing a 
+    to measure heuristic distance between goal_state and given state
+
+Constructors:
+
+* `ObjectAtom(domain; message_passes=2, residual=:linear, kwargs...)` The basic constructor 
+specializing for a given domain. Notice the arguments `message_passes` and 
+`residual` specifying the number of layers and the use of residual connections.
+* `ObjectAtom(domain, problem; embed_goal=true, kwargs...)` specializes the constructor for a 
+given domain and problem instance. The arguments are `message_passes`, `residual`, and additional `embed_goal` which will
+automatically extract information about the goal state.
 """     
 struct ObjectAtom{DO,D,N,MP,S,G}
     domain::DO

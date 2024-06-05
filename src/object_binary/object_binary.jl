@@ -1,5 +1,5 @@
 """
-struct ObjectBinary{DO,P,EB,MP,D,S,G}
+struct ObjectBinary{DO,P,EB,MP,D,II,S,G}
     domain::DO
     predicates::P
     edgebuilder::EB
@@ -7,36 +7,57 @@ struct ObjectBinary{DO,P,EB,MP,D,S,G}
     constmap::Dict{Symbol,Int64}
     model_params::MP
     obj2id::D
+    cached_types::II
     init_state::S
     goal_state::G
 end
 
-Represents a PDDL state as a multigraph (or graph with features on edges), where 
-- Each node is either an object or a contant
-- unary predicate is a property of an object
-- nullary predicate is a property of all objects
-- n-ary predicate is an edge between two vertices (objects) sharing the object
 
-The computational model is message-passing over hyper-graph, which is essentially 
-a message passing over a bipartite graph, where left vertices corresponds to vertices
-in hypergraph and right vertices corresponds to hyper-edges. There is an edge between
-vertex corresponding to the hyper-edge and its vertices. 
+Represents STRIPS state as a graph, where vertices corresponds to objects and contants 
+constants (map is stored in `obj2id`). There is an edge between objects, if they are both
+in the same atom with arity higher than two. The type of the atom (predicate) is considered
+as a type / feature of the edge. Unary and nullary predicates are represented as feature 
+of the vertex / all vertices.
 
---- `predicates` contains information about predicates as produced by `PredicateInfo(domain)`. 
+Following parameters are initialized for domain when `ObjectAtomBip(domain)` is called
+
+* `predicates` contains information about predicates as produced by `PredicateInfo(domain)`. 
     It contains list of predicates, their arrities, number of predicates with arity higher than two,
     and number of predicates with arity 0 and 1. Finally, it contains a map of predicate names to 
     indices, which is used in `intstates` to convert names to ids
---- `objtype2id` maps object types to an index in one-hot encoded vertex' properties 
---- `constmap` maps constants to an index in one-hot encoded vertex' properties 
---- `model_params` some parameters of an algorithm constructing the message passing passes 
---- `obj2id` maps object names to id of vertices
---- `init_state` fluents from the initial parsed to `intstates`. 
---- `goal_state` fluents from the initial parsed to `intstates` with ids appropriately shifted.
+* `objtype2id` maps object types to an index in one-hot encoded vertex' properties 
+* `constmap` maps constants to an index in one-hot encoded vertex' properties 
+* `model_params` some parameters of an algorithm constructing the message passing passes 
+* `edgebuilder` is used to specify, if different types of edges are represented as edges 
+with features (use `FeaturedEdgeBuilder`) or use multigraph with edges of multiple types (use `MultiEdgeBuilder`).
 
-We define three variants: 
-`ObjectBinaryFE` --- representing multiple edges as edges with features
-`ObjectBinaryFENA` --- representing multiple edges as edges with features, but do not aggregate multiple edges
-`ObjectBinaryME` --- representing edges as proper multi-graph
+Following parameters are initiliazed when extractor is specialized per problem instance
+
+* `obj2id` contains a map from object names to their ids. This is created when calling `specialize(ex::ObjectAtom, problem)`
+* `init_state` is information about initial state. If `nothing` it is added to the represenation of the state allowing a 
+    to measure heuristic distance between initial_state and given state
+* `init_state` is information about goal state. If `nothing` it is added to the represenation of the state allowing a 
+    to measure heuristic distance between goal_state and given state
+* `cached_types` contains a cache of (objectid, types), which makes the repeated extraction of states from the same
+problem instance faster.
+
+Constructors:
+
+* `ObjectBinary(domain; message_passes=2, residual=:linear, edgebuilder = FeaturedEdgeBuilder, kwargs...)` The basic constructor 
+specializing for a given domain. Notice the arguments `message_passes` and 
+`residual` specifying the number of layers and the use of residual connections. 
+Furthermore, there is an `edgebuilder` specifying how edges will be represented.
+* `ObjectBinary(domain, problem; embed_goal=true, kwargs...)` specializes the constructor for a 
+given domain and problem instance. The arguments are `message_passes`, `residual`, and additional `embed_goal` which will
+automatically extract information about the goal state.
+
+We define three convenient shortcuts to different variants of representation of edges: 
+
+* `ObjectBinaryFE` represents different types of edges as edges with features. The edges 
+are deduplicated, which means that if there are more edges, between two vertices, then they
+will be represented as a single edge with features aggregated (by default by `max`).
+* `ObjectBinaryFENA` is similar as ``ObjectBinaryFE`, but the edges are not deduplicated.
+* `ObjectBinaryME` represents different edges as multi-graph.
 """
 struct ObjectBinary{DO,P,EB,MP,D,II,S,G}
     domain::DO

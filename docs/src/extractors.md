@@ -1,1 +1,18 @@
-extractor info goes here
+## Extractors
+
+```@docs
+ObjectAtom
+```
+
+```@docs
+ObjectAtomBip
+```
+
+```@docs
+ObjectBinary
+```
+
+```@docs
+AtomBinary
+```
+
