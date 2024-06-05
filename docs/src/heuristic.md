@@ -1,12 +1,20 @@
 
 ## Heuristic functions
-At the moment, we implement three different heuristic functions
-* `HyperExtractor` which encodes state as relations coded in hypergraph (more on this later);
-* `HGNN` is an encoding proposed in *Learning Domain-Independent Planning Heuristics with Hypergraph Networks, William Shen, Felipe Trevizan, Sylvie Thiebaux, 2020*
-* `ASNet` is an encoding proposed in *Action Schema Networks: Generalised Policies with Deep Learning, 2018*
+The heuristic function is composed of two parts. First, called **extractor**, `ex` takes a STRIPS state `s` and project it to to (computation) graph (more on this later). The second is the neural network `nn`, which takes the computation graph and project it to the heuristic function. This functionality is based on a custom extension of **Mill.jl** library. The advantage is that the construction contains tedious non-differentiable operations and allows for minibatching and deduplication. The complete heuristic function is therefore composition `nn ∘ ex`.
 
-The parameters of the heuristic function are implemented in a neural network, `nn`, which expects some sample as an input. This sample is not directly a state in pddl, but an image of an  *extraction function* `ex`, which prepares the state `s`. This construction is reminiscent of **Mill.jl**, on top of which Lifted Relational NNs are built. The advantage is that the construction contains tedious non-differentiable operations and allows for minibatching. The heuristic function can be seen as a composition `nn ∘ ex`.
 
+
+
+The library implements various methods how to represent STRIPS states as graphs. This representation is important for the properties of the heuristic function, mainly to its ability to discriminate between states. This representation is perpendicular to the type of graph neural networks, in which this library in not that interested that much. The functionality projecting state to graph is called **extractor**.
+
+The available extractors are:
+* `ObjectAtom`[^1] represent state as a hyper-multi-graph. Each vertex corresponds to the object, each atom represent a hyper-edge. Different types of atoms are represented as different type of edges.
+* `ObjectAtomBip`[^1] represent state as a multi-graph or graphs with features on edges. Each object and atom corresponds to a vertex. Object-vertex is connected to atom-vertex when object is an argument of the atom. The representation is similar to the `ObjectAtom`, except the hyper-edges are represented in bipartite graph.
+* `ObjectBinary`[^1] represent states as multi graph (or graph with features on edges). Each object correponds to the vertex. Vertices are connected by the edge if they are in the same atom. The type of edge (or features one edges) corresponds to the type of atom and position of the object in the argument.
+* `AtomBinary`[^1] represent states as multi graph (or graph with features on edges). Each object correponds to the atom. Vertices are connected by the edge if they share the same object. The type of the edge (or features one edges) corresponds to the position of the object in both atoms.
+* `ObjectPair`[^1] each vertex corresponds to a tuple of objects and edges are create by some cryptic algorithm.
+* `ASNet`[^2] creates vertices for each possible atoms. The atoms are present in the graph even when they are not `true` in the state. This means that graph representing states differ only in features on edges, which codes if the atom is `true` or `false.` 
+* `HGNN`[^3] is similar to `ASNet`, except the message-passing over the hyper-edges is a bit different, as it includes more domain knowledge from the planning community.
 
 Let's now focus on extraction function `ex`, which takes a state `s` and converts it to some representation suitable for NN. While in most cases, this representation would be a tensor, here we preder a relational encoding similar to Lifted Relational Neural Networks (LRNN). In this library, LRNN are instance of `KnowledgeBase`. The extraction function `ex` therefore to  controls the computational graph used by the heuristic function, including things like the number of graph convolutions. The  extraction function is implemented as a callable struct with a following api, where `HyperExtractor` is used as an example:
 * `ex = HyperExtractor(domain)` --- initialize the extractor for a given domain
@@ -166,3 +174,10 @@ julia> model(b)
  -0.350715    0.111813
  -0.0134815  -0.0315447
 ```
+
+[^1]: Horčík, Rostislav, and Gustav Šír. "Expressiveness of Graph Neural Networks in Planning Domains." Proceedings of the International Conference on Automated Planning and Scheduling. Vol. 34. 2024.
+
+[^2]: Toyer, Sam, et al. "Action schema networks: Generalised policies with deep learning." Proceedings of the AAAI Conference on Artificial Intelligence. Vol. 32. No. 1. 2018.
+
+[^3]: Learning Domain-Independent Planning Heuristics with Hypergraph Networks, William Shen, Felipe Trevizan, Sylvie Thiebaux, 2020
+

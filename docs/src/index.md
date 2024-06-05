@@ -9,14 +9,49 @@ The library is experimental in the sense that it is used to research different p
 
 \[OUTDATED\] An api of heuristic function api and few details and gotchas can be found [here](heuristic.md).
 
-## Example of use
+## Short snipper
+
+```julia
+using NeuroPlanner
+using NeuroPlanner.PDDL
+using NeuroPlanner.Mill
+using NeuroPlanner.Flux
+using NeuroPlanner.SymbolicPlanners
+using NeuroPlanner.Flux.Optimisers
+domain = load_domain("../domains/ferry/domain.pddl")
+problem_files = [joinpath("../domains/ferry/", f) for f in readdir("../domains/ferry") if endswith(f,".pddl") && f !== "domain.pddl"]
+train_files = filter(s -> isfile(plan_file(s)), problem_files)
+problem = load_problem(first(problem_files))
+
+pddld = ObjectAtom(domain)
+pddle, state = initproblem(pddld, problem)
+h₀ = pddle(state)
+model = reflectinmodel(h₀, d -> Dense(d, 32, relu);fsm = Dict("" =>  d -> Chain(Dense(d, 32, relu), Dense(32,1))))
+
+fminibatch = NeuroPlanner.minibatchconstructor("lstar") 
+minibatches = map(train_files) do problem_file
+			plan = NeuroPlanner.load_plan(problem_file)
+			problem = load_problem(problem_file)
+			ds = fminibatch(pddld, domain, problem, plan)
+		end
+
+state_tree = Optimisers.setup(Optimisers.AdaBelief(), model) 
+for i in 1:10_000
+	mb = rand(minibatches)
+	l, ∇model = Flux.withgradient(model -> NeuroPlanner.loss(model, mb), model)
+	state_tree, model = Optimisers.update(state_tree, model, ∇model[1]);
+end
+```
+
+
+## A more detailed walkthrough
 
 A naive example of learning a heuristic on a domain
 
 First we load the domain and problem files
 ```julia
-using PDDL
 using NeuroPlanner
+using NeuroPlanner.PDDL
 domain = load_domain("../domains/ferry/domain.pddl")
 problem_files = [joinpath("../domains/ferry/", f) for f in readdir("../domains/ferry") if endswith(f,".pddl") && f !== "domain.pddl"]
 train_files = filter(s -> isfile(plan_file(s)), problem_files)
@@ -34,9 +69,9 @@ h₀ = pddle(state)
 ```
 Now we can create a model to represent the heuristic. 
 ```julia
-using Mill
-using Flux
-using SymbolicPlanners
+using NeuroPlanner.Mill
+using NeuroPlanner.Flux
+using NeuroPlanner.SymbolicPlanners
 model = reflectinmodel(h₀, d -> Dense(d, 32, relu);fsm = Dict("" =>  d -> Chain(Dense(d, 32, relu), Dense(32,1))))
 ```
 To allow for efficient training, we create minibatches from the training files. Each loss function has its own type of minibatch, which allows a dispatch of the loss on the type of the minibatch. In below example, the function `fminibatch` therefore creates minibatch for loss function named "lstar", which is designed to maximize efficiency of A* algorithm [^1].
@@ -51,27 +86,12 @@ minibatches = map(train_files) do problem_file
 
 With minibatches, we train the model using standart training loop.
 ```julia
-using Optimisers
-model = let model = model
-	state_tree = Optimisers.setup(Optimisers.AdaBelief(), model) 
-	max_steps = 1000
-	reset_fval = 100
-	fval, n = 0.0, 0
-	last_fval = nothing
-
-	for i in 1:max_steps
-		mb = rand(minibatches)
-		l, ∇model = Flux.withgradient(model -> NeuroPlanner.loss(model, mb), model)
-		fval += l
-		n += 1
-		state_tree, model = Optimisers.update(state_tree, model, ∇model[1]);
-		if mod(i, reset_fval) == 0
-			last_fval = fval / n
-			println(i,": ", round(last_fval, digits = 3))
-			fval, n = 0.0, 0
-		end
-	end
-	model
+using NeuroPlanner.Flux.Optimisers
+state_tree = Optimisers.setup(Optimisers.AdaBelief(), model) 
+for i in 1:10_000
+	mb = rand(minibatches)
+	l, ∇model = Flux.withgradient(model -> NeuroPlanner.loss(model, mb), model)
+	state_tree, model = Optimisers.update(state_tree, model, ∇model[1]);
 end
 ```
 
