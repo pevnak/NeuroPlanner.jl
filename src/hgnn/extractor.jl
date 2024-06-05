@@ -115,7 +115,7 @@ function encode_actions(ex::HGNN, kb::KnowledgeBase, kid::Symbol)
 end
 
 function encode_action(ex::HGNN, kb::KnowledgeBase, action::GenericAction, kid::Symbol)
-	preds = allgrounding(action, extract_predicates(action.precond), extract_predicates(action.effect), ex.type2obs)
+	preds = allgrounding(action, extract_predicates(action.precond), extract_predicates(action.effect), ex.type2obs; unique_args = false)
 	#encode edge 
 	l = length(first(preds).senders)
 	xs = map(1:l) do i 

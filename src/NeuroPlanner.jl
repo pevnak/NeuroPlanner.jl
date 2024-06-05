@@ -1,3 +1,4 @@
+
 module NeuroPlanner
 
 using PDDL
@@ -40,10 +41,7 @@ include("mill_extension/mill_extension.jl")
 include("relational/knowledge_base.jl")
 include("relational/knowledge_model.jl")
 export KBEntry, KnowledgeBase, append, atoms
-3#include("hyper/extractor.jl")
-#include("hyper/deduplication.jl")
-#include("hyper/dedu_matrix.jl")
-#export HyperExtractor, deduplicate
+
 #include("hyper/mha.jl")
 include("relational/deduplication.jl")
 include("relational/coloring.jl")
@@ -59,13 +57,18 @@ export EdgeBuilder
 include("lrnn/pure_extractor.jl")
 export LRNN
 
-# Object Binary structures by Sira and Horcik
+# Object Binary structures by Sir and Horcik
+include("object_binary/groupfacts.jl")
 include("object_binary/object_binary.jl")
+export ObjectBinary, ObjectBinaryFE, ObjectBinaryFENA, ObjectBinaryME
 include("object_binary/atom_binary.jl")
-include("object_binary/atom_binary_2.jl")
+export AtomBinary, AtomBinaryFE, AtomBinaryFENA, AtomBinaryME
 include("object_binary/object_pair.jl")
+export ObjectPair
 include("object_binary/object_atom.jl")
-export ObjectBinary, AtomBinary, AtomBinary2, ObjectAtom, ObjectPair
+export ObjectAtom
+include("object_binary/object_atom_bip.jl")
+export ObjectAtomBip, ObjectAtomBipFE, ObjectAtomBipFENA, ObjectAtomBipME
 
 # ASNet and HGNN by Silvia
 include("asnets/extractor.jl")
@@ -83,13 +86,12 @@ export LevinASNet, BFSPlanner
 include("hgnn/extractor.jl")
 export HGNNLite, HGNN
 
-include("admissible_planner/cheating_heuristic.jl")
+# wait until merged to official repository
+# include("admissible_planner/extractor.jl")
+# export AdmissibleExtractor
 
-include("admissible_planner/extractor.jl")
-export AdmissibleExtractor
-
-include("admissible_planner/apply_policy.jl")
-export ApplyPolicy, setOutputToPolicy, roundPolicyOutput
+# include("admissible_planner/apply_policy.jl")
+# export ApplyPolicy, setOutputToPolicy, roundPolicyOutput
 
 # Potential heuristic is useless
 include("potential/extractor.jl")

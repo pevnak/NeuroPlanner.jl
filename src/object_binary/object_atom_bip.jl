@@ -1,5 +1,5 @@
 """
-struct ObjectBinary{DO,P,EB,MP,D,S,G}
+struct ObjectAtomBip{DO,P,EB,MP,D,S,G}
     domain::DO
     predicates::P
     edgebuilder::EB
@@ -34,11 +34,12 @@ vertex corresponding to the hyper-edge and its vertices.
 --- `goal_state` fluents from the initial parsed to `intstates` with ids appropriately shifted.
 
 We define three variants: 
-`ObjectBinaryFE` --- representing multiple edges as edges with features
-`ObjectBinaryFENA` --- representing multiple edges as edges with features, but do not aggregate multiple edges
-`ObjectBinaryME` --- representing edges as proper multi-graph
+`ObjectAtomBipFE` --- representing multiple edges as edges with features
+`ObjectAtomBipFENA` --- representing multiple edges as edges with features, but do not aggregate multiple edges
+`ObjectAtomBipME` --- representing edges as proper multi-graph
 """
-struct ObjectBinary{DO,P,EB,MP,D,II,S,G}
+
+struct ObjectAtomBip{DO,P,EB,MP,D,II,S,G}
     domain::DO
     predicates::P
     edgebuilder::EB
@@ -49,7 +50,7 @@ struct ObjectBinary{DO,P,EB,MP,D,II,S,G}
     cached_types::II
     init_state::S
     goal_state::G
-    function ObjectBinary(domain::DO, predicates::P, edgebuilder::EB, objtype2id::Dict{Symbol,Int64}, 
+    function ObjectAtomBip(domain::DO, predicates::P, edgebuilder::EB, objtype2id::Dict{Symbol,Int64}, 
         constmap::Dict{Symbol,Int64}, model_params::MP, obj2id::D, cached_types::II, init::S, goal::G) where {DO,P,EB,MP<:NamedTuple,D,II,S,G}
         @assert issubset((:message_passes, :residual), keys(model_params)) "Parameters of the model are not fully specified"
         @assert (init === nothing || goal === nothing) "Fixing init and goal state is bizzaare, as the extractor would always create a constant"
@@ -58,11 +59,11 @@ struct ObjectBinary{DO,P,EB,MP,D,II,S,G}
 end
 
 
-ObjectBinaryNoGoal{DO,P,EB,MP,II} = ObjectBinary{DO,P,EB,MP,D,II,Nothing,Nothing} where {DO,P,EB,MP,D,II}
-ObjectBinaryStart{DO,P,EB,MP,D,II,S} = ObjectBinary{DO,P,EB,MP,D,II,S,Nothing} where {DO,P,EB,MP,D,II,S<:Vector}
-ObjectBinaryGoal{DO,P,EB,MP,D,II,G} = ObjectBinary{DO,P,EB,MP,D,II,Nothing,G} where {DO,P,EB,MP,D,II,G<:Vector}
+ObjectAtomBipNoGoal{DO,P,EB,MP} = ObjectAtomBip{DO,P,EB,MP,D,II,Nothing,Nothing} where {DO,P,EB,MP,D,II}
+ObjectAtomBipStart{DO,P,EB,MP,D,II,S} = ObjectAtomBip{DO,P,EB,MP,D,II,S,Nothing} where {DO,P,EB,MP,D,II,S<:Vector}
+ObjectAtomBipGoal{DO,P,EB,MP,D,II,G} = ObjectAtomBip{DO,P,EB,MP,D,II,Nothing,G} where {DO,P,EB,MP,D,II,G<:Vector}
 
-function ObjectBinary(domain; message_passes=2, residual=:linear, edgebuilder = FeaturedEdgeBuilder, kwargs...)
+function ObjectAtomBip(domain; message_passes=2, residual=:linear, edgebuilder = FeaturedEdgeBuilder, kwargs...)
     any(length(p.args) > 3 for p in values(domain.predicates)) && error("Ternary predicate is rare and it is not supported at the moment")
     model_params = (; message_passes, residual)
     dictmap(x) = Dict(reverse.(enumerate(sort(x))))
@@ -77,26 +78,26 @@ function ObjectBinary(domain; message_passes=2, residual=:linear, edgebuilder = 
     objtype2id = dictmap(collect(keys(domain.typetree)))
 
     constmap = Dict{Symbol,Int}(dictmap([x.name for x in domain.constants]))
-    ObjectBinary(domain, pifo, edgebuilder, objtype2id, constmap, model_params, nothing, nothing, nothing, nothing)
+    ObjectAtomBip(domain, pifo, edgebuilder, objtype2id, constmap, model_params, nothing, nothing, nothing, nothing)
 end
 
-isspecialized(ex::ObjectBinary) = ex.obj2id !== nothing
-hasgoal(ex::ObjectBinary) = ex.init_state !== nothing || ex.goal_state !== nothing
+isspecialized(ex::ObjectAtomBip) = ex.obj2id !== nothing
+hasgoal(ex::ObjectAtomBip) = ex.init_state !== nothing || ex.goal_state !== nothing
 
-function ObjectBinary(domain, problem; embed_goal=true, kwargs...)
-    ex = ObjectBinary(domain; kwargs...)
+function ObjectAtomBip(domain, problem; embed_goal=true, kwargs...)
+    ex = ObjectAtomBip(domain; kwargs...)
     ex = specialize(ex, problem)
     embed_goal ? add_goalstate(ex, problem) : ex
 end
 
-ObjectBinaryFE(domain; kwargs...) = ObjectBinary(domain; edgebuilder = FeaturedEdgeBuilder, kwargs...)
-ObjectBinaryFENA(domain; kwargs...) = ObjectBinary(domain; edgebuilder = FeaturedEdgeBuilderNA, kwargs...)
-ObjectBinaryME(domain; kwargs...) = ObjectBinary(domain; edgebuilder = MultiEdgeBuilder, kwargs...)
-ObjectBinaryFE(domain, problem; kwargs...) = ObjectBinary(domain, problem; edgebuilder = FeaturedEdgeBuilder, kwargs...)
-ObjectBinaryFENA(domain, problem; kwargs...) = ObjectBinary(domain, problem; edgebuilder = FeaturedEdgeBuilderNA, kwargs...)
-ObjectBinaryME(domain, problem; kwargs...) = ObjectBinary(domain, problem; edgebuilder = MultiEdgeBuilder, kwargs...)
+ObjectAtomBipFE(domain; kwargs...) = ObjectAtomBip(domain; edgebuilder = FeaturedEdgeBuilder, kwargs...)
+ObjectAtomBipFENA(domain; kwargs...) = ObjectAtomBip(domain; edgebuilder = FeaturedEdgeBuilderNA, kwargs...)
+ObjectAtomBipME(domain; kwargs...) = ObjectAtomBip(domain; edgebuilder = MultiEdgeBuilder, kwargs...)
+ObjectAtomBipFE(domain, problem; kwargs...) = ObjectAtomBip(domain, problem; edgebuilder = FeaturedEdgeBuilder, kwargs...)
+ObjectAtomBipFENA(domain, problem; kwargs...) = ObjectAtomBip(domain, problem; edgebuilder = FeaturedEdgeBuilderNA, kwargs...)
+ObjectAtomBipME(domain, problem; kwargs...) = ObjectAtomBip(domain, problem; edgebuilder = MultiEdgeBuilder, kwargs...)
 
-function Base.show(io::IO, ex::ObjectBinary)
+function Base.show(io::IO, ex::ObjectAtomBip)
     if !isspecialized(ex)
         print(io, "Unspecialized extractor for ", ex.domain.name, " ",ex.predicates.predicates)
     else
@@ -105,36 +106,35 @@ function Base.show(io::IO, ex::ObjectBinary)
     end
 end
 
-
 """
-specialize(ex::ObjectBinary{<:Nothing,<:Nothing}, problem)
+specialize(ex::ObjectAtomBip{<:Nothing,<:Nothing}, problem)
 
 initializes extractor for a given `problem` by initializing mapping 
 from objects to id of vertices. Goals are not changed added to the 
 extractor.
 """
-function specialize(ex::ObjectBinary, problem)
+function specialize(ex::ObjectAtomBip, problem)
     obj2id = Dict(v.name => i for (i, v) in enumerate(problem.objects))
     for k in keys(ex.constmap)
         obj2id[k] = length(obj2id) + 1
     end
     cached_types = cache_types_const(ex, obj2id, problem)
-    ex = ObjectBinary(ex.domain, ex.predicates, ex.edgebuilder, ex.objtype2id, ex.constmap, ex.model_params, obj2id, cached_types, nothing, nothing)
+    ex = ObjectAtomBip(ex.domain, ex.predicates, ex.edgebuilder, ex.objtype2id, ex.constmap, ex.model_params, obj2id, cached_types, nothing, nothing)
 end
 
 
-function intstates(ex::ObjectBinary, state::GenericState)
+function intstates(ex::ObjectAtomBip, state::GenericState)
     facts = collect(PDDL.get_facts(state))
     intstates(ex.domain, ex.obj2id, ex.predicates, facts)
 end
 
-function (ex::ObjectBinary)(state::GenericState)
+function (ex::ObjectAtomBip)(state::GenericState)
     # we need to add goal of start state with correctly remapped ids
     grouped_facts = addgoal(ex, intstates(ex, state))
     encode_state(ex, state, grouped_facts)
 end
 
-function encode_state(ex::ObjectBinary, state::GenericState, grouped_facts)
+function encode_state(ex::ObjectAtomBip, state::GenericState, grouped_facts)
     message_passes = ex.model_params.message_passes
     residual = ex.model_params.residual
     x = nunary_predicates(ex, state, grouped_facts)
@@ -158,13 +158,13 @@ end
 
 
 """
-    cache_types_const(ex::ObjectBinary)
+    cache_types_const(ex::ObjectAtomBip)
 
     Compute indices corresponding to types of objects and constants, which 
     are fixed for the problem. Indices are stores as a Vector of tuples 
     containing row and col to be set
 """
-function cache_types_const(ex::ObjectBinary, obj2id, problem)
+function cache_types_const(ex::ObjectAtomBip, obj2id, problem)
     ii = NTuple{2,Int}[]
     # encode types of objects
     offset = ex.predicates.nunary
@@ -185,14 +185,15 @@ end
 
 
 """
-nunary_predicates(ex::ObjectBinary, state)
+nunary_predicates(ex::ObjectAtomBip, state)
 
-Create matrix with one column per object and encode by one-hot-encoding unary predicates 
-and types of objects. Nunary predicates are encoded as properties of all objects.
+Create matrix with one column per object and atom. Encode by one-hot-encoding unary predicates 
+and types of objects. Furthermore, we encode by one-hot encoding types of nary predicates
 """
-function nunary_predicates(ex::ObjectBinary, state, grouped_facts)
-    idim = ex.predicates.nunary + length(ex.objtype2id) + length(ex.constmap)
-    x = zeros(Float32, idim, length(ex.obj2id))
+function nunary_predicates(ex::ObjectAtomBip, state, grouped_facts)
+    nnary_atoms = sum(length(grouped_facts[i]) for i in 3:length(grouped_facts))
+    idim = ex.predicates.nunary + length(ex.objtype2id) + length(ex.constmap) + ex.predicates.nary
+    x = zeros(Float32, idim, length(ex.obj2id) + nnary_atoms)
 
     # Set features indicating type of the object and constant.
     # The indices were precalculated during initialization.
@@ -209,34 +210,58 @@ function nunary_predicates(ex::ObjectBinary, state, grouped_facts)
     for s in grouped_facts[1] 
         x[s.name, :] .= 1
     end
+
+    # encode types of nary atoms
+    rowoffset = ex.predicates.nunary + length(ex.objtype2id) + length(ex.constmap)
+    coloffset = length(ex.obj2id) + 1
+    # consider making this generated function, which would be neatly fast
+    for gf in grouped_facts[3:end]
+        coloffset = encode_atom_type!(x, gf, rowoffset, coloffset)
+    end
     x
 end
 
+"""
+    encode_atom_type!(x, gf, rowoffset, coloffset)
 
-function multi_predicates(ex::ObjectBinary, kid::Symbol, grouped_facts, prefix=nothing)
+    This tiny function is to make this loop type stable
+"""
+function encode_atom_type!(x, gf, rowoffset, coloffset)
+    for s in gf
+        x[rowoffset + s.name, coloffset] = 1
+        coloffset += 1
+    end
+    coloffset
+end
+
+
+function multi_predicates(ex::ObjectAtomBip, kid::Symbol, grouped_facts, prefix=nothing)
     # estimate the number of predicates and initiates the 
+    nnary_atoms = 0
     max_edges = mapreduce(+, 3:length(grouped_facts)) do i
         a = i - 1 # arity of the predicate
-        (a * (a - 1) ÷ 2 ) * length(grouped_facts[i])
+        nnary_atoms += length(grouped_facts[i])
+        a * length(grouped_facts[i])
     end
-    num_type_edges = ex.predicates.nary
-    num_vertices = length(ex.obj2id)
+    num_type_edges = maximum(ex.predicates.arrities)
+    num_vertices = length(ex.obj2id) + nnary_atoms
     eb = ex.edgebuilder(2, max_edges, num_vertices, num_type_edges)
 
     # predicates from edges
+    coloffset = length(ex.obj2id) + 1
     for preds in grouped_facts[3:end]
-        encode_predicates!(eb, ex, preds)
+        coloffset = encode_predicates!(eb, ex, preds, coloffset)
     end
     return(construct(eb, kid))
 end
 
 """
-encode_predicates(ex::ObjectBinary, pname::Symbol, preds, kid::Symbol)
+encode_predicates(ex::ObjectAtomBip, pname::Symbol, preds, kid::Symbol)
 
-Encodes predicates for an ObjectBinary instance.
+Encodes predicates for an ObjectAtomBip instance.
 
 Arguments:
-- ex::ObjectBinary: ObjectBinary instance
+- ex::ObjectAtomBip: ObjectAtomBip instance
 - pname::Symbol: Predicate name
 - preds: Predicates
 - kid::Symbol: Symbol representing the key ID
@@ -244,28 +269,28 @@ Arguments:
 Returns:
 - BagNode: Encoded predicates as a BagNode
 
-This function encodes predicates for an ObjectBinary instance using the given predicate name, predicates, and key ID.
+This function encodes predicates for an ObjectAtomBip instance using the given predicate name, predicates, and key ID.
 """
-function encode_predicates!(eb::EB, ex::ObjectBinary, preds::Vector{<:IntState{N,<:Integer}}) where {N, EB<:Union{FeaturedEdgeBuilder,MultiEdgeBuilder}}
+function encode_predicates!(eb::EB, ex::ObjectAtomBip, preds::Vector{<:IntState{N,<:Integer}}, coloffset) where {N, EB<:Union{FeaturedEdgeBuilder,MultiEdgeBuilder}}
     for p in preds
+        oⱼ = coloffset
         for i in 1:N
             oᵢ = p.args[i]
-            for j in i+1:N
-                oⱼ = p.args[j]
-                @inbounds push!(eb, (oᵢ, oⱼ), p.name)
-            end
+            @inbounds push!(eb, (oᵢ, oⱼ), i)
         end
+        coloffset += 1
     end
+    coloffset
 end
 
 
 """
-    goal_id2fid(ex::ObjectBinary)
+    goal_id2fid(ex::ObjectAtomBip)
 
     construct new id2fid, such feature-ids of predicates points behind
     the feature_ids of normal states. 
 """
-function goal_id2fid(ex::ObjectBinary)
+function goal_id2fid(ex::ObjectAtomBip)
     arrities = ex.predicates.arrities
     m01 = arrities .≤ 1
     m2 = arrities .> 1
@@ -273,7 +298,7 @@ function goal_id2fid(ex::ObjectBinary)
     id2fid = ex.predicates.id2fid .+ m01 .* sum(m01) .+ m2 .* sum(m2)
 end
 
-function add_initstate(ex::ObjectBinary, problem, start=initstate(ex.domain, problem))
+function add_initstate(ex::ObjectAtomBip, problem, start=initstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
 
     #extract the init state
@@ -288,7 +313,7 @@ function add_initstate(ex::ObjectBinary, problem, start=initstate(ex.domain, pro
     new_ex
 end
 
-function add_goalstate(ex::ObjectBinary, problem, goal=goalstate(ex.domain, problem))
+function add_goalstate(ex::ObjectAtomBip, problem, goal=goalstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
 
     # change id2fid to code the goal, extract goal state with it and set it to goal_states
@@ -301,14 +326,14 @@ function add_goalstate(ex::ObjectBinary, problem, goal=goalstate(ex.domain, prob
     new_ex
 end
 
-function addgoal(ex::ObjectBinaryStart, kb)
+function addgoal(ex::ObjectAtomBipStart, kb)
     return (merge_states(ex.init_state, kb))
 end
 
-function addgoal(ex::ObjectBinaryGoal, kb)
+function addgoal(ex::ObjectAtomBipGoal, kb)
     return (merge_states(kb, ex.goal_state))
 end
 
-function addgoal(ex::ObjectBinaryNoGoal, kb)
+function addgoal(ex::ObjectAtomBipNoGoal, kb)
     return (kb)
 end

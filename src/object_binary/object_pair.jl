@@ -268,21 +268,32 @@ function encode_edges(ex::ObjectPair, kid::Symbol, grouped_facts, prefix=nothing
     ProductNode(NamedTuple{(name, ns...)}((edges_bn, xs...)))
 end
 
-function prepare_pids(ex::ObjectPair, eb::EdgeBuilder)
-    counts = fill(0, length(ex.pairs))
-    pids = Vector{Int}(undef, eb.num_vertices)
+function prepare_pids(ex::ObjectPair, eb::EdgeBuilder{N,T}) where {N,T}
+    ks = map(ii -> ii[1:eb.num_vertices], eb.indices)
+    max_size = length(ks[1])
+    num_vertices = length(ex.pairs)
 
-    for pid in eb.indices[1:eb.num_vertices]
-        counts[pid] += 1
+    counts = zeros(Int, num_vertices)
+    @inbounds for row in 1:N
+        row_ks = ks[row]
+        for i in row_ks
+            counts[i] += 1
+        end
     end
+
 
     ends = cumsum(counts)
     start = ends .- (counts .- 1)
     bags = map(UnitRange, start, ends)
 
-    for (i, pid) in enumerate(eb.indices[1:eb.num_vertices])
-        pids[start[pid]] = eb.indices[eb.num_vertices+i]
-        start[pid] += 1
+    pids = Vector{Int}(undef, N * max_size)
+    @inbounds for i in 1:N
+        kᵢ = ks[i]
+        for j in 1:max_size
+            k = kᵢ[j]
+            pids[start[k]] = j
+            start[k] += 1
+        end
     end
     return (pids, bags)
 end

@@ -37,7 +37,6 @@ end
 
 @inline _inlined_search(s, xs::Tuple) = _inlined_search(s, 1, xs)
 
-
 @inline function _map_tuple(f::F, xs::Tuple) where {F<:Union{Function, Base.Fix1, Base.Fix2}}
     isempty(xs) && return(xs)
     tuple(f(first(xs)), _map_tuple(f, Base.tail(xs))...)

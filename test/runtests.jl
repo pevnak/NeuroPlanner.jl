@@ -10,21 +10,13 @@ using NeuroPlanner: add_goalstate
 using Test
 using Random
 using PlanningDomains
-# using Yota
 
-_isapprox(a::Nothing, b::Nothing; kwargs...) = true
-_isapprox(a::ZeroTangent, b::Nothing; kwargs...) = true
-_isapprox(a::Number, b::Number; kwargs...) = isapprox(a,b;kwargs...)
-_isapprox(a::NamedTuple,b::NamedTuple; kwargs...) = all(_isapprox(a[k], b[k]; kwargs...) for k in keys(a))
-_isapprox(a::Tangent,b::NamedTuple; kwargs...) = all(_isapprox(a[k], b[k]; kwargs...) for k in keys(b))
-_isapprox(a::Tuple, b::Tuple; kwargs...) = all(_isapprox(a[k], b[k]; kwargs...) for k in keys(a))
-_isapprox(a::AbstractArray, b::AbstractArray; kwargs...) = all(_isapprox.(a,b;kwargs...))
-include("dedu_matrix.jl")
-include("lazyvcat.jl")
-include("knowledge_base.jl")
-include("datanode.jl")
-include("modelnode.jl")
-
+DOMAINS = ["briefcaseworld", "driverlog", "depot", "sokoban","ipc23_ferry", 
+			"ipc23_rovers", "ipc23_blocksworld", "ipc23_floortile", 
+			"ipc23_satellite", "ipc23_spanner", "ipc23_childsnack", 
+			"ipc23_miconic", "ipc23_sokoban", "ipc23_transport", 
+			"blocks", "ferry", "gripper", "npuzzle", "spanner", 
+			"elevators_00", "elevators_11"]
 
 domain_path(s) = joinpath(pkgdir(NeuroPlanner),"test","problems",s*".pddl")
 problem_path(s) = joinpath(pkgdir(NeuroPlanner),"test","problems",s*"_01.pddl")
@@ -45,19 +37,25 @@ function load_plan(domain_name)
 end
 
 
+_isapprox(a::Nothing, b::Nothing; kwargs...) = true
+_isapprox(a::ZeroTangent, b::Nothing; kwargs...) = true
+_isapprox(a::Number, b::Number; kwargs...) = isapprox(a,b;kwargs...)
+_isapprox(a::NamedTuple,b::NamedTuple; kwargs...) = all(_isapprox(a[k], b[k]; kwargs...) for k in keys(a))
+_isapprox(a::Tangent,b::NamedTuple; kwargs...) = all(_isapprox(a[k], b[k]; kwargs...) for k in keys(b))
+_isapprox(a::Tuple, b::Tuple; kwargs...) = all(_isapprox(a[k], b[k]; kwargs...) for k in keys(a))
+_isapprox(a::AbstractArray, b::AbstractArray; kwargs...) = all(_isapprox.(a,b;kwargs...))
+# include("dedu_matrix.jl")
+# include("lazyvcat.jl")
+# include("knowledge_base.jl")
+# include("datanode.jl")
+# include("modelnode.jl")
+# include("groupfacts.jl")
+
 # DOMAINS = ["briefcaseworld", "settlers", "driverlog", "depot", "sokoban",]
 # DOMAINS = []
-DOMAINS = ["briefcaseworld", "driverlog", "depot", "sokoban","ipc23_ferry", 
-			"ipc23_rovers", "ipc23_blocksworld", "ipc23_floortile", 
-			"ipc23_satellite", "ipc23_spanner", "ipc23_childsnack", 
-			"ipc23_miconic", "ipc23_sokoban", "ipc23_transport", 
-			"blocks", "ferry", "gripper", "npuzzle", "spanner", 
-			"elevators_00", "elevators_11"]
-ENCODINGS = (LRNN, ObjectAtom, AtomBinary, ObjectBinary, 
+ENCODINGS = (ObjectBinaryFE, ObjectBinaryFENA, ObjectBinaryME, ObjectAtom, ObjectAtomBipFE, 
+			ObjectAtomBipFENA, ObjectAtomBipME, AtomBinaryFE, AtomBinaryFENA, AtomBinaryME, 
 			ObjectPair, ASNet, HGNNLite, HGNN)
-
-ENCODINGS = (LRNN, ObjectAtom, AtomBinary, ObjectBinary, 
-			ObjectPair)
 
 @testset "extraction of hypergraph" begin
 	@testset "Domain: $domain_name" for domain_name in DOMAINS

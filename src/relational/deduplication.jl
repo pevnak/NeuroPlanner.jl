@@ -114,6 +114,13 @@ function _deduplicate(kb::KnowledgeBase, ds::ArrayNode{<:KBEntry})
 	dedu_ds, ii
 end
 
+function _deduplicate(kb::KnowledgeBase, ds::ArrayNode{<:Matrix})
+	x = ds.data
+	mask, ii = (x isa DeduplicatedMatrix || x isa DeduplicatingNode) ? find_duplicates(x.ii) : find_duplicates(x)
+	dedu_ds = DeduplicatingNode(ds[mask], ii)
+	dedu_ds, ii
+end
+
 # _sethash(xs::AbstractVector) = sum(hash.(xs)) # this might be good enough for the bang
 _sethash(xs::AbstractVector) = hash(sort(xs)) # this probably more correct
 
