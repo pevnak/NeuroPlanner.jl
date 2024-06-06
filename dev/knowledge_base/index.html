@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>- · NeuroPlanner</title><meta name="title" content="- · NeuroPlanner"/><meta property="og:title" content="- · NeuroPlanner"/><meta property="twitter:title" content="- · NeuroPlanner"/><meta name="description" content="Documentation for NeuroPlanner."/><meta property="og:description" content="Documentation for NeuroPlanner."/><meta property="twitter:description" content="Documentation for NeuroPlanner."/><meta property="og:url" content="https://Pevnak.github.io/NeuroPlanner/knowledge_base/"/><meta property="twitter:url" content="https://Pevnak.github.io/NeuroPlanner/knowledge_base/"/><link rel="canonical" href="https://Pevnak.github.io/NeuroPlanner/knowledge_base/"/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script><link href="../assets/favicon.ico" rel="icon" type="image/x-icon"/><link href="../assets/onlinestats.css" rel="stylesheet" type="text/css"/></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">NeuroPlanner</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../heuristic/">Heuristic</a></li><li><a class="tocitem" href="../usage_guide/">Usage guide</a></li><li><a class="tocitem" href="../theory/">Theoretical background</a></li><li><a class="tocitem" href="../losses/">Losses</a></li><li><a class="tocitem" href="../extractors/">Extractors</a></li><li><a class="tocitem" href="../model_representation/">Model representation</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>-</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>-</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Pevnak/NeuroPlanner.jl/blob/main/docs/src/knowledge_base.md#" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h2 id="Knowledge-Base"><a class="docs-heading-anchor" href="#Knowledge-Base">Knowledge Base</a><a id="Knowledge-Base-1"></a><a class="docs-heading-anchor-permalink" href="#Knowledge-Base" title="Permalink"></a></h2><p>The knowledge base is a structure, which (partially) expresses the computational graph. It is build on top of <a href="https://github.com/CTUAvastLab/Mill.jl">Mill.jl</a> adding a missing feature to point to the array containing the data (<code>Mill.jl</code> strictly supports only computational trees). This enables the KnowledgeBase to reuse computation (the computational graph is directed acyclic graph), which is useful for expressing operation over graphs and hyper/multi graphs.</p><p>Before going into details, let start with a simple example implementing a simple graph neural network.</p><p>Let&#39;s assume the graph has <code>5</code> vertices, each desribed by <code>3</code> features</p><pre><code class="language-julia hljs">using NeuroPlanner
+using NeuroPlanner.Mill
+using NeuroPlanner.Flux
+x = randn(Float32, 3, 5)</code></pre><p>Now, let&#39;s the graph has 4 edges [(1,2), (2,3), (3,4),(4,1)]. The simple graph neural network will first take features of corresponding vertices, concatenates them (<code>vcat</code>), and then it will aggregate them to each node. </p><p>Concatenation of information about the edges is done using <code>ProductNode</code> from <code>Mill.jl</code> and it will concatenate the source and destination of each edge. </p><pre><code class="language-julia hljs">xv = ProductNode((KBEntry(:x, [1,2,3,4]), KBEntry(:x, [2,3,4,1])))</code></pre><p>Notice the use of <code>KBEntry</code>, which is a way how to refer to the data in the knowledge base (not yet constructed).</p><p>Then, each node needs to aggregate information about each edge. This is achieved by <code>BagNode</code> (again from <code>Mill.jl</code>), which identifies from which columns of <code>xv</code> each vertex receives information. In our case, the first vertex receives information from columns <code>(1,4)</code>, the second from <code>(2,3)</code> etc. Effectively, the vertex receives information from each edge it contributes to. Therefore a simple message pass can be defined as </p><pre><code class="language-julia hljs">BagNode(
+	ProductNode((
+		KBEntry(:x, [1,2,3,4]), 
+		KBEntry(:x, [2,3,4,1]))), 
+	ScatteredBags([[1,4],[1,2],[2,3],[3,4],Int[]])
+		)</code></pre><p>Finally, we can define the structured of the sample by wrapping to the KnowledgeBase as follows</p><pre><code class="language-julia hljs">ds = KnowledgeBase((;
+	x = x,
+	gnn_1 = BagNode(
+	ProductNode((
+		KBEntry(:x, [1,2,3,4]), 
+		KBEntry(:x, [2,3,4,1]))), 
+		ScatteredBags([[1,4],[1,2],[2,3],[3,4],Int[]]))
+	))</code></pre><p>The <code>KnowledgeBase</code> defines the structure of the sample. A corresponding <code>KnowledgeModel</code> can be defined manually, but we overload <code>refletinmodel</code> from <code>Mill.jl</code> for a convenience. The model can be defined as </p><pre><code class="language-julia hljs">model = reflectinmodel(ds, d -&gt; Dense(d, 16, relu);fsm = Dict(&quot;&quot; =&gt;  d -&gt; Dense(d, 1)))</code></pre><p>and we can project the <code>KnowledgeBase</code> by <code>model</code> by <code>model(ds),</code> since model behaves like any other Flux layer.</p><pre><code class="language-julia hljs">julia&gt; model(ds)
+1×5 Matrix{Float32}:
+ 0.0850099  0.0129541  0.127564  0.202375  0.0</code></pre><p>The construction of graphs can be simplified by <code>EdgeBuilder.</code></p><p>While the above construction might seem clunky at first, it is relatively straightforward to create a hyper-graph. Let&#39;s again assume five vertices and hyper-edges <code>[(1,2,3), (2,3,5), (5,4,5)].</code> This can be expressed by the following KnowledgeBase</p><pre><code class="language-julia hljs">ds = KnowledgeBase((;
+	x = x,
+	gnn_1 = BagNode(
+	ProductNode((
+		KBEntry(:x, [1,2,5]), 
+		KBEntry(:x, [2,3,4]), 
+		KBEntry(:x, [3,5,5]))), 
+		ScatteredBags([[1],[1,2],[1,2],[3],[2,3]]))
+	))</code></pre><p>We create a new model and we are ready to go</p><pre><code class="language-julia hljs">model = reflectinmodel(ds, d -&gt; Dense(d, 16, relu);fsm = Dict(&quot;&quot; =&gt;  d -&gt; Dense(d, 1)))
+model(ds)</code></pre><p>If you want to add more message passing layers, you just repeat the construction and replace the <code>:x</code> to refer to preceeding layer as </p><pre><code class="language-julia hljs">ds = KnowledgeBase((;
+	x = x,
+	gnn_1 = BagNode(
+		ProductNode((
+			KBEntry(:x, [1,2,3,4]), 
+			KBEntry(:x, [2,3,4,1]))), 
+			ScatteredBags([[1,4],[1,2],[2,3],[3,4],Int[]])
+		),
+	gnn_2 = BagNode(
+		ProductNode((
+			KBEntry(:gnn_1, [1,2,3,4]), 
+			KBEntry(:gnn_1, [2,3,4,1]))), 
+			ScatteredBags([[1,4],[1,2],[2,3],[3,4],Int[]])
+		)
+	))</code></pre><p>We create a new model and we are ready to go</p><pre><code class="language-julia hljs">model = reflectinmodel(ds, d -&gt; Dense(d, 16, relu);fsm = Dict(&quot;&quot; =&gt;  d -&gt; Dense(d, 1)))
+model(ds)</code></pre><p>Since adding message-passing layers over the same graph is overhead, there is <code>KBEntryRenamer</code> which facilitates this. The construction of the above can be simplified to </p><pre><code class="language-julia hljs">using NeuroPlanner: KBEntryRenamer
+
+mplayer = BagNode(
+		ProductNode((
+			KBEntry(:x, [1,2,3,4]), 
+			KBEntry(:x, [2,3,4,1]))), 
+			ScatteredBags([[1,4],[1,2],[2,3],[3,4],Int[]])
+		)
+
+ds = KnowledgeBase((;
+	x = x,
+	gnn_1 = mplayer,
+	gnn_2 = KBEntryRenamer(:x1, :gnn_2)(mplayer),
+	))</code></pre><p>Finally, we can create a multigraph mixing edges with hyperedges as</p><pre><code class="language-julia hljs">mplayer = ProductNode((;
+			edges = BagNode(
+				ProductNode((
+					KBEntry(:x, [1,2,3,4]), 
+					KBEntry(:x, [2,3,4,1]))), 
+					ScatteredBags([[1,4],[1,2],[2,3],[3,4],Int[]])
+				),
+			hyperedges = BagNode(
+				ProductNode((
+					KBEntry(:x, [1,2,3,4]), 
+					KBEntry(:x, [2,3,4,1]))), 
+					ScatteredBags([[1,4],[1,2],[2,3],[3,4],Int[]])
+				)
+			))
+
+ds = KnowledgeBase((;
+	x = x,
+	gnn_1 = mplayer,
+	gnn_2 = KBEntryRenamer(:x1, :gnn_2)(mplayer),
+	))</code></pre><p>The appropriate model can be created by <code>reflectinmodel.</code></p><h3 id="Remarks"><a class="docs-heading-anchor" href="#Remarks">Remarks</a><a id="Remarks-1"></a><a class="docs-heading-anchor-permalink" href="#Remarks" title="Permalink"></a></h3><ul><li><code>KnowledgeBase</code> behaves like samples, therefore <code>numobs,</code>  <code>Mill.catobs</code>, and <code>batch</code> are overloaded for minibatching. Though we do not implement <code>MLUtils.getobs,</code> since that would be quite complicated.</li><li><code>deduplicate</code> remove duplicities from the knowledgebase without intacting the output.</li></ul></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.1 on <span class="colophon-date" title="Thursday 6 June 2024 10:51">Thursday 6 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
