@@ -7,7 +7,7 @@ This library implements two things:
 
 The library is experimental in the sense that it is used to research different phenomenons and trade-offs.  This also means that things can change.
 
-\[OUTDATED\] An api of heuristic function api and few details and gotchas can be found [here](heuristic.md).
+An api of heuristic function api and few details and gotchas can be found [here](heuristic.md).
 
 ## Short snipper
 

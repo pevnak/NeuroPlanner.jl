@@ -1,5 +1,6 @@
 # NeuroPlanner
 
+[![](https://img.shields.io/badge/Documentation-stable-blue.svg)](https://pevnak.github.io/NeuroPlanner.jl/dev/)
 ## Motivation
 
 This library is an experimental library that implements:
