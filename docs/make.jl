@@ -29,6 +29,7 @@ makedocs(;
     pages
 )
 
-# deploydocs(
-#     repo = "github.com/pevnak/NeuroPlanner.jl.git"
-# )
+deploydocs(
+    repo = "github.com/pevnak/NeuroPlanner.jl.git"
+)
+
