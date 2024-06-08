@@ -1,3 +1,5 @@
+using NeuroPlanner
+using LinearAlgebra
 using NeuroPlanner: EdgeBuilder, construct, FeaturedEdgeBuilder
 using Test
 
@@ -32,14 +34,44 @@ end
 
 
 @testset "FeaturedEdgeBuilder" begin
-    @test_broken "add some tests"
     nv = 7; max_edges = 13; arity = 2; num_features = 5
-    feb = FeaturedEdgeBuilder(arity, max_edges, nv, num_features)
+    feb = FeaturedEdgeBuilder(arity, max_edges, nv, num_features; agg = +)
     edges = [(1,2),(2,3),(3,4),(1,2),(3,4)]
     for (i,e) in enumerate(edges)
         x = NeuroPlanner.Flux.onehot(i,1:num_features)
         push!(feb, e, x)
-    end    
+    end
+    ds = construct(feb, :x)
+    @test ds.data.data[1].data.e == :x
+    @test ds.data.data[1].data.ii == [1,2,3]
+    @test ds.data.data[2].data.e == :x
+    @test ds.data.data[2].data.ii == [2,3,4]
+    @test ds.data.data[3].data == Float32[1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 1.0; 1.0 0.0 0.0; 0.0 0.0 1.0]
+
+    # Let's try empty edges
+    feb = FeaturedEdgeBuilder(arity, max_edges, nv, num_features; agg = +)
+    ds = construct(feb, :x)
+    @test ds.data.data[1].data.e == :x
+    @test ds.data.data[1].data.ii == Int[]
+    @test ds.data.data[2].data.e == :x
+    @test ds.data.data[2].data.ii == Int[]
+    @test ds.data.data[3].data == Matrix{Float32}(undef, 5, 0)
+    
+
+    # Let's try the dege builder without the deduplication
+    feb = FeaturedEdgeBuilder(arity, max_edges, nv, num_features;agg = nothing)
+    edges = [(1,2),(2,3),(3,4),(1,2),(3,4)]
+    for (i,e) in enumerate(edges)
+        x = NeuroPlanner.Flux.onehot(i,1:num_features)
+        push!(feb, e, x)
+    end
+    ds = construct(feb, :x)
+    @test ds.data.data[1].data.e == :x
+    @test ds.data.data[1].data.ii == [1,2,3,1,3]
+    @test ds.data.data[2].data.e == :x
+    @test ds.data.data[2].data.ii == [2,3,4,2,4]
+    @test ds.data.data[3].data == LinearAlgebra.I
+    
 end
 
 @testset "MultiEdgeBuilder" begin

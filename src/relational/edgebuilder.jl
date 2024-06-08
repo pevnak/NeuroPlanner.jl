@@ -158,6 +158,15 @@ end
     aggregated by `feb.agg`
 """
 function construct(feb::FeaturedEdgeBuilder{<:Any,<:Any,<:Function}, input_sym::Symbol)
+    if feb.eb.num_edges == 0 
+        x = feb.xe[:, 1:feb.eb.num_edges]
+        indices = map(ii -> ii[1:feb.eb.num_edges], feb.eb.indices)
+        
+        xs = map(Base.Fix1(KBEntry, input_sym), indices)
+        xs = tuple(xs..., ArrayNode(x))
+        ds = CompressedBagNode(ProductNode(xs), CompressedBags(indices, feb.eb.num_vertices, feb.eb.num_edges))    
+        return(ds)
+    end
     x = @view feb.xe[:, 1:feb.eb.num_edges]
     indices = map(ii -> (@view ii[1:feb.eb.num_edges]), feb.eb.indices)
 
