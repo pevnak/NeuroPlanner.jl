@@ -1,6 +1,6 @@
 using NeuroPlanner
 using LinearAlgebra
-using NeuroPlanner: EdgeBuilder, construct, FeaturedEdgeBuilder
+using NeuroPlanner: EdgeBuilder, construct, FeaturedEdgeBuilder, MultiEdgeBuilder
 using Test
 
 @testset "EdgeBuilder" begin
@@ -75,5 +75,21 @@ end
 end
 
 @testset "MultiEdgeBuilder" begin
-    @test_broken "add some tests"
+    nv = 7; max_edges = 13; arity = 2; num_features = 2
+    meb = MultiEdgeBuilder(arity, max_edges, nv, num_features)
+    edges = [(1,2),(2,3),(3,4),(1,2),(3,4)]
+    for (i,e) in enumerate(edges)
+        push!(meb, e, mod(i, num_features) + 1)
+    end
+    ds = construct(meb, :x)
+
+    @test ds.data[1].data.data[1].data.e == :x
+    @test ds.data[1].data.data[1].data.ii == [2,1]
+    @test ds.data[1].data.data[2].data.e == :x
+    @test ds.data[1].data.data[2].data.ii == [3,2]
+
+    @test ds.data[2].data.data[1].data.e == :x
+    @test ds.data[2].data.data[1].data.ii == [1,3,3]
+    @test ds.data[2].data.data[2].data.e == :x
+    @test ds.data[2].data.data[2].data.ii == [2,4,4]    
 end
