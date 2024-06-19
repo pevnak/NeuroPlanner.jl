@@ -18,12 +18,13 @@
     nunary --- number of predicates with zero or one arity
     nary --- number of predicates with arity two or more
 """
-struct PredicateInfo{N,I}
+struct PredicateInfo{N,I,A}
     predicates::NTuple{N,Symbol}
     arrities::NTuple{N,I}
     id2fid::NTuple{N,I}
     nunary::I
     nary::I
+    max_arrity::A
 end
 
 function PredicateInfo(domain::GenericDomain)
@@ -32,7 +33,8 @@ function PredicateInfo(domain::GenericDomain)
     id2fid = tuple(collect(1:length(predicates))...)
     nunary = sum(arrities .≤ 1)
     nary = sum(arrities .> 1)
-    PredicateInfo(predicates, arrities, id2fid, nunary, nary)
+    max_arrity = Val(maximum(arrities))
+    PredicateInfo(predicates, arrities, id2fid, nunary, nary, max_arrity)
 end
 
 """
@@ -64,29 +66,67 @@ function intstates(domain::GenericDomain, obj2id::Dict{Symbol,<:Integer}, facts:
     intstates(domain, obj2id, pifo, facts)
 end
 
-function intstates(domain::GenericDomain, obj2id::Dict{Symbol,<:Integer}, pifo::PredicateInfo, facts::Vector{<:Term})
-    arrities = pifo.arrities
-    predicates = pifo.predicates
-    pids = map(f -> _inlined_search(f.name, predicates), facts)
-    map(0:maximum(arrities)) do arrity
-        mask = [arrities[pid] == arrity for pid in pids]
-        intstates(obj2id, pifo, facts, pids, mask, Val(arrity))
+function get_pids_masks(pifo::PredicateInfo{N,I,Val{MaxArrity}}, facts) where {N,I,MaxArrity}
+    masks = falses(length(facts), MaxArrity + 1)
+    pids = Vector{UInt8}(undef, length(facts))
+    for (row, f) in enumerate(facts)
+        pid = _inlined_search(f.name, pifo.predicates)
+        masks[row, pifo.arrities[pid] + 1] = true
+        pids[row] = pid
     end
+    return(pids, masks)
 end
 
-function intstates(obj2id::Dict{Symbol,I}, pifo::PredicateInfo, facts::Vector{<:Term}, pids,  mask, arity::Val{N}) where {N,I<:Integer}
+@generated function intstates(domain::GenericDomain, obj2id::Dict{Symbol,<:Integer}, pifo::PredicateInfo{N,I,Val{MaxArrity}}, facts::Vector{<:Term}) where {N,I,MaxArrity}
+    stmts = quote 
+        (pids, masks) = get_pids_masks(pifo, facts)
+    end
+    retstmts = :(return(tuple()))
+    for i in 0:MaxArrity
+        xval = Symbol(:x, i)
+        push!(stmts.args, :($(xval) = intstates(obj2id, pifo, facts, pids, view(masks, :, $(i + 1)), Val($(i)))))
+        push!(retstmts.args[1].args, xval)
+    end
+    push!(stmts.args, retstmts)
+    return(stmts)
+end
+
+function intstates(obj2id::Dict{Symbol,I}, pifo::PredicateInfo, facts::Vector{<:Term}, pids, mask, arity::Val{N}) where {N,I<:Integer}
     id2fid = pifo.id2fid
     o = Vector{IntState{N,I}}(undef, sum(mask))
     index = 1
     for i in 1:length(mask)
         mask[i] || continue
         f = facts[i]
-        # o[index] = IntState(id2fid[pids[i]], _map_tuple(j -> obj2id[f.args[j].name], arity))
         o[index] = IntState(id2fid[pids[i]], args2ids(obj2id, f, arity))
         index += 1
     end
     o
 end
+
+# function intstates(domain::GenericDomain, obj2id::Dict{Symbol,<:Integer}, pifo::PredicateInfo{N,I,Val{MaxArrity}}, facts::Vector{<:Term}) where {N,I,MaxArrity}
+#     arrities = pifo.arrities
+#     predicates = pifo.predicates
+#     pids = map(f -> _inlined_search(f.name, predicates), facts)
+#     # map(0:maximum(arrities)) do arrity
+#     #     mask = [arrities[pid] == arrity for pid in pids]
+#     #     intstates(obj2id, pifo, facts, pids, mask, Val(arrity))
+#     # end
+# end
+
+# function intstates(obj2id::Dict{Symbol,I}, pifo::PredicateInfo, facts::Vector{<:Term}, pids, arity::Val{N}) where {N,I<:Integer}
+#     mask = [pifo.arrities[pid] == N for pid in pids]
+#     id2fid = pifo.id2fid
+#     o = Vector{IntState{N,I}}(undef, sum(mask))
+#     index = 1
+#     for i in 1:length(mask)
+#         mask[i] || continue
+#         f = facts[i]
+#         o[index] = IntState(id2fid[pids[i]], args2ids(obj2id, f, arity))
+#         index += 1
+#     end
+#     o
+# end
 
 @generated function args2ids(obj2id, f, arrity::Val{N}) where {N}
     chs = map(1:N) do j

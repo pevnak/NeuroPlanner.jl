@@ -117,11 +117,6 @@ data = map(problem -> benchmark_domain_arch(archs, problem), setdiff(IPC_PROBLEM
 df = DataFrame(reduce(vcat, data))
 gdf = DataFrames.groupby(df, ["domain_name"]);
 combine(gdf) do sub_df 
-	(ASNet = round(1e6*mean(sub_df.ASNet), digits = 1),
-	 HGNN = round(1e6*mean(sub_df.HGNN), digits = 1),
-	)
-end
-combine(gdf) do sub_df 
 	 (ObjectBinaryFE = round(1e6*mean(sub_df.ObjectBinaryFE), digits = 1),
 	 	ObjectBinaryFENA = round(1e6*mean(sub_df.ObjectBinaryFENA), digits = 1),
 	 	ObjectBinaryME = round(1e6*mean(sub_df.ObjectBinaryME), digits = 1),
@@ -202,3 +197,16 @@ end
 #    7 │ ipc23_childsnack              8.8              10.5            12.2        12.1             11.3                8.6             11.7          15.7            12.1          18.7
 #    8 │ ipc23_miconic                33.8              25.6            34.2        39.5             43.7               30.8             34.7         327.0           147.8         136.4
 #    9 │ ipc23_transport              14.5              10.6            19.4        22.3             17.9               12.9             13.0          75.5            40.7          46.4
+
+
+ Row │ domain_name        ObjectBinaryFE  ObjectBinaryFENA  ObjectBinaryME  ObjectAtom  ObjectAtomBipFE  ObjectAtomBipFENA  ObjectAtomBipME ⋯
+─────┼───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   1 │ ipc23_ferry                   6.6               5.9             6.4         6.3              9.2                6.9              6.8 ⋯
+   2 │ ipc23_rovers                 60.5              54.0            83.0        89.9             69.7               49.9             54.8
+   3 │ ipc23_blocksworld            11.5              10.7            13.0         6.6             12.7               10.8             12.7
+   4 │ ipc23_floortile              28.8              24.5            35.9        36.9             37.2               26.4             30.3
+   5 │ ipc23_satellite              20.2              20.9            24.7        29.2             33.1               20.4             21.3 ⋯
+   6 │ ipc23_spanner                14.2              11.4            14.6        13.4             19.6               12.0             13.1
+   7 │ ipc23_childsnack             10.9              10.3            13.4        14.8             11.6               12.7             11.5
+   8 │ ipc23_miconic                38.0              28.4            34.2        39.8             45.1               34.1             34.3
+   9 │ ipc23_transport              14.8              11.2            19.3        22.5             17.6               11.5             15.0 ⋯

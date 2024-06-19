@@ -78,8 +78,8 @@ end
 
 
 ObjectAtomBipNoGoal{DO,P,EB,MP} = ObjectAtomBip{DO,P,EB,MP,D,II,Nothing,Nothing} where {DO,P,EB,MP,D,II}
-ObjectAtomBipStart{DO,P,EB,MP,D,II,S} = ObjectAtomBip{DO,P,EB,MP,D,II,S,Nothing} where {DO,P,EB,MP,D,II,S<:Vector}
-ObjectAtomBipGoal{DO,P,EB,MP,D,II,G} = ObjectAtomBip{DO,P,EB,MP,D,II,Nothing,G} where {DO,P,EB,MP,D,II,G<:Vector}
+ObjectAtomBipStart{DO,P,EB,MP,D,II,S} = ObjectAtomBip{DO,P,EB,MP,D,II,S,Nothing} where {DO,P,EB,MP,D,II,S<:Union{Tuple, Vector}}
+ObjectAtomBipGoal{DO,P,EB,MP,D,II,G} = ObjectAtomBip{DO,P,EB,MP,D,II,Nothing,G} where {DO,P,EB,MP,D,II,G<:Union{Tuple, Vector}}
 
 function ObjectAtomBip(domain; message_passes=2, residual=:linear, edgebuilder = FeaturedEdgeBuilder, kwargs...)
     any(length(p.args) > 3 for p in values(domain.predicates)) && error("Ternary predicate is rare and it is not supported at the moment")
