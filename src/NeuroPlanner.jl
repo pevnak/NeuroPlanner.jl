@@ -63,8 +63,6 @@ include("object_binary/object_binary.jl")
 export ObjectBinary, ObjectBinaryFE, ObjectBinaryFENA, ObjectBinaryME
 include("object_binary/atom_binary.jl")
 export AtomBinary, AtomBinaryFE, AtomBinaryFENA, AtomBinaryME
-include("object_binary/object_pair.jl")
-export ObjectPair
 include("object_binary/object_atom.jl")
 export ObjectAtom
 include("object_binary/object_atom_bip.jl")

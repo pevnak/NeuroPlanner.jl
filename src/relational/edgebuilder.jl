@@ -268,8 +268,13 @@ struct MultiEdgeBuilder{N, EBS<:NTuple{N,<:AbstractEdgeBuilder}}
     ebs::EBS
 end
 
-function MultiEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features)
+function MultiHyperEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features)
     ebs = tuple([HyperEdgeBuilder(arity, max_edges, num_vertices) for _ in 1:num_features]...)
+    MultiEdgeBuilder(ebs)
+end
+
+function MultiGnnEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features)
+    ebs = tuple([GnnEdgeBuilder(arity, max_edges, num_vertices) for _ in 1:num_features]...)
     MultiEdgeBuilder(ebs)
 end
 

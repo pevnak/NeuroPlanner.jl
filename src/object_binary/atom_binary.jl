@@ -65,12 +65,12 @@ end
 isspecialized(ex::AtomBinary) = ex.obj2id !== nothing
 hasgoal(ex::AtomBinary) = ex.init_state !== nothing || ex.goal_state !== nothing
 
-AtomBinaryFE(domain; kwargs...) = AtomBinary(domain; edgebuilder = FeaturedEdgeBuilder, kwargs...)
-AtomBinaryFENA(domain; kwargs...) = AtomBinary(domain; edgebuilder = FeaturedEdgeBuilderNA, kwargs...)
-AtomBinaryME(domain; kwargs...) = AtomBinary(domain; edgebuilder = MultiEdgeBuilder, kwargs...)
-AtomBinaryFE(domain, problem; kwargs...) = AtomBinary(domain, problem; edgebuilder = FeaturedEdgeBuilder, kwargs...)
-AtomBinaryFENA(domain, problem; kwargs...) = AtomBinary(domain, problem; edgebuilder = FeaturedEdgeBuilderNA, kwargs...)
-AtomBinaryME(domain, problem; kwargs...) = AtomBinary(domain, problem; edgebuilder = MultiEdgeBuilder, kwargs...)
+AtomBinaryFE(domain; kwargs...) = AtomBinary(domain; edgebuilder = FeaturedHyperEdgeBuilder, kwargs...)
+AtomBinaryFENA(domain; kwargs...) = AtomBinary(domain; edgebuilder = FeaturedHyperEdgeBuilderNA, kwargs...)
+AtomBinaryME(domain; kwargs...) = AtomBinary(domain; edgebuilder = MultiHyperEdgeBuilder, kwargs...)
+AtomBinaryFE(domain, problem; kwargs...) = AtomBinary(domain, problem; edgebuilder = FeaturedHyperEdgeBuilder, kwargs...)
+AtomBinaryFENA(domain, problem; kwargs...) = AtomBinary(domain, problem; edgebuilder = FeaturedHyperEdgeBuilderNA, kwargs...)
+AtomBinaryME(domain, problem; kwargs...) = AtomBinary(domain, problem; edgebuilder = MultiHyperEdgeBuilder, kwargs...)
 
 function AtomBinary(domain, problem; embed_goal=true, kwargs...)
     ex = AtomBinary(domain; kwargs...)
