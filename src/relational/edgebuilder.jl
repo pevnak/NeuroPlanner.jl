@@ -1,3 +1,4 @@
+abstract type AbstractEdgeBuilder end
 """
     EdgeBuilder
 
@@ -24,7 +25,7 @@ BagNode  # 7 obs, 304 bytes
         ╰── ArrayNode(Colon()×2 KBEntry with Float32 elements)  # 2 obs, 88 bytes
 ```    
 """
-mutable struct EdgeBuilder{N, T<:Integer}
+mutable struct EdgeBuilder{N, T<:Integer} <: AbstractEdgeBuilder
     indices::NTuple{N,Vector{T}}
     num_vertices::Int
     max_edges::Int
@@ -54,7 +55,7 @@ function Base.push!(eb::EdgeBuilder, vertices::NTuple{N,I}) where {N,I<:Integer}
     end
 end
 
-function construct(eb::EdgeBuilder, input_sym::Symbol)
+function construct_hyperedge(eb::EdgeBuilder, input_sym::Symbol)
     indices = map(ii -> ii[1:eb.num_edges], eb.indices)
     xs = map(ii -> ArrayNode(KBEntry(input_sym, ii)), indices)
     # indices = view(eb.indices, :, 1:eb.num_edges)
@@ -62,50 +63,59 @@ function construct(eb::EdgeBuilder, input_sym::Symbol)
     CompressedBagNode(ProductNode(xs), CompressedBags(indices, eb.num_vertices, eb.num_edges))
 end
 
-# mutable struct EdgeBuilder{T<:Integer}
-#     indices::Matrix{T}
-#     num_vertices::Int
-#     arity::Int
-#     max_edges::Int
-#     num_edges::Int
-#     function EdgeBuilder(indices::Matrix{T}, num_vertices::Int, arity::Int, max_edges::Int) where {T}
-#         arity > 0 || error("Can create only edge of positive arity.")
-#         length(indices) == arity * max_edges || error("Length of indices must be equal to `arity * max_edges`.")
-#         num_edges = 0
-#         new{T}(indices, num_vertices, arity, max_edges, num_edges)
-#     end
-# end
+function construct_gnnedge(eb::EdgeBuilder{2}, input_sym::Symbol)
+    counts = zeros(Int, eb.num_vertices)
+    for i in 1:eb.num_edges
+        counts[eb.indices[1][i]] += 1
+        counts[eb.indices[2][i]] += 1
+    end
 
-# function EdgeBuilder(::Val{arity}, max_edges::Int, num_vertices::Int) where {arity}
-#     indices = Matrix{Int}(undef, arity, max_edges)
-#     EdgeBuilder(indices, num_vertices, arity, max_edges)
-# end
+    ends = cumsum(counts)
+    start = ends .- (counts .- 1)
+    bags = map(UnitRange, start, ends)
 
+    indices = Vector{Int}(undef, 2*eb.num_edges)
+    for i in 1:eb.num_edges
+        kᵢ = eb.indices[1][i]
+        kⱼ = eb.indices[2][i]
 
-# function EdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int)
-#     indices = Matrix{Int}(undef, arity, max_edges)
-#     EdgeBuilder(indices, num_vertices, arity, max_edges)
-# end
+        indices[start[kᵢ]] = kⱼ
+        start[kᵢ] += 1
 
-# function Base.push!(eb::EdgeBuilder, vertices::NTuple{N,I}) where {N,I<:Integer}
-#     @assert all(v <= eb.num_vertices for v in vertices) "Cannot push edge connected to non-existant vertex!"
-#     @assert eb.arity == N "Cannot push edge of different arity to fixed size arity edge builder!"
+        indices[start[kⱼ]] = kᵢ
+        start[kⱼ] += 1
+    end
 
-#     eb.num_edges += 1
-#     _mapenumerate_tuple(vertices) do i, vᵢ
-#         eb.indices[i, eb.num_edges] = vᵢ
-#     end
-# end
+    BagNode(
+        ArrayNode(KBEntry(input_sym, indices)),
+        AlignedBags(bags)
+    )
+end
 
-# function construct(eb::EdgeBuilder, input_sym::Symbol)
-#     indices = view(eb.indices, :, 1:eb.num_edges)
-#     xs = Tuple([ArrayNode(KBEntry(input_sym, indices[i, :])) for i in 1:eb.arity])
-#     CompressedBagNode(ProductNode(xs), CompressedBags(indices, eb.num_vertices, eb.num_edges, eb.arity))
-# end
+construct(eb::EdgeBuilder, input_sym::Symbol) = error("We do not implement construct for EdgeBuilder, because it is not meant for end-use. Edges are constructed either by `construct_gnnedge` or `construct_hyperedge`.")
 
+struct HyperEdgeBuilder{EB<:EdgeBuilder} <: AbstractEdgeBuilder
+    eb::EB
+end
+
+HyperEdgeBuilder(args...) = HyperEdgeBuilder(EdgeBuilder(args...))
+Base.push!(eb::HyperEdgeBuilder, args...) = push!(eb.eb, args...)
+construct(eb::HyperEdgeBuilder, input_sym) = construct_hyperedge(eb.eb, input_sym)
+
+struct GnnEdgeBuilder{EB<:EdgeBuilder{2}} <: AbstractEdgeBuilder
+    eb::EB
+end
+
+GnnEdgeBuilder(args...) = GnnEdgeBuilder(EdgeBuilder(args...))
+function Base.push!(eb::GnnEdgeBuilder, e::Tuple{<:Integer,<:Integer}) 
+    (i, j) = e
+    e = i < j ? (i, j) : (j, i)
+    push!(eb.eb, e)
+end
+construct(eb::GnnEdgeBuilder, input_sym) = construct_gnnedge(eb.eb, input_sym)
 
 """
-    struct FeaturedEdgeBuilder{EB<:EdgeBuilder,M,F}
+    struct FeaturedEdgeBuilder{EB<:AbstractEdgeBuilder,M,F}
         eb::EB
         xe::M
         agg::F
@@ -120,35 +130,52 @@ end
     when `agg=Function` (`+` is the default), the same edges are deduplicated and their 
     features are aggregated by `add`.
 """
-struct FeaturedEdgeBuilder{EB<:EdgeBuilder,M,F}
+struct FeaturedEdgeBuilder{EB<:AbstractEdgeBuilder,M,F}
     eb::EB
     xe::M
     agg::F
 end
 
-function FeaturedEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int; agg=+)
+function FeaturedHyperEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int; agg=+)
     xe = zeros(Float32, num_features, max_edges)
-    eb = EdgeBuilder(arity, max_edges, num_vertices)
+    eb = HyperEdgeBuilder(arity, max_edges, num_vertices)
+    FeaturedEdgeBuilder(eb, xe, agg)
+end
+
+function FeaturedGnnEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int; agg=+)
+    xe = zeros(Float32, num_features, max_edges)
+    eb = GnnEdgeBuilder(arity, max_edges, num_vertices)
     FeaturedEdgeBuilder(eb, xe, agg)
 end
 
 """
-    FeaturedEdgeBuilderNA(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int)
+    FeaturedGnnEdgeBuilderNA(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int)
 
     construct a `FeaturedEdgeBuilder` without aggregation
 """
-function FeaturedEdgeBuilderNA(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int)
-    FeaturedEdgeBuilder(arity, max_edges, num_vertices, num_features;agg=nothing)    
+function FeaturedGnnEdgeBuilderNA(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int)
+    FeaturedGnnEdgeBuilder(arity, max_edges, num_vertices, num_features;agg=nothing)    
+end
+
+"""
+    FeaturedHyperEdgeBuilderNA(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int)
+
+    construct a `FeaturedEdgeBuilder` without aggregation
+"""
+function FeaturedHyperEdgeBuilderNA(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int)
+    FeaturedHyperEdgeBuilder(arity, max_edges, num_vertices, num_features;agg=nothing)    
 end
 
 function Base.push!(feb::FeaturedEdgeBuilder, vertices::NTuple{N,I}, x) where {N,I<:Integer}
-    push!(feb.eb, vertices)
-    feb.xe[:, feb.eb.num_edges] .= x
+    eb = feb.eb.eb
+    push!(eb, vertices)
+    feb.xe[:, eb.num_edges] .= x
 end
 
 function Base.push!(feb::FeaturedEdgeBuilder, vertices::NTuple{N,I}, edge_type::Integer) where {N,I<:Integer}
-    push!(feb.eb, vertices)
-    feb.xe[edge_type, feb.eb.num_edges] = 1
+    eb = feb.eb.eb
+    push!(eb, vertices)
+    feb.xe[edge_type, eb.num_edges] = 1
 end
 
 """
@@ -158,44 +185,77 @@ end
     aggregated by `feb.agg`
 """
 function construct(feb::FeaturedEdgeBuilder{<:Any,<:Any,<:Function}, input_sym::Symbol)
-    if feb.eb.num_edges == 0 
-        x = feb.xe[:, 1:feb.eb.num_edges]
-        indices = map(ii -> ii[1:feb.eb.num_edges], feb.eb.indices)
-        
-        xs = map(Base.Fix1(KBEntry, input_sym), indices)
-        xs = tuple(xs..., ArrayNode(x))
-        ds = CompressedBagNode(ProductNode(xs), CompressedBags(indices, feb.eb.num_vertices, feb.eb.num_edges))    
+    eb = feb.eb.eb
+    if eb.num_edges == 0 
+        ds = _construct_featurededge(feb.eb, feb.xe, eb.indices, 0, eb.num_vertices, input_sym)
         return(ds)
     end
-    x = @view feb.xe[:, 1:feb.eb.num_edges]
-    indices = map(ii -> (@view ii[1:feb.eb.num_edges]), feb.eb.indices)
+    x = @view feb.xe[:, 1:eb.num_edges]
+    indices = map(ii -> (@view ii[1:eb.num_edges]), eb.indices)
 
     mask, ii = find_duplicates(indices...)
-    new_x = NNlib.scatter(feb.agg, x, ii)
-    indices = map(ii -> ii[mask], indices)
-    xs = map(Base.Fix1(KBEntry, input_sym), indices)
-    xs = tuple(xs..., ArrayNode(new_x))
+    dedupped_xe = NNlib.scatter(feb.agg, x, ii)
+    dedupped_indices = map(ii -> ii[mask], indices)
 
-    CompressedBagNode(ProductNode(xs), CompressedBags(indices, feb.eb.num_vertices, sum(mask)))
+    _construct_featurededge(feb.eb, dedupped_xe, dedupped_indices, length(dedupped_indices[1]), eb.num_vertices, input_sym)
 end
 
+
 """
-    construct(feb::FeaturedEdgeBuilder{<:Any,<:Any,Nothing}, input_sym::Symbol)
+    construct(feb::FeaturedEdgeBuilder, input_sym::Symbol)
 
     if `agg` is nothing, then edges are not deduplicated
 """
 function construct(feb::FeaturedEdgeBuilder{<:Any,<:Any,Nothing}, input_sym::Symbol)
-    x = feb.xe[:, 1:feb.eb.num_edges]
-    indices = map(ii -> ii[1:feb.eb.num_edges], feb.eb.indices)
+    eb = feb.eb.eb
+    _construct_featurededge(feb.eb, feb.xe, eb.indices, eb.num_edges, eb.num_vertices, input_sym)
+end
+
+function _construct_featurededge(::HyperEdgeBuilder, xe, indices, num_edges, num_vertices, input_sym::Symbol)
+    x = xe[:, 1:num_edges]
+    indices = map(ii -> ii[1:num_edges], indices)
 
     xs = map(Base.Fix1(KBEntry, input_sym), indices)
     xs = tuple(xs..., ArrayNode(x))
-    CompressedBagNode(ProductNode(xs), CompressedBags(indices, feb.eb.num_vertices, feb.eb.num_edges))
+    CompressedBagNode(ProductNode(xs), CompressedBags(indices, num_vertices, num_edges))
+end
+
+function _construct_featurededge(::GnnEdgeBuilder, xe, indices, num_edges, num_vertices, input_sym::Symbol)
+    # this is the part copied from the EdgeBuilder building the neighborhood
+    counts = zeros(Int, num_vertices)
+    for i in 1:num_edges
+        counts[indices[1][i]] += 1
+        counts[indices[2][i]] += 1
+    end
+
+    ends = cumsum(counts)
+    start = ends .- (counts .- 1)
+    bags = map(UnitRange, start, ends)
+
+    neighborhoods = Vector{Int}(undef, 2num_edges)
+    x = similar(xe, size(xe, 1), 2num_edges) # this is the new part, where we construct features on edges
+    for i in 1:num_edges
+        kᵢ = indices[1][i]
+        kⱼ = indices[2][i]
+
+        neighborhoods[start[kᵢ]] = kⱼ
+        x[:, start[kᵢ]] .= @view xe[:, i] # this is where we construct edge features
+        start[kᵢ] += 1
+
+        neighborhoods[start[kⱼ]] = kᵢ
+        x[:, start[kⱼ]] .= @view xe[:, i] # this is where we construct edge features
+        start[kⱼ] += 1
+    end
+
+    BagNode(
+        ProductNode((xe = ArrayNode(x), xv = ArrayNode(KBEntry(input_sym, neighborhoods)))),
+        AlignedBags(bags)
+    )
 end
 
 
 """
-    struct MultiEdgeBuilder{EB<:EdgeBuilder,T}
+    struct MultiEdgeBuilder{EB<:AbstractEdgeBuilder,T}
         eb::EB
         xe::Matrix{T}
     end
@@ -204,12 +264,12 @@ end
     edges are duplicated and their feaures are summed. The `Matrix` for features
     one edges are duplicated. 
 """
-struct MultiEdgeBuilder{N, EBS<:NTuple{N,<:EdgeBuilder}}
+struct MultiEdgeBuilder{N, EBS<:NTuple{N,<:AbstractEdgeBuilder}}
     ebs::EBS
 end
 
 function MultiEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features)
-    ebs = tuple([EdgeBuilder(arity, max_edges, num_vertices) for _ in 1:num_features]...)
+    ebs = tuple([HyperEdgeBuilder(arity, max_edges, num_vertices) for _ in 1:num_features]...)
     MultiEdgeBuilder(ebs)
 end
 
