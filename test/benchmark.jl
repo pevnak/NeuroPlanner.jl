@@ -74,21 +74,21 @@ function benchmark_domain_arch(archs, domain_name; difficulty="train")
 		end
 
 		# timing of extraction
-		# ts = map(archs) do hnet
-		# 	pddld = hnet(domain; message_passes = graph_layers, residual)
-		# 	pddle, state = initproblem(pddld, problem)
-		# 	map(pddle, states)
-		# 	mean(@elapsed map(pddle, states) for _ in 1:100) / length(states)
-		# end
+		ts = map(archs) do hnet
+			pddld = hnet(domain; message_passes = graph_layers, residual)
+			pddle, state = initproblem(pddld, problem)
+			map(pddle, states)
+			mean(@elapsed map(pddle, states) for _ in 1:100) / length(states)
+		end
 
 
 		# timing of extraction + model
-		ts = map(models, archs) do model, hnet
-			pddld = hnet(domain; message_passes = graph_layers, residual)
-			pddle, state = initproblem(pddld, problem)
-			map(model ∘ pddle, states)
-			mean(@elapsed map(model ∘ pddle, states) for _ in 1:100) / length(states)
-		end
+		# ts = map(models, archs) do model, hnet
+		# 	pddld = hnet(domain; message_passes = graph_layers, residual)
+		# 	pddle, state = initproblem(pddld, problem)
+		# 	map(model ∘ pddle, states)
+		# 	mean(@elapsed map(model ∘ pddle, states) for _ in 1:100) / length(states)
+		# end
 
 		# ts = map(models, archs) do model, hnet
 		# 	pddld = hnet(domain; message_passes = graph_layers, residual)

@@ -37,15 +37,12 @@ mutable struct EdgeBuilder{N, T<:Integer} <: AbstractEdgeBuilder
 end
 
 function EdgeBuilder(ar::Val{arity}, max_edges::Int, num_vertices::Int) where {arity}
-    indices = _map_tuple(_ -> Vector{Int}(undef, max_edges), ar)
+    indices = ntuple(_ -> Vector{Int}(undef, max_edges), arity)
     EdgeBuilder(indices, num_vertices, max_edges)
 end
 
 
-function EdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int)
-    indices = _map_tuple(_ -> Vector{Int}(undef, max_edges), Val(arity))
-    EdgeBuilder(indices, num_vertices, max_edges)
-end
+EdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int) = EdgeBuilder(Val(arity), max_edges, num_vertices)
 
 function Base.push!(eb::EdgeBuilder, vertices::NTuple{N,I}) where {N,I<:Integer}
     @assert all(v <= eb.num_vertices for v in vertices) "Cannot push edge connected to non-existant vertex!"
@@ -65,7 +62,7 @@ end
 
 function construct_gnnedge(eb::EdgeBuilder{2}, input_sym::Symbol)
     counts = zeros(Int, eb.num_vertices)
-    for i in 1:eb.num_edges
+    @inbounds for i in 1:eb.num_edges
         counts[eb.indices[1][i]] += 1
         counts[eb.indices[2][i]] += 1
     end
@@ -75,7 +72,7 @@ function construct_gnnedge(eb::EdgeBuilder{2}, input_sym::Symbol)
     bags = map(UnitRange, start, ends)
 
     indices = Vector{Int}(undef, 2*eb.num_edges)
-    for i in 1:eb.num_edges
+    @inbounds for i in 1:eb.num_edges
         kᵢ = eb.indices[1][i]
         kⱼ = eb.indices[2][i]
 
@@ -136,13 +133,13 @@ struct FeaturedEdgeBuilder{EB<:AbstractEdgeBuilder,M,F}
     agg::F
 end
 
-function FeaturedHyperEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int; agg=+)
+function FeaturedHyperEdgeBuilder(arity, max_edges::Int, num_vertices::Int, num_features::Int; agg=+)
     xe = zeros(Float32, num_features, max_edges)
     eb = HyperEdgeBuilder(arity, max_edges, num_vertices)
     FeaturedEdgeBuilder(eb, xe, agg)
 end
 
-function FeaturedGnnEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int; agg=+)
+function FeaturedGnnEdgeBuilder(arity, max_edges::Int, num_vertices::Int, num_features::Int; agg=+)
     xe = zeros(Float32, num_features, max_edges)
     eb = GnnEdgeBuilder(arity, max_edges, num_vertices)
     FeaturedEdgeBuilder(eb, xe, agg)
@@ -153,7 +150,7 @@ end
 
     construct a `FeaturedEdgeBuilder` without aggregation
 """
-function FeaturedGnnEdgeBuilderNA(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int)
+function FeaturedGnnEdgeBuilderNA(arity, max_edges::Int, num_vertices::Int, num_features::Int)
     FeaturedGnnEdgeBuilder(arity, max_edges, num_vertices, num_features;agg=nothing)    
 end
 
@@ -162,7 +159,7 @@ end
 
     construct a `FeaturedEdgeBuilder` without aggregation
 """
-function FeaturedHyperEdgeBuilderNA(arity::Int, max_edges::Int, num_vertices::Int, num_features::Int)
+function FeaturedHyperEdgeBuilderNA(arity, max_edges::Int, num_vertices::Int, num_features::Int)
     FeaturedHyperEdgeBuilder(arity, max_edges, num_vertices, num_features;agg=nothing)    
 end
 
@@ -223,7 +220,7 @@ end
 function _construct_featurededge(::GnnEdgeBuilder, xe, indices, num_edges, num_vertices, input_sym::Symbol)
     # this is the part copied from the EdgeBuilder building the neighborhood
     counts = zeros(Int, num_vertices)
-    for i in 1:num_edges
+    @inbounds for i in 1:num_edges
         counts[indices[1][i]] += 1
         counts[indices[2][i]] += 1
     end
@@ -234,7 +231,7 @@ function _construct_featurededge(::GnnEdgeBuilder, xe, indices, num_edges, num_v
 
     neighborhoods = Vector{Int}(undef, 2num_edges)
     x = similar(xe, size(xe, 1), 2num_edges) # this is the new part, where we construct features on edges
-    for i in 1:num_edges
+    @inbounds for i in 1:num_edges
         kᵢ = indices[1][i]
         kⱼ = indices[2][i]
 
@@ -268,12 +265,12 @@ struct MultiEdgeBuilder{N, EBS<:NTuple{N,<:AbstractEdgeBuilder}}
     ebs::EBS
 end
 
-function MultiHyperEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features)
-    ebs = tuple([HyperEdgeBuilder(arity, max_edges, num_vertices) for _ in 1:num_features]...)
+function MultiHyperEdgeBuilder(arity, max_edges::Int, num_vertices::Int, num_features::Int)
+    ebs = ntuple(_ -> HyperEdgeBuilder(arity, max_edges, num_vertices) ,num_features)
     MultiEdgeBuilder(ebs)
 end
 
-function MultiGnnEdgeBuilder(arity::Int, max_edges::Int, num_vertices::Int, num_features)
+function MultiGnnEdgeBuilder(arity, max_edges::Int, num_vertices::Int, num_features::Int)
     ebs = tuple([GnnEdgeBuilder(arity, max_edges, num_vertices) for _ in 1:num_features]...)
     MultiEdgeBuilder(ebs)
 end

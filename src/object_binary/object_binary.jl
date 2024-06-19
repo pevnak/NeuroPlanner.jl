@@ -242,7 +242,7 @@ function multi_predicates(ex::ObjectBinary, kid::Symbol, grouped_facts, prefix=n
     end
     num_type_edges = ex.predicates.nary
     num_vertices = length(ex.obj2id)
-    eb = ex.edgebuilder(2, max_edges, num_vertices, num_type_edges)
+    eb = ex.edgebuilder(Val(2), max_edges, num_vertices, num_type_edges)
 
     # predicates from edges
     for preds in grouped_facts[3:end]

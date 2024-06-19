@@ -263,7 +263,7 @@ function multi_predicates(ex::ObjectAtomBip, kid::Symbol, grouped_facts, prefix=
     end
     num_type_edges = maximum(ex.predicates.arrities)
     num_vertices = length(ex.obj2id) + nnary_atoms
-    eb = ex.edgebuilder(2, max_edges, num_vertices, num_type_edges)
+    eb = ex.edgebuilder(Val(2), max_edges, num_vertices, num_type_edges)
 
     # predicates from edges
     coloffset = length(ex.obj2id) + 1
