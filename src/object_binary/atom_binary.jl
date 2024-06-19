@@ -190,7 +190,7 @@ function encode_edges(ex::AtomBinary, atoms::Vector{Julog.Term}, kid::Symbol)
     ids_in_atoms = group_facts(ex, atoms)
     l = length(atoms)
     capacity = ex.max_arity * l * (l + 1) ÷ 2
-    eb = ex.edgebuilder(2, capacity, l, ex.max_arity^2)
+    eb = ex.edgebuilder(Val(2), capacity, l, ex.max_arity^2)
     encode_edges(ex, eb, ids_in_atoms, kid)
 end
 
