@@ -121,7 +121,6 @@ ArgParse example implemented in Comonicon.
 	@show filename
 
 	archs = Dict(
-		"objectpair" => ObjectPair,
 		"asnet" => ASNet,
 		"hgnnlite" => HGNNLite,
 		"hgnn" => HGNN,

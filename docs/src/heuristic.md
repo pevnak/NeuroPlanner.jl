@@ -16,7 +16,6 @@ The available extractors are:
 * `ObjectAtomBip`[^1] represent state as a multi-graph or graphs with features on edges. Each object and atom corresponds to a vertex. Object-vertex is connected to atom-vertex when object is an argument of the atom. The representation is similar to the `ObjectAtom`, except the hyper-edges are represented in bipartite graph.
 * `ObjectBinary`[^1] represent states as multi graph (or graph with features on edges). Each object correponds to the vertex. Vertices are connected by the edge if they are in the same atom. The type of edge (or features one edges) corresponds to the type of atom and position of the object in the argument.
 * `AtomBinary`[^1] represent states as multi graph (or graph with features on edges). Each object correponds to the atom. Vertices are connected by the edge if they share the same object. The type of the edge (or features one edges) corresponds to the position of the object in both atoms.
-* `ObjectPair`[^1] each vertex corresponds to a tuple of objects and edges are create by some cryptic algorithm.
 * `ASNet`[^2] creates vertices for each possible atoms. The atoms are present in the graph even when they are not `true` in the state. This means that graph representing states differ only in features on edges, which codes if the atom is `true` or `false.` 
 * `HGNN`[^3] is similar to `ASNet`, except the message-passing over the hyper-edges is a bit different, as it includes more domain knowledge from the planning community.
 
