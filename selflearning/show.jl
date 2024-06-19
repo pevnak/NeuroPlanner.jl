@@ -44,6 +44,8 @@ function compute_stats(df; max_time = 30)
 	     	tst_solved_sum = sum(solved[.!sub_df.used_in_train]),
 	     	tst_solved_fold1 = mean(solved[i1]),
 	     	tst_solved_fold2 = mean(solved[i2]),
+	     	tst_solved_sum_fold1 = sum(solved[i1]),
+	     	tst_solved_sum_fold2 = sum(solved[i2]),
 	     	expanded_fold1 = mean(sub_df.expanded[i1]),
 	     	expanded_fold2 = mean(sub_df.expanded[i2]),
 	     	solution_time_fold1 = mean(sub_df.solution_time[i1]),
@@ -56,14 +58,6 @@ function compute_stats(df; max_time = 30)
 	     	solved_problems = size(sub_df, 1),
 		)
 	end
-end
-
-function rename_maxsum(;domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed, result_dir = "super")
-	old_filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
-	new_filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed], "_"))
-	isfile(old_filename*"_stats.jls") && mv(old_filename*"_stats.jls", new_filename*"_stats.jls")
-	isfile(old_filename*"_stats_tmp.jls") && mv(old_filename*"_stats_tmp.jls", new_filename*"_stats_tmp.jls")
-	isfile(old_filename*"_model.jls") && mv(old_filename*"_model.jls", new_filename*"_model.jls")
 end
 
 function submit_missing(;dry_run = true, domain_name, arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed, result_dir = "super")
@@ -198,7 +192,6 @@ function show_vitek()
 	seed = 2
 	all_archs = ["objectbinaryme", "objectbinaryfena", "atombinaryme", "atombinaryfena", "objectatom", "objectatombipfe",  "objectatombipfena", "atombinaryfe", "objectbinaryfe", "objectatombipme","asnet", "hgnn",]
 
-	# cases = vec(collect(Iterators.product(("atombinary2", "atombinary","objectatom", "objectbinary"), ("lstar", "l2"), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), ("maxsum",), (:none, ), (1, 2, 3))))
 	cases = vec(collect(Iterators.product(all_archs, ("lstar", ), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), ("summax",), (:none, ), (1, 2, 3))))
 
 	# map(shuffle(cases)) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, aggregation,  residual, seed)

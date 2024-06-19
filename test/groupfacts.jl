@@ -82,7 +82,7 @@ end
 
 	@testset "Domain: $domain_name" for domain_name in DOMAINS
 		domain, problem = load_problem_domain(domain_name) 
-		pddld = AtomBinaryME(domain; message_passes = graph_layers, residual)
+		pddld = AtomBinaryME(domain; message_passes = 2, residual = :none)
 		ex, state = initproblem(pddld, problem);
 		facts = collect(PDDL.get_facts(state))
 		@test sort.(NeuroPlanner.group_facts(ex, facts)) == sort.(group_facts_ref(ex, facts))

@@ -108,9 +108,9 @@ ArgParse example implemented in Comonicon.
 
 # max_steps = 10_000; max_time = 30; aggregation = "summax"; graph_layers = 3; dense_dim = 16; dense_layers = 3; residual = "none"; seed = 1
 # max_steps = 10_000; max_time = 30; aggregation = "summax"; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
-# domain_name = "ipc23_floortile"
+# domain_name = "ipc23_rovers"
 # loss_name = "lstar"
-# arch_name = "objectbinary"
+# arch_name = "atombinaryfe"
 """
 @main function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
 		dense_dim::Int = 32, aggregation = "summax", dense_layers::Int = 2, residual::String = "none", seed::Int = 1)
