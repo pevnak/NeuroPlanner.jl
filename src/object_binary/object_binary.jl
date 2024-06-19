@@ -80,10 +80,10 @@ end
 
 
 ObjectBinaryNoGoal{DO,P,EB,MP,II} = ObjectBinary{DO,P,EB,MP,D,II,Nothing,Nothing} where {DO,P,EB,MP,D,II}
-ObjectBinaryStart{DO,P,EB,MP,D,II,S} = ObjectBinary{DO,P,EB,MP,D,II,S,Nothing} where {DO,P,EB,MP,D,II,S<:Vector}
-ObjectBinaryGoal{DO,P,EB,MP,D,II,G} = ObjectBinary{DO,P,EB,MP,D,II,Nothing,G} where {DO,P,EB,MP,D,II,G<:Vector}
+ObjectBinaryStart{DO,P,EB,MP,D,II,S} = ObjectBinary{DO,P,EB,MP,D,II,S,Nothing} where {DO,P,EB,MP,D,II,S<:Union{Tuple, Vector}}
+ObjectBinaryGoal{DO,P,EB,MP,D,II,G} = ObjectBinary{DO,P,EB,MP,D,II,Nothing,G} where {DO,P,EB,MP,D,II,G<:Union{Tuple, Vector}}
 
-function ObjectBinary(domain; message_passes=2, residual=:linear, edgebuilder = FeaturedEdgeBuilder, kwargs...)
+function ObjectBinary(domain; message_passes=2, residual=:linear, edgebuilder = FeaturedGnnEdgeBuilder, kwargs...)
     any(length(p.args) > 3 for p in values(domain.predicates)) && error("Ternary predicate is rare and it is not supported at the moment")
     model_params = (; message_passes, residual)
     dictmap(x) = Dict(reverse.(enumerate(sort(x))))
@@ -267,7 +267,7 @@ Returns:
 
 This function encodes predicates for an ObjectBinary instance using the given predicate name, predicates, and key ID.
 """
-function encode_predicates!(eb::EB, ex::ObjectBinary, preds::Vector{<:IntState{N,<:Integer}}) where {N, EB<:Union{FeaturedEdgeBuilder,MultiEdgeBuilder}}
+function encode_predicates!(eb::EB, ex::ObjectBinary, preds::Vector{<:IntState{N,<:Integer}}) where {N, EB}
     for p in preds
         for i in 1:N
             oᵢ = p.args[i]

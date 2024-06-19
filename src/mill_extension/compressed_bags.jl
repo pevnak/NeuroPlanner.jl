@@ -68,10 +68,10 @@ function CompressedBags(ks::AbstractMatrix{T}, num_vertices::Int, num_observatio
     indices = Vector{Int}(undef, ar * num_observations)
     max_size = size(ks, 2)
 
-    for i in 1:ar
+    @inbounds for i in 1:ar
         for j in 1:num_observations
             k = ks[i, j]
-            indices[start[k]] = (j - 1) % max_size + 1
+            indices[start[k]] = j
             start[k] += 1
         end
     end
@@ -95,13 +95,13 @@ function CompressedBags(ks::NTuple{N,<:AbstractVector{T}}, num_vertices::Int, nu
     start = ends .- (counts .- 1)
     bags = map(UnitRange, start, ends)
 
-    indices = Vector{Int}(undef, N * num_observations)
+    indices = Vector{T}(undef, N * num_observations)
 
     @inbounds for i in 1:N
         kᵢ = ks[i]
         for j in 1:num_observations
             k = kᵢ[j]
-            indices[start[k]] = (j - 1) % max_size + 1
+            indices[start[k]] = j
             start[k] += 1
         end
     end
