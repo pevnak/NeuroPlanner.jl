@@ -112,8 +112,7 @@ function benchmark_domain_arch(archs, domain_name; difficulty="train")
 	end
 end
 
-# archs = [ObjectBinary,ObjectAtom, AtomBinary, ObjectPair]
-archs = [ObjectBinaryFE, ObjectBinaryFENA, ObjectBinaryME, ObjectAtom, ObjectAtomBipFE, ObjectAtomBipFENA, ObjectAtomBipME, AtomBinaryFE, AtomBinaryFENA, AtomBinaryME, ObjectPair, ASNet, HGNNLite, HGNN]
+archs = [ObjectBinaryFE, ObjectBinaryFENA, ObjectBinaryME, ObjectAtom, ObjectAtomBipFE, ObjectAtomBipFENA, ObjectAtomBipME, AtomBinaryFE, AtomBinaryFENA, AtomBinaryME, ASNet, HGNNLite, HGNN]
 data = map(problem -> benchmark_domain_arch(archs, problem), setdiff(IPC_PROBLEMS,["ipc23_sokoban"]))
 df = DataFrame(reduce(vcat, data))
 gdf = DataFrames.groupby(df, ["domain_name"]);
