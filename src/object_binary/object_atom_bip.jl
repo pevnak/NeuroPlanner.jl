@@ -270,7 +270,7 @@ function multi_predicates(ex::ObjectAtomBip, kid::Symbol, grouped_facts, prefix=
     for preds in grouped_facts[3:end]
         coloffset = encode_predicates!(eb, ex, preds, coloffset)
     end
-    return(construct(eb, kid))
+    return(add_central_vertex(construct(eb, kid), kid))
 end
 
 """

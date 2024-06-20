@@ -18,7 +18,6 @@ function find_duplicates(xs::AbstractVector...)
 	find_duplicates(h)
 end
 
-
 function find_duplicates(x::Vector{T}) where {T<:Number}
 	cols = length(x)
 	si = Vector{Int}(undef, cols)
@@ -31,6 +30,54 @@ function find_duplicates(x::Vector{T}) where {T<:Number}
 	end
 	unique_cols, si
 end
+
+"""
+	find_duplicates(x::Vector{T}, max_val::Int) where {T<:Number}
+	find_duplicates(xs::NTuple{N,<:AbstractVector}, max_val::Integer) where {N}
+
+	faster version of deduplication assuming the vector `x` contains values from 1:max_val.
+"""
+function find_duplicates(x::Vector{T}, max_val::Integer) where {T<:Integer}
+	cols = length(x)
+	si = Vector{Int}(undef, cols)
+	unique_cols = Vector{Bool}(undef, cols)
+	di = zeros(T, max_val)
+	unique_count = 0
+	@inbounds for (j, v) in enumerate(x)
+		if iszero(di[v])
+			unique_count += 1
+			di[v] = unique_count
+			unique_cols[j] = true
+		else
+			unique_cols[j] = false
+		end
+		si[j] = di[v]
+	end
+	unique_cols, si
+end
+
+function find_duplicates(xs::NTuple{N,<:AbstractVector{T}}, max_val::Integer) where {N,T<:Integer}
+	o = [x for x in xs[1]]	# this is to make it vector
+	@inbounds for j in 2:N
+		for (i, v) in enumerate(xs[j])
+			o[i] = (o[i] - 1) * max_val + v
+		end
+	end
+	find_duplicates(o, max_val^N)
+end
+
+function find_duplicates(xs::AbstractVector{NTuple{N,<:T}}, max_val::Integer) where {N,T<:Integer}
+	new_x = Vector{T}(undef,length(xs))
+	for (i, x) in enumerate(xs)
+		o = x[1]
+		for j in 2:N
+			o = (o - 1) * max_val + x[j]
+		end
+		new_x[i] = o
+	end
+	find_duplicates(new_x, max_val^N)
+end
+
 
 # Custom key with overwritten hash function allows to bypass the hashing, since when values are already hashed
 # https://discourse.julialang.org/t/dictionary-with-custom-hash-function/49168

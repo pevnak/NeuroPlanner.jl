@@ -4,6 +4,33 @@ using NeuroPlanner.Flux
 using NeuroPlanner: DeduplicatedMatrix
 using FiniteDifferences
 
+@testset "find duplicates" begin
+	max_val = 11
+	for i in 1:10
+		x = rand(1:max_val,100)
+		m₁, ii₁ = NeuroPlanner.find_duplicates(x)
+		m₂, ii₂ = NeuroPlanner.find_duplicates(x, max_val)
+		@test m₁ == m₂
+		@test ii₁ == ii₂
+	end
+
+	for i in 1:10
+		x = [(rand(1:max_val), rand(1:max_val)) for _ in 1:100]
+		m₁, ii₁ = NeuroPlanner.find_duplicates(hash.(x))
+		m₂, ii₂ = NeuroPlanner.find_duplicates(x, max_val)
+		@test m₁ == m₂
+		@test ii₁ == ii₂
+	end
+	
+	for i in 1:10
+		x = (rand(1:max_val, 100), rand(1:max_val,100))
+		m₁, ii₁ = NeuroPlanner.find_duplicates(hash.(zip(x...)))
+		m₂, ii₂ = NeuroPlanner.find_duplicates(x, max_val)
+		@test m₁ == m₂
+		@test ii₁ == ii₂
+	end
+end
+
 @testset "DeduplicatedMatrix" begin 
 	x = [1 2 2 1; 3 4 4 5]
 	dx = DeduplicatedMatrix(x)

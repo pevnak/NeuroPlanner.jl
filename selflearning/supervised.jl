@@ -117,7 +117,7 @@ ArgParse example implemented in Comonicon.
 	Random.seed!(seed)
 	settings = (;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, aggregation, dense_dim, dense_layers, residual, seed)
 	@show settings
-	filename = joinpath("super_amd_faster", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed], "_"))
+	filename = joinpath("super_amd_gnn", domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed], "_"))
 	@show filename
 
 	archs = Dict(

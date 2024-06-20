@@ -17,15 +17,6 @@ DOMAINS = ["briefcaseworld", "driverlog", "depot", "sokoban","ipc23_ferry",
 			"blocks", "ferry", "gripper", "npuzzle", "spanner", 
 			"elevators_00", "elevators_11"]
 
-
-
-DOMAINS = ["briefcaseworld", "driverlog", "depot", "sokoban","ipc23_ferry", 
-			"ipc23_rovers", "ipc23_blocksworld", "ipc23_floortile", 
-			"ipc23_satellite", "ipc23_spanner", "ipc23_childsnack", 
-			"ipc23_miconic", "ipc23_sokoban", "ipc23_transport", 
-			"blocks", "ferry", "gripper", "npuzzle", "spanner", 
-			"elevators_00", "elevators_11"]
-
 domain_path(s) = joinpath(pkgdir(NeuroPlanner),"test","problems",s*".pddl")
 problem_path(s) = joinpath(pkgdir(NeuroPlanner),"test","problems",s*"_01.pddl")
 plan_path(s) = joinpath(pkgdir(NeuroPlanner),"test","problems",s*"_01.plan")

@@ -203,7 +203,7 @@ function encode_edges(ex, eb, ids_in_atoms, kid)
             end
         end
     end
-    construct(eb, kid)
+    add_central_vertex(construct(eb, kid), kid)
 end
 
 @inline function _type_of_edge(ex::AtomBinary, i, j)
