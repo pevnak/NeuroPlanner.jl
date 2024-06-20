@@ -10,34 +10,6 @@ using Test
 using Random
 using PlanningDomains
 
-
-DOMAINS = ["briefcaseworld", "driverlog", "depot", "sokoban","ipc23_ferry", 
-			"ipc23_rovers", "ipc23_blocksworld", "ipc23_floortile", 
-			"ipc23_satellite", "ipc23_spanner", "ipc23_childsnack", 
-			"ipc23_miconic", "ipc23_sokoban", "ipc23_transport", 
-			"blocks", "ferry", "gripper", "npuzzle", "spanner", 
-			"elevators_00", "elevators_11"]
-
-domain_path(s) = joinpath(pkgdir(NeuroPlanner),"test","problems",s*".pddl")
-problem_path(s) = joinpath(pkgdir(NeuroPlanner),"test","problems",s*"_01.pddl")
-plan_path(s) = joinpath(pkgdir(NeuroPlanner),"test","problems",s*"_01.plan")
-function load_problem_domain(domain_name) 
-	(load_domain(domain_path(domain_name)), 
-		load_problem(problem_path(domain_name)),
-	)
-end
-
-function load_plan(domain_name)
-	lines = readlines(plan_path(domain_name))
-	lines = filter(s -> s[1] != ';', lines)
-	map(lines) do s
-		p = Symbol.(split(s[2:end-1]," "))
-		Compound(p[1], Const.(p[2:end]))
-	end
-end
-
-# DOMAINS = ["briefcaseworld", "settlers", "driverlog", "depot", "sokoban",]
-# DOMAINS = []
 ENCODINGS = (ObjectBinaryFE, ObjectBinaryFENA, ObjectBinaryME, ObjectAtom, ObjectAtomBipFE, 
 			ObjectAtomBipFENA, ObjectAtomBipME, AtomBinaryFE, AtomBinaryFENA, AtomBinaryME, 
 			ASNet, HGNNLite, HGNN)
