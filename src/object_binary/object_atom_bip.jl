@@ -108,12 +108,12 @@ function ObjectAtomBip(domain, problem; embed_goal=true, kwargs...)
     embed_goal ? add_goalstate(ex, problem) : ex
 end
 
-ObjectAtomBipFE(domain; kwargs...) = ObjectAtomBip(domain; edgebuilder = FeaturedHyperEdgeBuilder, kwargs...)
-ObjectAtomBipFENA(domain; kwargs...) = ObjectAtomBip(domain; edgebuilder = FeaturedHyperEdgeBuilderNA, kwargs...)
-ObjectAtomBipME(domain; kwargs...) = ObjectAtomBip(domain; edgebuilder = MultiHyperEdgeBuilder, kwargs...)
-ObjectAtomBipFE(domain, problem; kwargs...) = ObjectAtomBip(domain, problem; edgebuilder = FeaturedHyperEdgeBuilder, kwargs...)
-ObjectAtomBipFENA(domain, problem; kwargs...) = ObjectAtomBip(domain, problem; edgebuilder = FeaturedHyperEdgeBuilderNA, kwargs...)
-ObjectAtomBipME(domain, problem; kwargs...) = ObjectAtomBip(domain, problem; edgebuilder = MultiHyperEdgeBuilder, kwargs...)
+ObjectAtomBipFE(domain; kwargs...) = ObjectAtomBip(domain; edgebuilder = FeaturedGnnEdgeBuilder, kwargs...)
+ObjectAtomBipFENA(domain; kwargs...) = ObjectAtomBip(domain; edgebuilder = FeaturedGnnEdgeBuilderNA, kwargs...)
+ObjectAtomBipME(domain; kwargs...) = ObjectAtomBip(domain; edgebuilder = MultiGnnEdgeBuilder, kwargs...)
+ObjectAtomBipFE(domain, problem; kwargs...) = ObjectAtomBip(domain, problem; edgebuilder = FeaturedGnnEdgeBuilder, kwargs...)
+ObjectAtomBipFENA(domain, problem; kwargs...) = ObjectAtomBip(domain, problem; edgebuilder = FeaturedGnnEdgeBuilderNA, kwargs...)
+ObjectAtomBipME(domain, problem; kwargs...) = ObjectAtomBip(domain, problem; edgebuilder = MultiGnnEdgeBuilder, kwargs...)
 
 function Base.show(io::IO, ex::ObjectAtomBip)
     if !isspecialized(ex)

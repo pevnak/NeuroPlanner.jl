@@ -110,12 +110,12 @@ function ObjectBinary(domain, problem; embed_goal=true, kwargs...)
     embed_goal ? add_goalstate(ex, problem) : ex
 end
 
-ObjectBinaryFE(domain; kwargs...) = ObjectBinary(domain; edgebuilder = FeaturedHyperEdgeBuilder, kwargs...)
-ObjectBinaryFENA(domain; kwargs...) = ObjectBinary(domain; edgebuilder = FeaturedHyperEdgeBuilderNA, kwargs...)
-ObjectBinaryME(domain; kwargs...) = ObjectBinary(domain; edgebuilder = MultiHyperEdgeBuilder, kwargs...)
-ObjectBinaryFE(domain, problem; kwargs...) = ObjectBinary(domain, problem; edgebuilder = FeaturedHyperEdgeBuilder, kwargs...)
-ObjectBinaryFENA(domain, problem; kwargs...) = ObjectBinary(domain, problem; edgebuilder = FeaturedHyperEdgeBuilderNA, kwargs...)
-ObjectBinaryME(domain, problem; kwargs...) = ObjectBinary(domain, problem; edgebuilder = MultiHyperEdgeBuilder, kwargs...)
+ObjectBinaryFE(domain; kwargs...) = ObjectBinary(domain; edgebuilder = FeaturedGnnEdgeBuilder, kwargs...)
+ObjectBinaryFENA(domain; kwargs...) = ObjectBinary(domain; edgebuilder = FeaturedGnnEdgeBuilderNA, kwargs...)
+ObjectBinaryME(domain; kwargs...) = ObjectBinary(domain; edgebuilder = MultiGnnEdgeBuilder, kwargs...)
+ObjectBinaryFE(domain, problem; kwargs...) = ObjectBinary(domain, problem; edgebuilder = FeaturedGnnEdgeBuilder, kwargs...)
+ObjectBinaryFENA(domain, problem; kwargs...) = ObjectBinary(domain, problem; edgebuilder = FeaturedGnnEdgeBuilderNA, kwargs...)
+ObjectBinaryME(domain, problem; kwargs...) = ObjectBinary(domain, problem; edgebuilder = MultiGnnEdgeBuilder, kwargs...)
 
 function Base.show(io::IO, ex::ObjectBinary)
     if !isspecialized(ex)
