@@ -1,6 +1,6 @@
 using NeuroPlanner
 using LinearAlgebra
-using NeuroPlanner: FeaturedHyperEdgeBuilder, FeaturedGnnEdgeBuilder, EdgeBuilder, HyperEdgeBuilder, GnnEdgeBuilder, construct, construct_hyperedge, construct_gnnedge, FeaturedEdgeBuilder, MultiEdgeBuilder
+using NeuroPlanner: FeaturedHyperEdgeBuilder, FeaturedGnnEdgeBuilder, EdgeBuilder, HyperEdgeBuilder, GnnEdgeBuilder, construct, construct_hyperedge, construct_gnnedge, FeaturedEdgeBuilder
 using Test
 
 @testset "HyperEdgeBuilder" begin
@@ -173,7 +173,7 @@ end
 
 @testset "MultiEdgeBuilder" begin
     nv = 7; max_edges = 13; arity = 2; num_features = 2
-    meb = MultiEdgeBuilder(arity, max_edges, nv, num_features)
+    meb = NeuroPlanner.MultiHyperEdgeBuilder(arity, max_edges, nv, num_features)
     edges = [(1,2),(2,3),(3,4),(1,2),(3,4)]
     for (i,e) in enumerate(edges)
         push!(meb, e, mod(i, num_features) + 1)

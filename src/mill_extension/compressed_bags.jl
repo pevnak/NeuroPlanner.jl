@@ -84,9 +84,8 @@ function CompressedBags(ks::NTuple{N,<:AbstractVector{T}}, num_vertices::Int, nu
     all(max_size == length(k) for k in ks) || error("Cannot construct CompressedBags from empty indices")
 
     counts = zeros(Int, num_vertices)
-    @inbounds for row in 1:N
-        row_ks = ks[row]
-        for i in row_ks
+    for row_ks in ks
+        @inbounds for i in row_ks
             counts[i] += 1
         end
     end

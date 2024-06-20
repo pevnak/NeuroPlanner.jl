@@ -209,7 +209,7 @@ function construct(feb::FeaturedEdgeBuilder{<:Any,<:Any,Nothing}, input_sym::Sym
 end
 
 function _construct_featurededge(::HyperEdgeBuilder, xe, indices, num_edges, num_vertices, input_sym::Symbol)
-    x = xe[:, 1:num_edges]
+    x = num_edges < size(xe,2) ? xe[:, 1:num_edges] : xe
     indices = map(ii -> ii[1:num_edges], indices)
 
     xs = map(Base.Fix1(KBEntry, input_sym), indices)
