@@ -189,8 +189,8 @@ function construct(feb::FeaturedEdgeBuilder{<:Any,<:Any,<:Function}, input_sym::
     end
     x = @view feb.xe[:, 1:eb.num_edges]
     indices = map(ii -> (@view ii[1:eb.num_edges]), eb.indices)
-
-    mask, ii = find_duplicates(indices...)
+    # mask, ii = find_duplicates(indices...)
+    mask, ii = find_duplicates(indices, eb.num_vertices)
     dedupped_xe = NNlib.scatter(feb.agg, x, ii)
     dedupped_indices = map(ii -> ii[mask], indices)
 
@@ -235,13 +235,17 @@ function _construct_featurededge(::GnnEdgeBuilder, xe, indices, num_edges, num_v
         kᵢ = indices[1][i]
         kⱼ = indices[2][i]
 
-        neighborhoods[start[kᵢ]] = kⱼ
-        x[:, start[kᵢ]] .= @view xe[:, i] # this is where we construct edge features
+        sᵢ = start[kᵢ]
+        neighborhoods[sᵢ] = kⱼ
         start[kᵢ] += 1
 
-        neighborhoods[start[kⱼ]] = kᵢ
-        x[:, start[kⱼ]] .= @view xe[:, i] # this is where we construct edge features
+        sⱼ = start[kⱼ]
+        neighborhoods[sⱼ] = kᵢ
         start[kⱼ] += 1
+        for row in 1:size(xe,1)
+            x[row, sᵢ] = xe[row, i] # this is where we construct edge features
+            x[row, sⱼ] = xe[row, i] # this is where we construct edge features
+        end
     end
 
     BagNode(
@@ -282,3 +286,16 @@ end
 function construct(feb::MultiEdgeBuilder, input_sym::Symbol)
     ProductNode(map(Base.Fix2(construct, input_sym), feb.ebs))
 end
+
+
+"""
+    add_central_vertex(ds::ProductNode, input_sym::Symbol)
+    add_central_vertex(ds::BagNode, input_sym::Symbol)
+
+    Add a central vertex to message. This is a convenience function which 
+    adds a central vertex as `ArrayNode(KBEntry(:input_sym))` 
+    as an additional item to ProductNode when `ds isa ProductNode`,
+    or creates a ProductNode when `ds isa BagNode`
+"""
+add_central_vertex(ds::ProductNode, input_sym::Symbol) = ProductNode((ArrayNode(KBEntry(input_sym, 1:numobs(ds))), ds.data...))
+add_central_vertex(ds::BagNode, input_sym::Symbol) = ProductNode((ArrayNode(KBEntry(input_sym, 1:numobs(ds))), ds))

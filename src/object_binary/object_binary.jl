@@ -248,7 +248,7 @@ function multi_predicates(ex::ObjectBinary, kid::Symbol, grouped_facts, prefix=n
     for preds in grouped_facts[3:end]
         encode_predicates!(eb, ex, preds)
     end
-    return(construct(eb, kid))
+    return(add_central_vertex(construct(eb, kid), kid))
 end
 
 """

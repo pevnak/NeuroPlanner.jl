@@ -153,7 +153,7 @@ end
 
 function find_smallest_solutions(df)
 	# first, go over all files and identify shortes trajectories
-	stat_files = map(walkdir("super_amd_faster")) do (root, dirs, files)
+	stat_files = map(walkdir("super_amd_gnn")) do (root, dirs, files)
 		stat_files = filter(file -> endswith(file, "_stats.jls"), files)
 		map(s -> joinpath(root, s), stat_files)
 	end
@@ -194,11 +194,11 @@ function show_vitek()
 
 	cases = vec(collect(Iterators.product(all_archs, ("lstar", ), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), ("summax",), (:none, ), (1, 2, 3))))
 
-	# map(shuffle(cases)) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, aggregation,  residual, seed)
-	# 	submit_missing(;dry_run, domain_name, arch_name, aggregation, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_faster")
-	# end |> vec |> countmap
+	map(shuffle(cases)) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, aggregation,  residual, seed)
+		submit_missing(;dry_run, domain_name, arch_name, aggregation, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_gnn")
+	end |> vec |> countmap
 
-	df = isfile("super_amd_faster/results.csv") ? CSV.read("super_amd_faster/results.csv", DataFrame) :  DataFrame();
+	df = isfile("super_amd_gnn/results.csv") ? CSV.read("super_amd_gnn/results.csv", DataFrame) :  DataFrame();
 
 	if !isempty(df)
 		done = Set([(r.arch_name, r.loss_name, r.domain_name, r.dense_dim, r.graph_layers, r.aggregation, Symbol(r.residual), r.seed,) for r in eachrow(df)])
@@ -206,7 +206,7 @@ function show_vitek()
 	end;
 
 	amd_stats = map(cases) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, aggregation, residual, seed)
-		read_data(;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed, result_dir="super_amd_faster")
+		read_data(;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed, result_dir="super_amd_gnn")
 	end |> vec;
 	amd_stats = filter(!isempty, amd_stats)
 	if !isempty(amd_stats)
@@ -214,7 +214,7 @@ function show_vitek()
 		println("adding results from following architectures: ",unique(dff.arch_name))
 
 		df = isempty(df) ? dff : vcat(df, dff);
-		CSV.write("super_amd_faster/results.csv", df)
+		CSV.write("super_amd_gnn/results.csv", df)
 	end
 	# println("aggregation = meanmax")
 	# dff = filter(r -> r.aggregation == "meanmax", df)
