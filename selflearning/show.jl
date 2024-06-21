@@ -2,11 +2,9 @@ using Serialization
 using Statistics
 using DataFrames
 using NeuroPlanner
-using JSON
 using CSV
 using DataFrames
 using Random
-using HypothesisTests
 using Statistics
 using PrettyTables
 using Term
@@ -127,6 +125,37 @@ function vitek_table(df, k, high; max_time = 30, backend = Val(:text))
 	da
 end
 
+function paper_table(df)
+	#add rank
+	rank = map(eachrow(df)) do row
+		r = [ismissing(r) ? 0 : r for r in row[2:end]]
+		tiedrank(r,rev=true)
+	end |> mean
+	push!(df, vcat(["mean rank"],rank))
+
+	names = names(df)
+	blank_col = fill(missing, size(df,1))
+	problems = map(s -> replace(s, "ipc23_" => ""), df.problem)
+	data = hcat(df.problem, blank_col,
+			df.objectbinaryfe, df.objectbinaryfena, df.objectbinaryme, blank_col, 
+			df.atombinaryfe, df.atombinaryfena, df.atombinaryme, blank_col,
+			df.objectatombipfe, df.objectatombipfena, df.objectatombipme, blank_col,
+			df.objectatom)
+	header = ["problem","",
+		"objectbinaryfe", "objectbinaryfena", "objectbinaryme", "", 
+		"atombinaryfe", "atombinaryfena", "atombinaryme", "",
+			"objectatombipfe", "objectatombipfena", "objectatombipme", "",
+			"objectatom"]
+
+	h = [i == size(data,1) ? highlight_min(data, i, j) : highlight_max(data, i, j) for i in 1:size(data,1), j in 1:size(data,2)]
+	h[h .=== missing] .= false
+	# after highlighting remove missings
+	data[:,[2,6,10,14]] .= ""
+	highlighters = Highlighter((data, i, j) -> h[i, j], crayon"yellow")
+	pretty_table(data ; header, backend = Val(:text) , highlighters)
+
+end
+
 function finished(df; max_time = 30)
 	# df = filter(r -> r.planner == "AStarPlanner" && r.loss_name == "l2", df)
 	df = filter(r -> r.planner == "AStarPlanner" && r.loss_name == "lstar", df)
@@ -194,9 +223,9 @@ function show_vitek()
 
 	cases = vec(collect(Iterators.product(all_archs, ("lstar", ), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), ("summax",), (:none, ), (1, 2, 3))))
 
-	map(shuffle(cases)) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, aggregation,  residual, seed)
-		submit_missing(;dry_run, domain_name, arch_name, aggregation, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_gnn")
-	end |> vec |> countmap
+	# map(shuffle(cases)) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, aggregation,  residual, seed)
+	# 	submit_missing(;dry_run, domain_name, arch_name, aggregation, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_gnn")
+	# end |> vec |> countmap
 
 	df = isfile("super_amd_gnn/results.csv") ? CSV.read("super_amd_gnn/results.csv", DataFrame) :  DataFrame();
 
