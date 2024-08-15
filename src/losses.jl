@@ -2,9 +2,11 @@ using Parameters
 using SymbolicPlanners: PathNode
 using DataStructures: Queue
 using OneHotArrays: onehotbatch
+
 #############
-#	L2 Losses
+#	L2 Loss
 #############
+
 struct L₂MiniBatch{X,Y}
 	x::X 
 	y::Y
@@ -55,7 +57,7 @@ l₂loss(model, mb::NamedTuple{(:minibatch,:stats)}) = l₂loss(model, mb.miniba
 (l::L₂Loss)(args...) = l₂loss(args...)
 
 #############
-#	Lstar Losses
+#	Lstar Losses as described in  Chrestien, Leah, et al. "Optimize planning heuristics to rank, not to estimate cost-to-goal." Advances in Neural Information Processing Systems 36 (2024).
 #############
 struct LₛMiniBatch{X,H,Y}
 	x::X 
@@ -411,6 +413,10 @@ end
 
 
 
+#############
+#	LgbfsLoss Losses as described in  Chrestien, Leah, et al. "Optimize planning heuristics to rank, not to estimate cost-to-goal." Advances in Neural Information Processing Systems 36 (2024).
+#############
+
 """
 LgbfsLoss(x, g, H₊, H₋)
 
@@ -431,8 +437,10 @@ lgbfsloss(model, xy::LgbfsMiniBatch) = lgbfsloss(model, xy.x, xy.path_cost, xy.H
 lgbfsloss(model, xy::LgbfsMiniBatch, surrogate) = lgbfsloss(model, xy.x, xy.path_cost, xy.H₊, xy.H₋, surrogate)
 lgbfsloss(model, mb::NamedTuple{(:minibatch,:stats)}) = lgbfsloss(model, mb.minibatch)
 
+
 #########
 #	LRT loss enforcing ordering on the trajectory
+#   Caelan Reed Garrett, Leslie Pack Kaelbling, and Tomás Lozano-Pérez. Learning to rank for synthesizing planning heuristics. page 3089–3095, 2016.
 #########
 struct LRTMiniBatch{X,H,Y}
 	x::X 

@@ -7,4 +7,5 @@
 #SBATCH --out=/home/pevnytom/logs/pddl.%j.out
 
 ml Julia/1.10.2-linux-x86_64
+# julia --project=. supervised.jl $1 $6 $5 --dense-dim $2 --graph-layers $3 --aggregation summax  --residual $4 --seed $7 --max-time 1800
 julia --project=. supervised.jl $1 $6 $5 --dense-dim $2 --graph-layers $3 --aggregation summax  --residual $4 --seed $7

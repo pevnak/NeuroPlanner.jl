@@ -58,6 +58,8 @@ are deduplicated, which means that if there are more edges, between two vertices
 will be represented as a single edge with features aggregated (by default by `max`).
 * `ObjectBinaryFENA` is similar as ``ObjectBinaryFE`, but the edges are not deduplicated.
 * `ObjectBinaryME` represents different edges as multi-graph.
+
+Horčík, Rostislav, and Gustav Šír. "Expressiveness of Graph Neural Networks in Planning Domains." Proceedings of the International Conference on Automated Planning and Scheduling. Vol. 34. 2024.
 """
 struct ObjectBinary{DO,P,EB,MP,D,II,S,G}
     domain::DO

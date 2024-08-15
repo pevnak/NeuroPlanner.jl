@@ -30,6 +30,8 @@ vertex corresponding to the hyper-edge and its vertices.
 --- `objtype2id` maps unary predicates to an index in one-hot encoded vertex' properties 
 --- `constmap` maps constants to an index in one-hot encoded vertex' properties 
 --- `model_params` some parameters of an algorithm constructing the message passing passes 
+
+Horčík, Rostislav, and Gustav Šír. "Expressiveness of Graph Neural Networks in Planning Domains." Proceedings of the International Conference on Automated Planning and Scheduling. Vol. 34. 2024.
 """
 struct AtomBinary{DO,EB,MP,D,S,G}
     domain::DO
