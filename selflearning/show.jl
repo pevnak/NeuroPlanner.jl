@@ -26,9 +26,9 @@ function highlight_table(df; backend = Val(:text), high = highlight_max)
 	pretty_table(data ; header, backend = Val(:text) , highlighters)
 end
 
+"""
 
-joindomains(a,b) = outerjoin(a, b, on = :domain_name)
-
+"""
 function compute_stats(df; max_time = 30)
 	gdf = DataFrames.groupby(df, [:domain_name, :arch_name, :loss_name, :planner, :max_steps,  :max_time, :graph_layers, :residual, :dense_layers, :dense_dim, :seed])
 	combined_stats = combine(gdf) do sub_df
@@ -44,16 +44,8 @@ function compute_stats(df; max_time = 30)
 	     	tst_solved_fold2 = mean(solved[i2]),
 	     	tst_solved_sum_fold1 = sum(solved[i1]),
 	     	tst_solved_sum_fold2 = sum(solved[i2]),
-	     	expanded_fold1 = mean(sub_df.expanded[i1]),
-	     	expanded_fold2 = mean(sub_df.expanded[i2]),
-	     	solution_time_fold1 = mean(sub_df.solution_time[i1]),
-	     	solution_time_fold2 = mean(sub_df.solution_time[i2]),
-	     	sol_length_fold1 = mean(skipmissing(sub_df.sol_length[i1])),
-	     	sol_length_fold2 = mean(skipmissing(sub_df.sol_length[i2])),
-	     	solx_length_fold1 = Dict([sub_df.problem_file[i] => sub_df.sol_length[i] for i in i1 if solved[i]]),
-	     	solx_length_fold2 = Dict([sub_df.problem_file[i] => sub_df.sol_length[i] for i in i2 if solved[i]]),
-	     	time_in_heuristic = mean(sub_df.time_in_heuristic[.!sub_df.used_in_train]),
-	     	solved_problems = size(sub_df, 1),
+	     	sol_length_fold1 = sum(sub_df.sol_length[i1]),
+	     	sol_length_fold2 = sum(sub_df.sol_length[i2]),
 		)
 	end
 end
@@ -80,9 +72,9 @@ function submit_missing(;dry_run = true, domain_name, arch_name, loss_name, max_
 	return(:nothing)
 end
 
-function read_data(;domain_name, arch_name, loss_name, max_steps, aggregation,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir="super")
+function read_data(;domain_name, arch_name, loss_name, max_steps, aggregation,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir="super", suffix = "_stats.jls")
 	filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed], "_"))
-	filename = filename*"_stats.jls"
+	filename = filename*suffix
 	!isfile(filename) && return(DataFrame())
 	stats = deserialize(filename)
 	df = stats isa DataFrame ? stats : DataFrame(vec(stats))
@@ -101,10 +93,28 @@ function read_data(;domain_name, arch_name, loss_name, max_steps, aggregation,  
 	df
 end
 
-function vitek_table(df, k, high; max_time = 30, backend = Val(:text))
-	# df = filter(r -> r.planner == "AStarPlanner" && r.loss_name == "l2", df)
-	df = filter(r -> r.planner == "AStarPlanner" && r.loss_name == "lstar", df)
-	ds = compute_stats(df;max_time)
+function filter_results(df; planner = nothing, loss_name = nothing, max_time = nothing)
+	if planner !== nothing
+		df = filter(r -> r.planner == planner, df);
+	end
+
+	if loss_name !== nothing
+		df = filter(r -> r.loss_name == loss_name, df);
+	end
+
+	if max_time !== nothing
+		df = filter(r -> r.max_time == max_time, df);
+	end
+	df
+end
+
+"""
+	coverage_table(df, k, high; max_time = 30)
+
+	compute coverage on testing set while using half of test as validation
+"""
+function coverage_table(df, k, high; max_time = 30)
+	ds = compute_stats(df; max_time)
 	gdf = DataFrames.groupby(ds, [:domain_name, :arch_name])
 	dfs = combine(gdf) do sub_df
 		map(unique(sub_df.seed)) do s
@@ -121,44 +131,71 @@ function vitek_table(df, k, high; max_time = 30, backend = Val(:text))
 	cols = sort(unique(dfs.arch_name))
 	data = [get(d, (i,j), missing) for i in rows, j in cols]
 	da = DataFrame(hcat(rows, data), vcat(["problem"], cols))
+	# highlight_table(da; backend, high)
+	da
+end
+
+function best_configuration(df)
+	stats = compute_stats(df)
+	gdf = DataFrames.groupby(stats, [:domain_name, :arch_name])
+	dfs = combine(gdf) do sub_df
+		i = argmax(sub_df.tst_solved)
+		sub_df[i,:]
+	end
+
+	# now, make table from the results
+	d = Dict([(r.domain_name, r.arch_name) => join([r.dense_dim, r.graph_layers]," / ") for r in eachrow(dfs)])
+	rows = sort(unique(dfs.domain_name))
+	cols = sort(unique(dfs.arch_name))
+	data = [get(d, (i,j), missing) for i in rows, j in cols]
+	da = DataFrame(hcat(rows, data), vcat(["problem"], cols))
 	highlight_table(da; backend, high)
 	da
 end
 
-function paper_table(df)
-	#add rank
-	rank = map(eachrow(df)) do row
-		r = [ismissing(r) ? 0 : r for r in row[2:end]]
-		tiedrank(r,rev=true)
-	end |> mean
-	push!(df, vcat(["mean rank"],rank))
+"""
+	paper_table(df; highlighter = highlight_max, add_rank = true)
 
-	names = names(df)
+	format the results for the paper, mainly ordering of the columns
+"""
+function paper_table(df; highlighter = highlight_max, add_rank = true)
+	#add rank
+	if add_rank
+		rank = map(eachrow(df)) do row
+			r = [ismissing(r) ? 0 : r for r in row[2:end]]
+			tiedrank(r,rev=true)
+		end |> mean
+		push!(df, vcat(["mean rank"],rank))
+	end
+
 	blank_col = fill(missing, size(df,1))
 	problems = map(s -> replace(s, "ipc23_" => ""), df.problem)
-	data = hcat(df.problem, blank_col,
+	data = hcat(problems, blank_col,
 			df.objectbinaryfe, df.objectbinaryfena, df.objectbinaryme, blank_col, 
 			df.atombinaryfe, df.atombinaryfena, df.atombinaryme, blank_col,
-			df.objectatombipfe, df.objectatombipfena, df.objectatombipme, blank_col,
-			df.objectatom)
+			df.objectatombipfe, df.objectatombipfena, df.objectatombipme, df.objectatom, blank_col,
+			 df.asnet, df.hgnn)
+	data = map(x -> x isa Number ? round(100 * x, digits = 1) : x, data)
 	header = ["problem","",
-		"objectbinaryfe", "objectbinaryfena", "objectbinaryme", "", 
-		"atombinaryfe", "atombinaryfena", "atombinaryme", "",
-			"objectatombipfe", "objectatombipfena", "objectatombipme", "",
-			"objectatom"]
+		"ObjectBinaryFE", "ObjectBinaryfena", "ObjectBinaryme", "", 
+		"AtomBinaryfe", "AtomBinaryfena", "AtomBinaryme", "",
+			"ObjectAtomBipfe", "ObjectAtomBipfena", "ObjectAtomBipme", "ObjectAtom", "",
+			 "ASNet", "HGNN"]
 
-	h = [i == size(data,1) ? highlight_min(data, i, j) : highlight_max(data, i, j) for i in 1:size(data,1), j in 1:size(data,2)]
+	h = [highlighter(data, i, j) for i in 1:size(data,1), j in 1:size(data,2)]
 	h[h .=== missing] .= false
 	# after highlighting remove missings
-	data[:,[2,6,10,14]] .= ""
+	data[:,[2,6,10,15]] .= ""
+
+	# text backend
 	highlighters = Highlighter((data, i, j) -> h[i, j], crayon"yellow")
 	pretty_table(data ; header, backend = Val(:text) , highlighters)
-
+	# latex backend
+	highlighters = LatexHighlighter((data, i, j) -> h[i, j], ["textbf"])
+	pretty_table(data ; header, backend = Val(:latex) , highlighters)
 end
 
 function finished(df; max_time = 30)
-	# df = filter(r -> r.planner == "AStarPlanner" && r.loss_name == "l2", df)
-	df = filter(r -> r.planner == "AStarPlanner" && r.loss_name == "lstar", df)
 	ds = compute_stats(df;max_time)
 	gdf = DataFrames.groupby(ds, [:domain_name, :arch_name])
 	dfs = combine(gdf) do sub_df
@@ -176,10 +213,11 @@ function finished(df; max_time = 30)
 	da
 end
 
-# function fixstats()
-	# filename = joinpath(result_dir, domain_name, join([arch_name, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed], "_"))
-# end
+"""
+	find_smallest_solutions(df)
 
+	find smallest plans from all soutions
+"""
 function find_smallest_solutions(df)
 	# first, go over all files and identify shortes trajectories
 	stat_files = map(walkdir("super_amd_gnn")) do (root, dirs, files)
@@ -200,35 +238,137 @@ function find_smallest_solutions(df)
 		i = argmin(sub_df.sol_length)
 		sub_df[i,:]
 	end
-
-	# then we need to extract plan from the trajectory
-
 end
 
-function show_vitek()
+
+"""
+	dataframe_for_pairplots(df)
+
+	filter the dataset to keep only results of the best configuration for triplets 
+	[:domain_name, :arch_name, :seed].
+	This is used to produce dataframe used to plot Figures 5 and 6 in the paper.
+"""
+function dataframe_for_pairplots(df)
+	function select_val_return_test(df, val_ii, tst_ii)
+		performance = combine(DataFrames.groupby(df, [:graph_layers, :residual, :dense_layers, :dense_dim])) do sub_df
+			dff = filter(r -> r.problem_file ∈ val_ii, sub_df)
+			(;coverage = mean(dff.solved))
+		end
+		best = performance[argmax(performance.coverage),:]
+		filter(r -> r.graph_layers == best.graph_layers && r.residual == best.residual && r.dense_layers == best.dense_layers && r.dense_dim == best.dense_dim && r.problem_file ∈ tst_ii, df)
+	end
+	
+	gdf = DataFrames.groupby(df, [:domain_name, :arch_name, :seed])
+	dff = combine(gdf) do sub_df
+		ii = sort(unique(sub_df.problem_file))
+		i1 = ii[1:2:end]
+		i2 = ii[2:2:end]
+		vcat(
+			select_val_return_test(sub_df, i1, i2),
+			select_val_return_test(sub_df, i2, i1),
+		)
+	end
+end
+
+"""
+	add_temporary_results(df, cases; result_dir="super_amd_gnn")
+
+	Add results from the experiments which did not finish in time, yet they still could solve some stuff.
+	The difficulty is that we need to add "bogus" information about results on unfinished problem instances.
+	Note that the `used_in_train` field is slightly wrong, since it is set to `false` for all unfinished results.
+"""
+function add_temporary_results(df, cases; result_dir="super_amd_gnn")
+	empty_fields = Dict()
+	problem_files = map(IPC_PROBLEMS) do domain_name
+		problem_files = getproblem(domain_name, false)[2]
+		domain_name => problem_files
+	end |> Dict
+	new_dfs = map(cases) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, aggregation, residual, seed)
+		new_df = read_data(;domain_name, arch_name, loss_name, max_steps, max_time, graph_layers, aggregation, residual, dense_layers, dense_dim, seed, result_dir, suffix = "_stats_tmp.jls")		
+
+		# We need to construct new bogus fields marking that the attempt has failed
+		bogus_stats = get!(empty_fields, domain_name) do
+			fdf = filter(r -> r.domain_name == domain_name, df)
+			(domain_name,
+			arch_name,
+			loss_name,
+			graph_layers,
+			dense_dim,
+			aggregation,
+			dense_layers,
+			residual,
+			seed,
+			max_steps,
+			max_time,
+			solution_time = typemax(Float64),
+			sol_length = typemax(Int64),
+			expanded = typemax(Int64),
+			solved = false,
+			used_in_train = false,
+			time_in_heuristic = typemax(Float64),
+			)
+		end
+
+		_problem_files = isempty(new_df) ? problem_files[domain_name] : setdiff(problem_files[domain_name], filter(r -> r.planner == "AStarPlanner", new_df).problem_file)
+		for problem_file in _problem_files
+			push!(new_df, merge(bogus_stats, (;problem_file, planner = "AStarPlanner")))
+		end
+
+		_problem_files = isempty(new_df) ? problem_files[domain_name] : setdiff(problem_files[domain_name], filter(r -> r.planner == "GreedyPlanner", new_df).problem_file)
+		for problem_file in _problem_files
+			push!(new_df, merge(bogus_stats, (;problem_file, planner = "GreedyPlanner")))
+		end
+		new_df
+	end
+
+	new_dfs = reduce(vcat, new_dfs)
+	vcat(df, new_dfs)
+end
+
+"""
+	submit_experiments()
+
+	submit all experiments required for the results, except the experiments with LAMA planner
+"""
+function submit_experiments()
 	max_steps = 10_000
 	max_time = 30
 	dense_layers = 2
-	seed = 1
 	dry_run = true
-	domain_name = "ferry"
-	arch_name = "atombinaryfena"
-	loss_name = "lstar"
-	graph_layers = 3
-	residual = "none"
-	dense_layers = 2
-	dense_dim = 8
-	seed = 2
 	all_archs = ["objectbinaryme", "objectbinaryfena", "atombinaryme", "atombinaryfena", "objectatom", "objectatombipfe",  "objectatombipfena", "atombinaryfe", "objectbinaryfe", "objectatombipme","asnet", "hgnn",]
 
-	cases = vec(collect(Iterators.product(all_archs, ("lstar", ), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), ("summax",), (:none, ), (1, 2, 3))))
+	cases = vec(collect(Iterators.product(all_archs, ("l2", "lstar",), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), ("summax",), (:none, ), (1, 2, 3))))
 
-	# map(shuffle(cases)) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, aggregation,  residual, seed)
-	# 	submit_missing(;dry_run, domain_name, arch_name, aggregation, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_gnn")
-	# end |> vec |> countmap
+	map(cases) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, aggregation,  residual, seed)
+		submit_missing(;dry_run, domain_name, arch_name, aggregation, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_gnn")
+	end |> vec |> countmap
 
+	max_steps = 10_000
+	max_time = 180
+	dense_layers = 2
+	dry_run = true
+	all_archs = ["objectbinaryfe"]
+
+	cases = vec(collect(Iterators.product(all_archs, ("lstar",), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), ("summax",), (:none, ), (1, 2, 3))))
+
+	map(cases) do (arch_name, loss_name, domain_name, dense_dim, graph_layers, aggregation,  residual, seed)
+		submit_missing(;dry_run, domain_name, arch_name, aggregation, loss_name, max_steps,  max_time, graph_layers, residual, dense_layers, dense_dim, seed, result_dir = "super_amd_gnn")
+	end |> vec |> countmap
+end
+
+function create_tables()
+	max_steps = 10_000
+	max_time = 30
+	dense_layers = 2
+	dry_run = true
+	all_archs = ["objectbinaryme", "objectbinaryfena", "atombinaryme", "atombinaryfena", "objectatom", "objectatombipfe",  "objectatombipfena", "atombinaryfe", "objectbinaryfe", "objectatombipme","asnet", "hgnn",]
+
+	cases = vec(collect(Iterators.product(all_archs, ("l2", "lstar",), IPC_PROBLEMS, (4, 16, 32), (1, 2, 3), ("summax",), (:none, ), (1, 2, 3))))
+
+	# loads cached results
 	df = isfile("super_amd_gnn/results.csv") ? CSV.read("super_amd_gnn/results.csv", DataFrame) :  DataFrame();
 
+	# add new finished results
 	if !isempty(df)
 		done = Set([(r.arch_name, r.loss_name, r.domain_name, r.dense_dim, r.graph_layers, r.aggregation, Symbol(r.residual), r.seed,) for r in eachrow(df)])
 		cases = filter(e -> e ∉ done, collect(cases))
@@ -241,18 +381,18 @@ function show_vitek()
 	if !isempty(amd_stats)
 		dff = reduce(vcat, amd_stats);
 		println("adding results from following architectures: ",unique(dff.arch_name))
-
 		df = isempty(df) ? dff : vcat(df, dff);
 		CSV.write("super_amd_gnn/results.csv", df)
 	end
-	# println("aggregation = meanmax")
-	# dff = filter(r -> r.aggregation == "meanmax", df)
-	finished(df);
-	vitek_table(df, :tst_solved, highlight_max);
 
-	# println("aggregation = maxsum")
-	# dff = filter(r -> r.aggregation == "maxsum", df);
-	# finished(dff);
-	# vitek_table(dff, :tst_solved, highlight_max);
+
+	# this adds the results which has not finished in time
+	df = add_temporary_results(df, cases; result_dir="super_amd_gnn")
+	# this removes all training problem instances, especially those not used for training (due to missing plan)
+	df = filter(r -> !(contains(r.problem_file, "training") && !r.used_in_train), df);
+
+
+	# print the coverage table of lstar with AStarPlanner and max_time 30 (Table 1 in the paper)
+	dff = filter_results(df; planner = "AStarPlanner", loss_name = "lstar", max_time = 30)
+	paper_table(coverage_table(dff, :tst_solved, highlight_max; max_time, add_rank = false))
 end
-show_vitek();

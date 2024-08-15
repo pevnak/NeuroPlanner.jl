@@ -1,3 +1,8 @@
+"""
+	STRIPS-HGNS
+	
+	Shen, W.; Trevizan, F. W.; and Thiébaux, S. 2020. Learning Domain-Independent Planning Heuristics with Hypergraph Networks. In Beck, J. C.; Buffet, O.; Hoffmann, J.; Karpas, E.; and Sohrabi, S., eds., Proceedings of the 30th Interna- tional Conference on Automated Planning and Scheduling (ICAPS’20), 574–584. AAAI Press.
+"""
 struct HGNN{DO,TO,MP<:NamedTuple, P<:Union{Dict,Nothing},KB<:Union{Nothing, KnowledgeBase},S<:Union{Nothing,Matrix},G<:Union{Nothing,Matrix}}
 	domain::DO
 	type2obs::TO

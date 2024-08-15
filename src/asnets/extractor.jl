@@ -1,3 +1,8 @@
+"""
+	ASNet
+
+	Toyer, Sam, et al. "Asnets: Deep learning for generalised planning." Journal of Artificial Intelligence Research 68 (2020): 1-68.
+"""
 struct ASNet{DO,TO,MP<:NamedTuple, P<:Union{Dict,Nothing},KB<:Union{Nothing, KnowledgeBase},S<:Union{Nothing,Matrix},G<:Union{Nothing,Matrix}}
 	domain::DO
 	type2obs::TO

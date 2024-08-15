@@ -49,6 +49,8 @@ specializing for a given domain. Notice the arguments `message_passes` and
 * `ObjectAtom(domain, problem; embed_goal=true, kwargs...)` specializes the constructor for a 
 given domain and problem instance. The arguments are `message_passes`, `residual`, and additional `embed_goal` which will
 automatically extract information about the goal state.
+
+Ståhlberg, S.; Bonet, B.; and Geffner, H. 2022a. Learning General Optimal Policies with Graph Neural Networks: Ex- pressive Power, Transparency, and Limits. In Proceedings of the 32nd International Conference on Automated Planning and Scheduling (ICAPS’22), 629–637. AAAI Press.
 """     
 struct ObjectAtom{DO,D,N,MP,S,G}
     domain::DO

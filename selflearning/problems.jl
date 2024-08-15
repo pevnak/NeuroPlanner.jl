@@ -21,26 +21,6 @@ function load_plan(problem_file)
 	end
 end
 
-# for ifile in filter(s -> endswith(s,"plan"), readdir())
-# 	if length(unique(readlines(ifile)))>1
-# 		@show ifile
-# 		continue
-# 	end
-# 	if length(unique(readlines(ifile)))<1
-# 		@show ifile
-# 		continue
-# 	end
-# 	ss = only(unique(readlines(ifile)))
-# 	ss = split(ss[2:end-1],",")
-# 	plan = map(ss) do s
-# 		s = s[findfirst("(",s).stop+1:findfirst(")",s).stop-1]
-# 		p = Symbol.(split(s," "))
-# 		Compound(p[1], Const.(p[2:end]))
-# 	end
-# 	save_plan(ifile, plan)
-# end
-
-
 function setup_problem(problem_name)
 	sdir(s...) = joinpath("..","domains",problem_name,s...)
 	domain_pddl = sdir("domain.pddl")
