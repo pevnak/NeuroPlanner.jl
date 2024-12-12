@@ -86,7 +86,7 @@ ObjectBinaryStart{DO,P,EB,MP,D,II,S} = ObjectBinary{DO,P,EB,MP,D,II,S,Nothing} w
 ObjectBinaryGoal{DO,P,EB,MP,D,II,G} = ObjectBinary{DO,P,EB,MP,D,II,Nothing,G} where {DO,P,EB,MP,D,II,G<:Union{Tuple, Vector}}
 
 function ObjectBinary(domain; message_passes=2, residual=:linear, edgebuilder = FeaturedGnnEdgeBuilder, kwargs...)
-    any(length(p.args) > 3 for p in values(domain.predicates)) && error("Ternary predicate is rare and it is not supported at the moment")
+    # any(length(p.args) > 3 for p in values(domain.predicates)) && error("Ternary predicate is rare and it is not supported at the moment")
     model_params = (; message_passes, residual)
     dictmap(x) = Dict(reverse.(enumerate(sort(x))))
     pifo = PredicateInfo(domain)
@@ -316,7 +316,7 @@ function add_goalstate(ex::ObjectBinary, problem, goal=goalstate(ex.domain, prob
 
     # change id2fid to code the goal, extract goal state with it and set it to goal_states
     gex = @set ex.predicates.id2fid = goal_id2fid(ex)
-    new_ex = @set ex.goal_state = intstates(gex, goal)
+    new_ex = @set ex.goal_state = initstates(gex, goal)
 
     # change the number of predicates, which has doubled
     new_ex = @set new_ex.predicates.nunary = 2*new_ex.predicates.nunary
