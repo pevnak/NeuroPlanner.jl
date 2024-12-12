@@ -44,17 +44,21 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 		end
 
 		t = @elapsed minibatches = map(train_files) do problem_file
-			@show problem_file
-			println("creating sample from problem: ",problem_file)
-			plan = load_plan(problem_file)
-			problem = load_problem(problem_file)
-			ds = fminibatch(pddld, domain, problem, plan)
-			@show ds.x
-			dedu = @set ds.x = deduplicate(ds.x)
-			size_o, size_d =  Base.summarysize(ds), Base.summarysize(dedu)
-			println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size_o, digits =2),"%)")
-			dedu
+			try
+				println("creating sample from problem: ",problem_file)
+				plan = load_plan(problem_file)
+				problem = load_problem(problem_file)
+				ds = fminibatch(pddld, domain, problem, plan)
+				dedu = @set ds.x = deduplicate(ds.x)
+				size_o, size_d =  Base.summarysize(ds), Base.summarysize(dedu)
+				println("original: ", size_o, " dedupped: ", size_d, " (",round(100*size_d / size_o, digits =2),"%)")
+				dedu
+			catch 
+				println("there was a problem with ", problem_file)
+				return missing
+			end
 		end
+		minibatches = collect(skipmissing(minibatches))
 		logger=TBLogger(filename*"_events")
 		log_value(logger, "time_minibatch", t; step=0)
 		opt = AdaBelief();
@@ -68,19 +72,24 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 
 	stats = DataFrame()
 	#precompilation
-	solve_problem(pddld, first(problem_files), model, first(planners); return_unsolved = true, max_time)
+	# solve_problem(pddld, first(problem_files), model, first(planners); return_unsolved = true, max_time)
 	t₀ = time()
 	for (planner, problem_file) in Iterators.product(planners, problem_files)
-		used_in_train = problem_file ∈ train_files
-		@show problem_file
-		t = @elapsed sol = solve_problem(pddld, problem_file, model, planner; return_unsolved = true, max_time)
-		println("time in the solver: ", t)
-		trajectory = sol.sol.status == :max_time ? nothing : sol.sol.trajectory
-		s = merge(sol.stats, (;used_in_train, planner = "$(planner)", trajectory, problem_file))
-		push!(stats, s, cols=:union, promote=true)
-		if time()-t₀ > 3600	# serialize stats evert hour
-			serialize(filename*"_stats_tmp.jls", stats)
-			t₀ = time()
+		try 
+			used_in_train = problem_file ∈ train_files
+			@show problem_file
+			t = @elapsed sol = solve_problem(pddld, problem_file, model, planner; return_unsolved = true, max_time)
+			println("time in the solver: ", t, " status:  ", sol.sol.status, " length: ", length(sol.sol.trajectory) - 1)
+			trajectory = sol.sol.status == :max_time ? nothing : sol.sol.trajectory
+			s = merge(sol.stats, (;used_in_train, planner = "$(planner)", trajectory, problem_file))
+			# @show s
+			push!(stats, s, cols=:union, promote=true)
+			if time()-t₀ > 3600	# serialize stats evert hour
+				serialize(filename*"_stats_tmp.jls", stats)
+				t₀ = time()
+			end
+		catch
+			println("failed on ",problem_file)
 		end
 	end
 	println("evaluation finished")
@@ -108,9 +117,9 @@ ArgParse example implemented in Comonicon.
 
 # max_steps = 10_000; max_time = 30; aggregation = "summax"; graph_layers = 3; dense_dim = 16; dense_layers = 3; residual = "none"; seed = 1
 # max_steps = 10_000; max_time = 30; aggregation = "summax"; graph_layers = 2; dense_dim = 16; dense_layers = 2; residual = "none"; seed = 1
-# domain_name = "ipc23_rovers"
+# domain_name = "ferry"
 # loss_name = "lstar"
-# arch_name = "atombinaryfe"
+# arch_name = "objectbinaryfe"
 """
 @main function main(domain_name, arch_name, loss_name; max_steps::Int = 10_000, max_time::Int = 30, graph_layers::Int = 1, 
 		dense_dim::Int = 32, aggregation = "summax", dense_layers::Int = 2, residual::String = "none", seed::Int = 1)
@@ -141,7 +150,7 @@ ArgParse example implemented in Comonicon.
 	domain_pddl, problem_files = getproblem(domain_name, false)
 	# problem_files = filter(s -> isfile(plan_file(domain_name, s)), problem_files)
 	train_files = filter(s -> isfile(plan_file(s)), problem_files)
-	train_files = domain_name ∉ IPC_PROBLEMS ? sample(train_files, min(div(length(problem_files), 2), length(train_files)), replace = false) : train_files
+	# train_files = domain_name ∉ IPC_PROBLEMS ? sample(train_files, min(div(length(problem_files), 2), length(train_files)), replace = false) : train_files
 	fminibatch = NeuroPlanner.minibatchconstructor(loss_name)
 	hnet = archs[arch_name]
 	aggregation = aggregations[aggregation]

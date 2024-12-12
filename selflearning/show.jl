@@ -332,7 +332,7 @@ end
 """
 function submit_experiments()
 	max_steps = 10_000
-	max_time = 30
+	max_time = 120
 	dense_layers = 2
 	dry_run = true
 	all_archs = ["objectbinaryme", "objectbinaryfena", "atombinaryme", "atombinaryfena", "objectatom", "objectatombipfe",  "objectatombipfena", "atombinaryfe", "objectbinaryfe", "objectatombipme","asnet", "hgnn",]
@@ -344,7 +344,7 @@ function submit_experiments()
 	end |> vec |> countmap
 
 	max_steps = 10_000
-	max_time = 180
+	max_time = 1800
 	dense_layers = 2
 	dry_run = true
 	all_archs = ["objectbinaryfe"]
@@ -394,5 +394,5 @@ function create_tables()
 
 	# print the coverage table of lstar with AStarPlanner and max_time 30 (Table 1 in the paper)
 	dff = filter_results(df; planner = "AStarPlanner", loss_name = "lstar", max_time = 30)
-	paper_table(coverage_table(dff, :tst_solved, highlight_max; max_time, add_rank = false))
+	paper_table(coverage_table(dff, :tst_solved, highlight_max; max_time))
 end

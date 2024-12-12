@@ -56,6 +56,8 @@ are deduplicated, which means that if there are more edges, between two vertices
 will be represented as a single edge with features aggregated (by default by `max`).
 * `ObjectAtomBipFENA` is similar as ``ObjectAtomBipFE`, but the edges are not deduplicated.
 * `ObjectAtomBipME` represents different edges as multi-graph.
+
+Horčík, Rostislav, and Gustav Šír. "Expressiveness of Graph Neural Networks in Planning Domains." Proceedings of the International Conference on Automated Planning and Scheduling. Vol. 34. 2024.
 """
 struct ObjectAtomBip{DO,P,EB,MP,D,II,S,G}
     domain::DO

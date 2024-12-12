@@ -28,6 +28,15 @@ function setup_problem(problem_name)
 	return(domain_pddl, problem_files)
 end
 
+function setup_beluga_problem(variant="beluga")
+	sdir(s...) = joinpath("..",variant,s...)
+	domain_pddl = sdir("domain.pddl")
+	problem_files = mapreduce(vcat, ["training", "testing"]) do t
+		[sdir(t, f) for f in readdir(sdir(t)) if endswith(f,".pddl") && f !== "domain.pddl"]
+	end
+	return(domain_pddl, problem_files)
+end
+
 function setup_ispc23_problem(problem_name)
 	sdir(s...) = joinpath("..","ipc23-learning",problem_name,s...)
 	domain_pddl = sdir("domain.pddl")
@@ -55,6 +64,8 @@ function getproblem(problem)
 	problem == "spanner" && return(setup_problem("spanner"))
 	problem == "elevators_00" && return(setup_problem("elevators-00-strips"))
 	problem == "elevators_11" && return(setup_problem("elevators-opt11-strips"))
+	problem == "beluga" && return(setup_beluga_problem())
+	problem == "beluga_real" && return(setup_beluga_problem("beluga_real"))
 	problem ∈ IPC_PROBLEMS && return(setup_ispc23_problem(problem[7:end]))
 	# problem ∈ WORKING_CLASSIC && return(setup_problem("blocks-slaney"))
 	error("unknown problem $(problem)")
