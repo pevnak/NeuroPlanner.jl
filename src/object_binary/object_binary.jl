@@ -316,7 +316,7 @@ function add_goalstate(ex::ObjectBinary, problem, goal=goalstate(ex.domain, prob
 
     # change id2fid to code the goal, extract goal state with it and set it to goal_states
     gex = @set ex.predicates.id2fid = goal_id2fid(ex)
-    new_ex = @set ex.goal_state = initstates(gex, goal)
+    new_ex = @set ex.goal_state = intstates(gex, goal)
 
     # change the number of predicates, which has doubled
     new_ex = @set new_ex.predicates.nunary = 2*new_ex.predicates.nunary
