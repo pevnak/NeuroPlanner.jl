@@ -1,5 +1,5 @@
 
-struct L₂MiniBatch{X,Y}
+struct L₂MiniBatch{X,Y} <: AbstractMinibatch
 	x::X 
 	y::Y
 end

@@ -2,7 +2,7 @@
 #############
 #	LGBFS Losses
 #############
-struct LgbfsMiniBatch{X,H,Y}
+struct LgbfsMiniBatch{X,H,Y} <: AbstractMinibatch
 	x::X 
 	H₊::H 
 	H₋::H 

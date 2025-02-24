@@ -3,7 +3,7 @@
 #	LRT loss enforcing ordering on the trajectory
 #   Caelan Reed Garrett, Leslie Pack Kaelbling, and Tomás Lozano-Pérez. Learning to rank for synthesizing planning heuristics. page 3089–3095, 2016.
 #########
-struct LRTMiniBatch{X,H,Y}
+struct LRTMiniBatch{X,H,Y} <: AbstractMinibatch
 	x::X 
 	H₊::H 
 	H₋::H 

@@ -1,7 +1,7 @@
 #############
 #	Lstar Losses as described in  Chrestien, Leah, et al. "Optimize planning heuristics to rank, not to estimate cost-to-goal." Advances in Neural Information Processing Systems 36 (2024).
 #############
-struct LₛMiniBatch{X,H,Y}
+struct LₛMiniBatch{X,H,Y} <: AbstractMinibatch
 	x::X 
 	H₊::H 
 	H₋::H 

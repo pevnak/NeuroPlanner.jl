@@ -3,15 +3,16 @@ using SymbolicPlanners: PathNode
 using DataStructures: Queue
 using OneHotArrays: onehotbatch
 
+abstract type AbstractMinibatch end
+
+
 include("bellman.jl")
 include("l2loss.jl")
 include("lgbfs.jl")
-include("losses.jl")
 include("lrt.jl")
 include("lstar.jl")
 include("lstar_lmcut.jl")
 
-abstract type AbstractMinibatch end
 
 ########
 #	dispatch for loss function

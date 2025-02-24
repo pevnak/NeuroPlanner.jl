@@ -114,7 +114,7 @@ end
 #	Binary Classification Losses
 #############
 
-struct BinClassBatch{X,H,Y}
+struct BinClassBatch{X,H,Y} <: AbstractMinibatch
 	x::X
 	H::H
 	path_cost::Y

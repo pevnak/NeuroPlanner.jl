@@ -9,7 +9,7 @@ as proposed in
 Ståhlberg, Simon, Blai Bonet, and Hector Geffner. "Learning Generalized Policies without Supervision Using GNNs.", 2022
 Equation (15)
 """
-struct BellmanMiniBatch{X,Y}
+struct BellmanMiniBatch{X,Y} <: AbstractMinibatch
 	x::X 
 	path_cost::Y
 	trajectory_states::Vector{Int}
