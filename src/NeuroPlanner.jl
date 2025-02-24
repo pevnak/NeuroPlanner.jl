@@ -97,7 +97,7 @@ export LinearExtractor
 
 # loss functions
 include("rsearch_tree.jl")
-include("losses.jl")
+include("losses/losses.jl")
 export L₂MiniBatch, LₛMiniBatch, LRTMiniBatch, LgbfsMiniBatch
 
 # leftovers from a small research in artificial goals
