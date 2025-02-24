@@ -311,7 +311,7 @@ function add_initstate(ex::ObjectBinary, problem, start=initstate(ex.domain, pro
     new_ex
 end
 
-function add_goalstate(ex::ObjectBinary, problem, goal=goalstate(ex.domain, problem))
+function add_goalstate(ex::ObjectBinary, problem, goal = goalstate(ex.domain, problem))
     ex = isspecialized(ex) ? ex : specialize(ex, problem)
 
     # change id2fid to code the goal, extract goal state with it and set it to goal_states

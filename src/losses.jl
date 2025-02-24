@@ -116,7 +116,7 @@ function _next_states(domain, problem, sᵢ, st::Nothing)
 end
 
 function LₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:GenericState}; goal_aware = true, max_branch = typemax(Int), plot_dict=nothing)
-	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem) : pddld
+	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem) : specialize(pddld, problem)
 	state = trajectory[1]
 	spec = Specification(problem)
 
