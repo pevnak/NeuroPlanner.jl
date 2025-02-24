@@ -17,8 +17,8 @@ function LₛMiniBatch(sol, pddld, problem::GenericProblem)
 	LₛMiniBatch(sol, pddle, trajectory)
 end
 
-function LₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, trajectory::AbstractVector{<:GenericState}; goal_aware = true, max_branch = typemax(Int), plot_dict=nothing)
-	LₛMiniBatch(pddld, domain, problem, nothing, trajectory; goal_aware, max_branch, plot_dict)
+function LₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, trajectory::AbstractVector{<:GenericState};kwargs...)
+	LₛMiniBatch(pddld, domain, problem, nothing, trajectory; kwargs...)
 end
 
 function LₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; kwargs...)
