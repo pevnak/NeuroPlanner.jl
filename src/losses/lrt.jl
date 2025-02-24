@@ -28,19 +28,18 @@ function LRTMiniBatch(pddle, trajectory::AbstractVector{<:GenericState})
      )
 end
 
-function LRTMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; goal_aware = true, max_branch = typemax(Int))
+function LRTMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:GenericState}; kwargs...)
+	LRTMiniBatch(pddld, domain, problem, trajectory; kwargs...)
+end
+
+function LRTMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; kwargs...)
 	state = initstate(domain, problem)
 	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
-	LRTMiniBatch(pddld, domain, problem, trajectory; goal_aware, max_branch)
+	LRTMiniBatch(pddld, domain, problem, trajectory; kwargs...)
 end
 
-
-function LRTMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:GenericState}; goal_aware = true, max_branch = typemax(Int))
-	LRTMiniBatch(pddld, domain, problem, trajectory; goal_aware, max_branch)
-end
-
-function LRTMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, trajectory; goal_aware = true, max_branch = typemax(Int))
-	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem) : pddld
+function LRTMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, trajectory; goal_aware = true, max_branch = typemax(Int), goal_state = goalstate(pddld.domain, problem), kwargs...)
+	pddle = goal_aware ? add_goalstate(pddld, problem, goal_state) : specialize(pddld, problem)
 	LRTMiniBatch(pddle, trajectory)
 end
 

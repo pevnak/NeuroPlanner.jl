@@ -1,7 +1,7 @@
+#############
+#	LgbfsLoss Losses as described in  Chrestien, Leah, et al. "Optimize planning heuristics to rank, not to estimate cost-to-goal." Advances in Neural Information Processing Systems 36 (2024).
+#############
 
-#############
-#	LGBFS Losses
-#############
 struct LgbfsMiniBatch{X,H,Y} <: AbstractMinibatch
 	x::X 
 	H₊::H 
@@ -10,31 +10,17 @@ struct LgbfsMiniBatch{X,H,Y} <: AbstractMinibatch
 	sol_length::Int64
 end
 
-struct UnsolvedLgbfs{S,D,P}
-	sol::S 
-	pddld::D
-	problem::P 
-end
-
-function LgbfsMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, trajectory; goal_aware = true, max_branch = typemax(Int))
-	l = LₛMiniBatch(pddld, domain, problem, trajectory; goal_aware, max_branch)
+function LgbfsMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, trajectory; kwargs...)
+	l = LₛMiniBatch(pddld, domain, problem, trajectory; kwargs...)
 	LgbfsMiniBatch(l.x, l.H₊, l.H₋, l.path_cost, l.sol_length)	
 end
 
-function prepare_minibatch(mb::UnsolvedLgbfs)
-	@unpack sol, problem, pddld = mb
-	trajectory = artificial_trajectory(sol)
-	goal = trajectory[end]
-	pddle = NeuroPlanner.add_goalstate(pddld, problem, goal)
-	l = LₛMiniBatch(pddle, sol, trajectory)
-	LgbfsMiniBatch(l.x, l.H₊, l.H₋, l.path_cost, l.sol_length)
+function LgbfsMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; kwargs...)
+	state = initstate(domain, problem)
+	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
+	LgbfsMiniBatch(pddld, domain, problem, trajectory; kwargs...)
 end
 
-
-
-#############
-#	LgbfsLoss Losses as described in  Chrestien, Leah, et al. "Optimize planning heuristics to rank, not to estimate cost-to-goal." Advances in Neural Information Processing Systems 36 (2024).
-#############
 
 """
 LgbfsLoss(x, g, H₊, H₋)

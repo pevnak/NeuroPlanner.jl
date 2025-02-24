@@ -1,16 +1,16 @@
 
-function LₛMiniBatchPossibleInequalities(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; goal_aware = true, max_branch = typemax(Int), plot_dict=nothing)
+function LₛMiniBatchPossibleInequalities(pddld, domain::GenericDomain, problem::GenericProblem, trajectory::AbstractVector{<:GenericState}; kwargs...)
+	LₛMiniBatchPossibleInequalities(pddld, domain, problem, nothing, trajectory; kwargs...)
+end
+
+function LₛMiniBatchPossibleInequalities(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; kwargs...)
 	state = initstate(domain, problem)
 	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
-	LₛMiniBatchPossibleInequalities(pddld, domain, problem, trajectory; goal_aware, max_branch, plot_dict)
+	LₛMiniBatchPossibleInequalities(pddld, domain, problem, trajectory; kwargs...)
 end
 
-function LₛMiniBatchPossibleInequalities(pddld, domain::GenericDomain, problem::GenericProblem, trajectory::AbstractVector{<:GenericState}; goal_aware = true, max_branch = typemax(Int), plot_dict=nothing)
-	LₛMiniBatchPossibleInequalities(pddld, domain, problem, nothing, trajectory; goal_aware, max_branch, plot_dict)
-end
-
-function LₛMiniBatchPossibleInequalities(pddld, domain::GenericDomain, problem::GenericProblem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:GenericState}; goal_aware = true, max_branch = typemax(Int), plot_dict=nothing)
-	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem) : pddld
+function LₛMiniBatchPossibleInequalities(pddld, domain::GenericDomain, problem::GenericProblem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:GenericState}; goal_aware = true, max_branch = typemax(Int), goal_state = goalstate(pddld.domain, problem), plot_dict=nothing, kwargs...)
+	pddle = goal_aware ? add_goalstate(pddld, problem, goal_state) : specialize(pddld, problem)
 	state = trajectory[1]
 	spec = Specification(problem)
 	lmcut = LM_CutHeuristic()
@@ -132,7 +132,7 @@ function BinClassBatch(pddld, domain::GenericDomain, problem::GenericProblem, tr
 end
 
 function BinClassBatch(pddld, domain::GenericDomain, problem::GenericProblem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:GenericState}; goal_aware = true, max_branch = typemax(Int), plot_dict=nothing)
-	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem) : pddld
+	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem) : specialize(pddld, problem)
 	state = trajectory[1]
 	spec = Specification(problem)
 	lmcut = LM_CutHeuristic()

@@ -5,14 +5,12 @@ using OneHotArrays: onehotbatch
 
 abstract type AbstractMinibatch end
 
-
-include("bellman.jl")
 include("l2loss.jl")
+include("lstar.jl")
 include("lgbfs.jl")
 include("lrt.jl")
-include("lstar.jl")
+include("bellman.jl")
 include("lstar_lmcut.jl")
-
 
 ########
 #	dispatch for loss function

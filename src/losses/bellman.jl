@@ -18,8 +18,8 @@ struct BellmanMiniBatch{X,Y} <: AbstractMinibatch
 	sol_length::Int64
 end
 
-function BellmanMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:GenericState}; goal_aware = true, max_branch = typemax(Int))
-	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem) : pddld
+function BellmanMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:GenericState}; goal_aware = true, goal_state = goalstate(pddld.domain, problem), max_branch = typemax(Int))
+	pddle = goal_aware ? add_goalstate(pddld, problem, goal_state) : specialize(pddld, problem)
 	state = trajectory[1]
 	spec = Specification(problem)
 
@@ -58,14 +58,14 @@ function BellmanMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem,
 	BellmanMiniBatch(x, path_cost, trajectory_states, child_states, cost_to_goal, length(trajectory))
 end
 
-function BellmanMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; goal_aware = true, max_branch = typemax(Int))
-	state = initstate(domain, problem)
-	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
-	BellmanMiniBatch(pddld, domain, problem, trajectory; goal_aware, max_branch)
+function BellmanMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, trajectory::AbstractVector{<:GenericState}; kwargs...)
+	BellmanMiniBatch(pddld, domain, problem, nothing, trajectory; kwargs...)
 end
 
-function BellmanMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, trajectory::AbstractVector{<:GenericState}; goal_aware = true, max_branch = typemax(Int))
-	BellmanMiniBatch(pddld, domain, problem, nothing, trajectory; goal_aware, max_branch)
+function BellmanMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; kwargs...)
+	state = initstate(domain, problem)
+	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
+	BellmanMiniBatch(pddld, domain, problem, trajectory; kwargs...)
 end
 
 

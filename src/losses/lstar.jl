@@ -9,13 +9,6 @@ struct LₛMiniBatch{X,H,Y} <: AbstractMinibatch
 	sol_length::Int64
 end
 
-struct UnsolvedLₛ{S,D,P}
-	sol::S 
-	pddld::D
-	problem::P 
-end
-
-
 function LₛMiniBatch(sol, pddld, problem::GenericProblem)
 	sol.search_tree === nothing && error("solve the problem with `save_search=true` to keep the search tree")
 	sol.status != :success && return(UnsolvedLₛ(sol, pddld, problem))
@@ -24,23 +17,16 @@ function LₛMiniBatch(sol, pddld, problem::GenericProblem)
 	LₛMiniBatch(sol, pddle, trajectory)
 end
 
-function prepare_minibatch(mb::UnsolvedLₛ)
-	@unpack sol, problem, pddld = mb
-	trajectory = artificial_trajectory(sol)
-	goal = trajectory[end]
-	pddle = NeuroPlanner.add_goalstate(pddld, problem, goal)
-	LₛMiniBatch(sol, pddle, trajectory)
-end
-
-function LₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; goal_aware = true, max_branch = typemax(Int), plot_dict=nothing)
-	state = initstate(domain, problem)
-	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
-	LₛMiniBatch(pddld, domain, problem, trajectory; goal_aware, max_branch, plot_dict)
-end
-
 function LₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, trajectory::AbstractVector{<:GenericState}; goal_aware = true, max_branch = typemax(Int), plot_dict=nothing)
 	LₛMiniBatch(pddld, domain, problem, nothing, trajectory; goal_aware, max_branch, plot_dict)
 end
+
+function LₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, plan::AbstractVector{<:Julog.Term}; kwargs...)
+	state = initstate(domain, problem)
+	trajectory = SymbolicPlanners.simulate(StateRecorder(), domain, state, plan)
+	LₛMiniBatch(pddld, domain, problem, trajectory; kwargs...)
+end
+
 
 _next_states(domain, problem, sᵢ, st::RSearchTree) = st.st[hash(sᵢ)]
 function _next_states(domain, problem, sᵢ, st::Nothing) 
@@ -57,8 +43,8 @@ function _next_states(domain, problem, sᵢ, st::Nothing)
 	end
 end
 
-function LₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:GenericState}; goal_aware = true, max_branch = typemax(Int), plot_dict=nothing)
-	pddle = goal_aware ? NeuroPlanner.add_goalstate(pddld, problem) : specialize(pddld, problem)
+function LₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, st::Union{Nothing,RSearchTree}, trajectory::AbstractVector{<:GenericState}; goal_aware = true, goal_state = goalstate(pddld.domain, problem), max_branch = typemax(Int), plot_dict=nothing, kwargs...)
+	pddle = goal_aware ? add_goalstate(pddld, problem, goal_state) : specialize(pddld, problem)
 	state = trajectory[1]
 	spec = Specification(problem)
 
@@ -99,7 +85,6 @@ function LₛMiniBatch(pddld, domain::GenericDomain, problem::GenericProblem, st
 		open_set = setdiff(keys(stateids), htrajectory)
 
 		for s in open_set
-			#TODO sem dat nerovnost
 			push!(I₊, stateids[s])
 			push!(I₋, stateids[hsⱼ])
 		end
