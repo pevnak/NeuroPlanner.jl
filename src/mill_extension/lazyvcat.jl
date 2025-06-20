@@ -83,3 +83,18 @@ function (a::ChainRulesCore.ProjectTo{LazyVCatMatrix{T,N,Matrix{T}}})(x::Matrix)
 end
 
 
+# Constructor adjoint
+function ChainRulesCore.rrule(::Type{LazyVCatMatrix}, xs::NTuple{N,M}) where {N,M}
+    y = LazyVCatMatrix(xs)
+    function LazyVCatMatrix_pullback(ȳ)
+    	ȳ = unthunk(ȳ)
+        return (NoTangent(), ȳ.xs)
+    end
+    return y, LazyVCatMatrix_pullback
+end
+
+# Enhanced projection to handle Tangent inputs
+function (a::ChainRulesCore.ProjectTo{LazyVCatMatrix{T,N,M}})(x::Tangent) where {T,N,M}
+    return x
+end
+

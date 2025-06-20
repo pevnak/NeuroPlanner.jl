@@ -33,6 +33,18 @@ function initproblem(ex, problem; add_goal=true)
 end
 export initproblem
 
+# for the purpose of the extension
+function plot_digraph end
+export plot_digraph
+
+
+
+#####
+#   A general support for architectures
+#####
+include("graphs.jl")
+export digraph
+
 #####
 #	A general support for architectures
 #####
@@ -122,4 +134,7 @@ include("utils/solution_tracking.jl")
 export solve_problem, update_solutions!, update_solution, issolved, show_stats, _show_stats
 include("utils/problems.jl")
 export load_plan, save_plan, plan_file, setup_problem, setup_classic, getproblem, accomodate_leah_plans, merge_ferber_problems, hashfile, _parse_plan, systematize, similarity_of_problems
+
+include("all_trajectories.jl")
+
 end

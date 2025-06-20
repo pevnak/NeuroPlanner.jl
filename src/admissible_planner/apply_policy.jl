@@ -12,7 +12,7 @@ function ApplyPolicy(model; output_key=:o, heuristic_key=:h)
     return ApplyPolicy(model[output_key], heuristic_key)
 end
 
-Flux.Functors.@functor ApplyPolicy
+Flux.Functors.@layer ApplyPolicy
 
 function setOutputToPolicy(model, policy::ApplyPolicy; output_key=:o)
     @set model.layer.o = policy
@@ -35,7 +35,7 @@ function (m::ApplyPolicy)(kb::KnowledgeBase, ds)
     # return round.(a)
     a
 end
-Flux.Functors.@functor RoundedPolicy
+Flux.Functors.@layer RoundedPolicy
 function RoundedPolicy(model; output_key=:o, heuristic_key=:h)
     if isa(model[output_key], ApplyPolicy) 
         return RoundedPolicy(model[output_key].model_output_layer, heuristic_key)

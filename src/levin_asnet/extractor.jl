@@ -147,7 +147,7 @@ struct LevinModel{PK, KB}
 	kbm::KB
 end
 
-Flux.@functor LevinModel
+Flux.@layer LevinModel
 
 function Mill.reflectinmodel(ds::LevinState, fm = d -> Dense(d, 10), fa= SegmentedSumMax; fsm=Dict(), 
 	fsa=Dict(), single_key_identity=true, single_scalar_identity=true, all_imputing=false, residual = :none)

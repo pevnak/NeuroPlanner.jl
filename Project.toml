@@ -27,12 +27,18 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 SymbolicPlanners = "b6fe5377-9711-4fad-95b0-be4eed71ecbb"
 Term = "22787eb5-b846-44ae-b979-8e399b8463ab"
 
+[weakdeps]
+GraphMakie = "1ecd5474-83a3-4783-bb4f-06765db800d2"
+
+[extensions]
+GraphMakieExt = "GraphMakie"
+
 [compat]
-Accessors = "0.1.32"
-ChainRulesCore = "1.15, 1.16"
-Flux = "0.13, 0.14"
+Accessors = "0.1.35"
+ChainRulesCore = "1.21"
+Flux = "0.16"
 MLUtils = "0.4"
-Mill = "2.10"
+Mill = "2.12"
 PDDL = "0.2"
 Statistics = "1.11.1"
 SymbolicPlanners = "0.1"

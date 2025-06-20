@@ -2,7 +2,7 @@ struct KnowledgeModel{KS, VS}
 	layers::NamedTuple{KS,VS}
 end
 
-Flux.@functor KnowledgeModel
+Flux.@layer KnowledgeModel
 
 function Base.show(io::IO, km::KnowledgeModel) 
 	print(io, "KnowledgeModel: (",join(keys(km), ","),")");

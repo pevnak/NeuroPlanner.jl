@@ -44,14 +44,12 @@ function ChainRulesCore.rrule(::Type{DeduplicatedMatrix}, a, ii)
     function dedu_pullback(ȳ)
     	Ȳ = unthunk(ȳ)
     	δx = zeros(eltype(a), size(a))
-    	gather_cols!(δx, ȳ, ii, true,true)
+    	gather_cols!(δx, Ȳ, ii, true,true)
     	NoTangent(), δx, NoTangent()
     end
 
-    function dedu_pullback(ȳ::Tangent{Any, @NamedTuple{x::Matrix{Float32}, ii::ZeroTangent}})
-    	Ȳ = unthunk(ȳ)
-    	# @show typeof(Ȳ)
-    	δx = Ȳ.x
+    function dedu_pullback(ȳ::Tangent)
+    	δx = unthunk(ȳ.x)
     	NoTangent(), δx, NoTangent()
     end
     return DeduplicatedMatrix(a, ii), dedu_pullback

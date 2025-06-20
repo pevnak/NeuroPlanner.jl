@@ -90,7 +90,7 @@ struct MaskedModel{T} <: AbstractMillModel
     m::T
 end
 
-Flux.@functor MaskedModel
+Flux.@layer MaskedModel
 
 function (m::MaskedModel)(x::MaskedNode)
     m.m(x.data) .* x.mask'

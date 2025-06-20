@@ -61,9 +61,7 @@ function experiment(domain_name, hnet, domain_pddl, train_files, problem_files, 
 		minibatches = collect(skipmissing(minibatches))
 		logger=TBLogger(filename*"_events")
 		log_value(logger, "time_minibatch", t; step=0)
-		opt = AdaBelief();
-		ps = Flux.params(model);
-		t = @elapsed train!(NeuroPlanner.loss, model, ps, opt, () -> rand(minibatches), max_steps; logger, trn_data = minibatches, reset_fval=1000)
+		t = @elapsed model = train(NeuroPlanner.loss, model, Optimisers.Adam(), () -> rand(minibatches), max_steps; logger, trn_data = minibatches, reset_fval=1000)
 		log_value(logger, "time_train", t; step=0)
 		serialize(modelfile, model)	
 		model

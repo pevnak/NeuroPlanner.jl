@@ -41,13 +41,11 @@ end
 
 
 function setup_problem(problem_name)
-	sdir(s...) = joinpath("..","domains",problem_name,s...)
+	sdir(s...) = joinpath(dirname(pathof(NeuroPlanner)),"..", "domains",problem_name, s...)
 	domain_pddl = sdir("domain.pddl")
 	problem_files = [sdir(f) for f in readdir(sdir()) if endswith(f,".pddl") && f !== "domain.pddl"]
 	return(domain_pddl, problem_files)
 end
-
-
 
 const WORKING_CLASSIC = Set(["agricola-opt18", "agricola-sat18", "airport-adl", "assembly", "barman-opt11-strips", "barman-opt14-strips", "barman-sat11-strips", "barman-sat14-strips", "blocks", "blocks-3op", "briefcaseworld", "caldera-opt18", "caldera-sat18", "caldera-split-opt18", "caldera-split-sat18", "cavediving", "childsnack-opt14-strips", "childsnack-sat14-strips", "citycar-opt14-adl", "citycar-sat14-adl", "data-network-opt18", "data-network-sat18", "depot", "driverlog", "elevators-00-full", "elevators-00-strips", "elevators-opt11-strips", "elevators-sat11-strips", "ferry", "floortile-opt11-strips", "floortile-opt14-strips", "floortile-sat11-strips", "floortile-sat14-strips", "freecell", "ged-opt14-strips", "ged-sat14-strips", "grid", "gripper", "hanoi", "hiking-opt14-strips", "hiking-sat14-strips", "logistics00", "logistics98", "maintenance-opt14-adl", "maintenance-sat14-adl", "miconic", "miconic-fulladl", "miconic-simpleadl", "movie", "mprime", "mystery", "no-mprime", "no-mystery", "nomystery-opt11-strips", "nomystery-sat11-strips", "nurikabe-opt18", "nurikabe-sat18", "openstacks", "optical-telegraphs", "parking-opt11-strips", "parking-opt14-strips", "parking-sat11-strips", "parking-sat14-strips", "pegsol-opt11-strips", "pegsol-sat11-strips", "philosophers", "pipesworld-06", "pipesworld-notankage", "psr-large", "psr-middle", "rovers", "rovers-02", "satellite", "scanalyzer-opt11-strips", "scanalyzer-sat11-strips", "schedule", "settlers", "settlers-opt18", "settlers-sat18", "snake-opt18", "snake-sat18", "tetris-opt14-strips", "tetris-sat14-strips", "thoughtful-sat14-strips", "tidybot-opt11-strips", "tidybot-opt14-strips", "tidybot-sat11-strips", "tpp", "transport-opt11-strips", "transport-opt14-strips", "transport-sat11-strips", "transport-sat14-strips", "trucks", "tsp", "tyreworld", "visitall-opt11-strips", "visitall-opt14-strips", "visitall-sat11-strips", "visitall-sat14-strips", "woodworking-opt11-strips", "woodworking-sat11-strips", "zenotravel"])
 const IPC_PROBLEM_NAMES = ["ferry", "rovers","blocksworld","floortile","satellite","spanner","childsnack","miconic","sokoban","transport"]

@@ -91,7 +91,7 @@ See also: [`AbstractMillNode`](@ref), [`MaskedModel`](@ref), [`ProductNode`](@re
 """
 MaskedNode(d::AbstractMillNode) = MaskedNode(d, BitVector(ones(Bool, numobs(d))))
 
-Flux.@functor MaskedNode
+Flux.@layer MaskedNode
 
 mapdata(f, x::MaskedNode) = MaskedNode(mapdata(f, x.data), x.mask)
 
